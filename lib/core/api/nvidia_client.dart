@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'; // Added for kIsWeb
 
 /// NVIDIA NIM API (OpenAI-compatible)
 class NvidiaApiClient {
-  static const String _baseUrl = 'https://integrate.api.nvidia.com/v1';
+  static const String _remoteUrl = 'https://integrate.api.nvidia.com/v1';
+  static const String _proxyUrl  = '/api/nvidia';
+  
+  String get _baseUrl => kIsWeb ? _proxyUrl : _remoteUrl;
+  
   final String apiKey;
   final String model;
 

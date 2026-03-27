@@ -105,6 +105,9 @@ class AIRouter extends ChangeNotifier {
       _selectedModels[p]  = prefs.getString('provider_${p.name}_model');
     }
     notifyListeners();
+
+    // Proactively load keys from environment if missing in storage
+    await _initEnvironmentKeys();
     
     // Proactively load models for NVIDIA
     await _initGoogleDocs();
@@ -112,6 +115,26 @@ class AIRouter extends ChangeNotifier {
     if (key != null && key.trim().isNotEmpty) {
       // Don't wait for it to block init
       fetchModels(AIProvider.nvidia).catchError((_) => <String>[]);
+    }
+  }
+
+  Future<void> _initEnvironmentKeys() async {
+    // Check for each provider's key in environment defines
+    const providers = {
+      'nvidia': 'NVIDIA_API_KEY',
+      'ollamaCloud': 'OLLAMA_CLOUD_API_KEY',
+      'gemini': 'GEMINI_API_KEY',
+    };
+
+    for (var entry in providers.entries) {
+      final existing = await _secureStorage.getApiKey(entry.key);
+      if (existing == null || existing.isEmpty) {
+        final envKey = String.fromEnvironment(entry.value);
+        if (envKey.isNotEmpty) {
+          debugPrint('[AIRouter] Injected ${entry.key} key from environment');
+          await _secureStorage.saveApiKey(entry.key, envKey);
+        }
+      }
     }
   }
 
@@ -246,8 +269,13 @@ RULE 12: GOOGLE DOCS (docx)
   Future<void> _initGoogleDocs() async {
     String? json = await _secureStorage.getApiKey('google_service_account');
     
-    // Fallback to assets if not in secure storage
+    // Fallback to environment define if not in storage or assets
     if (json == null || json.isEmpty) {
+      json = const String.fromEnvironment('GOOGLE_SERVICE_ACCOUNT');
+    }
+    
+    // Fallback to assets if still not found
+    if (json.isEmpty) {
       try {
         json = await rootBundle.loadString('assets/config/google_service_account.json');
       } catch (_) {

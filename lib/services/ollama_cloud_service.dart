@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart'; // Relocated from below
 import '../core/security/secure_storage_service.dart';
 
 // ─────────────────────────────────────────────
@@ -77,7 +78,7 @@ class OllamaCloudService {
   static const String _prefKeyModel = 'ollama_selected_model';
 
   String _apiKey        = '';
-  String _cloudBaseUrl  = 'https://api.ollama.com';
+  String _cloudBaseUrl  = kIsWeb ? '/api/ollama' : 'https://api.ollama.com';
   String _localUrl      = 'http://127.0.0.1:11434';
   bool   _useCloud      = true;
   String _selectedModel = 'gpt-oss:120b';
