@@ -1,0 +1,99 @@
+name: jarvis_ai
+description: "JARVIS - Multi-Provider Intelligent AI OS"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Networking
+  http: ^1.2.1
+  dio: ^5.7.0
+
+  # Secure Storage
+  flutter_secure_storage: ^9.2.2
+
+  # Local Database / Memory
+  hive_flutter: ^1.1.0
+  hive: ^2.2.3
+
+  # State Management
+  provider: ^6.1.2
+
+  # Text-to-Speech
+  flutter_tts: ^4.2.2
+
+  # Speech-to-Text
+  speech_to_text: ^7.0.0
+
+  # Google Fonts (downloads Outfit at runtime)
+  google_fonts: ^6.2.1
+
+  # UUID generation
+  uuid: ^4.5.1
+
+  # Markdown rendering in chat
+  flutter_markdown: ^0.7.4
+
+  # Animations
+  flutter_animate: ^4.5.0
+
+  # Shared Prefs (for simple settings)
+  shared_preferences: ^2.3.3
+
+  # Lottie animations
+  lottie: ^3.2.0
+
+  # Crypto for cache hashing
+  crypto: ^3.0.5
+
+  # JSON annotation
+  json_annotation: ^4.9.0
+
+  # Path provider
+  path_provider: ^2.1.5
+
+  # File Parsing
+  file_picker: ^8.1.0
+  syncfusion_flutter_pdf: ^24.1.41
+  docx_to_text: ^1.0.1
+  archive: ^3.4.9
+  google_mlkit_text_recognition: ^0.13.0
+
+
+  # Vibration
+  vibration: ^2.0.1
+  # URL launcher
+  url_launcher: ^6.3.0
+  # Native sharing
+  share_plus: ^10.1.2
+  pdf: ^3.12.0
+  flutter_local_notifications: ^21.0.0
+  timezone: ^0.11.0
+  flutter_inappwebview: ^6.1.5
+  camera: ^0.12.0+1
+  image: ^4.3.0
+  googleapis: ^16.0.0
+  googleapis_auth: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  hive_generator: ^2.0.1
+  build_runner: ^2.4.12
+  json_serializable: ^6.8.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/animations/
+    - assets/images/
+    - assets/config/
