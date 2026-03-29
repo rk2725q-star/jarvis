@@ -78,7 +78,7 @@ class OllamaCloudService {
   static const String _prefKeyModel = 'ollama_selected_model';
 
   String _apiKey        = '';
-  String _cloudBaseUrl  = kIsWeb ? '/api/ollama' : 'https://api.ollama.com';
+  String _cloudBaseUrl  = kIsWeb ? Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), '') : 'https://api.ollama.com';
   String _localUrl      = 'http://127.0.0.1:11434';
   bool   _useCloud      = true;
   String _selectedModel = 'gpt-oss:120b';
@@ -100,7 +100,14 @@ class OllamaCloudService {
   Future<void> init() async {
     final prefs    = await SharedPreferences.getInstance();
     _apiKey        = await _secureStorage.getApiKey('ollamaCloud') ?? '';
-    _cloudBaseUrl  = await _secureStorage.getBaseUrl('ollamaCloud') ?? 'https://api.ollama.com';
+    
+    final savedCloudUrl = await _secureStorage.getBaseUrl('ollamaCloud') ?? 'https://api.ollama.com';
+    if (kIsWeb && (savedCloudUrl == 'https://api.ollama.com' || savedCloudUrl.isEmpty || savedCloudUrl == '/api/ollama')) {
+      _cloudBaseUrl = Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), '');
+    } else {
+      _cloudBaseUrl = savedCloudUrl;
+    }
+    
     _localUrl      = await _secureStorage.getBaseUrl('ollamaLocal') ?? 'http://127.0.0.1:11434';
     _useCloud      = prefs.getBool(_prefKeyMode)    ?? true;
     _selectedModel = prefs.getString(_prefKeyModel) ?? 'gpt-oss:120b';

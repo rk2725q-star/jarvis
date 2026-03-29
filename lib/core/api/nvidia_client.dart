@@ -7,7 +7,13 @@ class NvidiaApiClient {
   static const String _remoteUrl = 'https://integrate.api.nvidia.com/v1';
   static const String _proxyUrl  = '/api/nvidia';
   
-  String get _baseUrl => kIsWeb ? _proxyUrl : _remoteUrl;
+  String get _baseUrl {
+    if (kIsWeb) {
+      final baseUri = Uri.base;
+      return baseUri.resolve(_proxyUrl).toString().replaceAll(RegExp(r'/$'), '');
+    }
+    return _remoteUrl;
+  }
   
   final String apiKey;
   final String model;
