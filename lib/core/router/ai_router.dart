@@ -1,5 +1,6 @@
  import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/gemini_client.dart';
 import '../api/nvidia_client.dart';
@@ -841,7 +842,11 @@ RULE 12: GOOGLE DOCS (docx)
 
       case AIProvider.ollamaCloud:
         final cloudUrl = await _secureStorage.getBaseUrl('ollamaCloud') ?? 'https://api.ollama.com';
-        _ollamaService.setBaseUrl(cloudUrl);
+        if (kIsWeb && (cloudUrl == 'https://api.ollama.com' || cloudUrl.isEmpty || cloudUrl == '/api/ollama')) {
+           _ollamaService.setBaseUrl(Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), ''));
+        } else {
+           _ollamaService.setBaseUrl(cloudUrl);
+        }
         
         final messages = [
           if (systemPrompt != null) OllamaChatMessage(role: 'system', content: systemPrompt),
@@ -925,7 +930,11 @@ RULE 12: GOOGLE DOCS (docx)
           return all.where((m) => !m.isCloud).map((m) => m.name).toList();
         case AIProvider.ollamaCloud:
           final cloudUrl = await _secureStorage.getBaseUrl('ollamaCloud') ?? 'https://api.ollama.com';
-          _ollamaService.setBaseUrl(cloudUrl);
+          if (kIsWeb && (cloudUrl == 'https://api.ollama.com' || cloudUrl.isEmpty || cloudUrl == '/api/ollama')) {
+             _ollamaService.setBaseUrl(Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), ''));
+          } else {
+             _ollamaService.setBaseUrl(cloudUrl);
+          }
           final all = await _ollamaService.fetchAvailableModels();
           return all.where((m) => m.isCloud).map((m) => m.name).toList();
         case AIProvider.nvidia:
