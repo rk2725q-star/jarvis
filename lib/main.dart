@@ -19,6 +19,7 @@ import 'theme/jarvis_theme.dart';
 import 'features/vibecode/vibecode_controller.dart';
 import 'services/google_docs_service.dart';
 import 'features/assignment/assignment_provider.dart';
+import 'features/integrations/integrations_provider.dart';
 import 'app.dart';
 
 Future<void> main() async {
@@ -70,16 +71,22 @@ Future<void> main() async {
   );
   await router.init(); 
 
+  // Build integrations provider FIRST (needed by chatProvider)
+  final integrationsProvider = IntegrationsProvider();
+  await integrationsProvider.init();
+
   // Build chat provider
   final chatProvider = ChatProvider(
     router: router,
     sessionService: sessionService,
     ttsService: ttsService,
+    integrationsProvider: integrationsProvider,
   );
   await chatProvider.init();
 
   final vibecodeController = VibeCodeController(router: router);
   final assignmentProvider = AssignmentProvider(router: router);
+
 
   runApp(
     MultiProvider(
@@ -89,6 +96,7 @@ Future<void> main() async {
         ChangeNotifierProvider<OllamaProvider>.value(value: ollamaProvider),
         ChangeNotifierProvider<VibeCodeController>.value(value: vibecodeController),
         ChangeNotifierProvider<AssignmentProvider>.value(value: assignmentProvider),
+        ChangeNotifierProvider<IntegrationsProvider>.value(value: integrationsProvider),
         Provider<SecureStorageService>.value(value: secureStorage),
         Provider<MemoryService>.value(value: memory),
         Provider<SessionService>.value(value: sessionService),

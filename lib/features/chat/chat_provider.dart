@@ -11,16 +11,20 @@ import 'package:jarvis_ai/services/session_service.dart';
 import 'package:jarvis_ai/services/tts_service.dart';
 import 'package:jarvis_ai/services/notification_service.dart';
 import 'package:jarvis_ai/features/diagram/diagram_service.dart';
+import 'package:jarvis_ai/features/integrations/integrations_model.dart';
+import 'package:jarvis_ai/features/integrations/integrations_provider.dart';
 
 class ChatProvider extends ChangeNotifier {
   final AIRouter router;
   final SessionService sessionService;
   final TtsService ttsService;
+  final IntegrationsProvider integrationsProvider;
   final FileProcessor _fileProcessor = FileProcessor();
   ChatProvider({
     required this.router,
     required this.sessionService,
     required this.ttsService,
+    required this.integrationsProvider,
   });
 
   final _uuid = const Uuid();
@@ -153,6 +157,60 @@ class ChatProvider extends ChangeNotifier {
 
     String combinedText = text.trim();
 
+    // ── @ Integration routing ─────────────────────────────────────────────────
+    String? atIntegrationCapability;
+    String? resolvedProvider;
+    AIIntegration? targetIntg;
+
+    final atMatch = RegExp(r'^@(\w+)\s*').firstMatch(combinedText);
+    if (atMatch != null) {
+      final intId = atMatch.group(1)!.toLowerCase();
+      targetIntg = findIntegration(intId);
+      if (targetIntg != null) {
+        resolvedProvider = intId;
+        combinedText = combinedText.substring(atMatch.end).trim();
+      }
+    } else {
+      // Autonomous Decision Maker (JARVIS decides best tool if connected)
+      final lowerText = combinedText.toLowerCase();
+      int highestMatches = 0;
+
+      // New: Project/Design autonomous trigger - PRIORITIZE ZEERA first as requested
+      if (lowerText.contains('build') || lowerText.contains('project') || lowerText.contains('architecture') || lowerText.contains('complete app')) {
+         // Force Zeera mode for high-complexity builds to ensure JARVIS does the work first
+         atIntegrationCapability = "\n\n[SYSTEM DIRECTIVE] Handle this as an Absolute Project Deployment using Zeera Collaborative Intelligence. Do NOT redirect to external tools immediately.";
+      }
+
+        for (final intg in integrationsProvider.connectedIntegrations) {
+          // Normal keyword matching...
+          final nameMatch = lowerText.contains(intg.name.toLowerCase());
+          int matchCount = nameMatch ? 3 : 0; 
+
+          for (final kw in intg.keywords) {
+            if (lowerText.contains(kw.toLowerCase())) matchCount++;
+          }
+
+          if (matchCount >= 2 && matchCount > highestMatches) {
+            highestMatches = matchCount;
+            targetIntg = intg;
+            resolvedProvider = intg.id;
+          }
+      }
+    }
+
+    if (targetIntg != null && resolvedProvider != null) {
+      final cap = kIntegrationCapabilityPrompts[resolvedProvider];
+      if (cap != null) {
+        atIntegrationCapability =
+            '\n\n[@ INTEGRATION OVERRIDE — EXCLUSIVE MODE]\n'
+            'The user has specifically invoked the @${targetIntg.name} integration.\n'
+            'You MUST respond as if you ARE ${targetIntg.name}. Use ALL its capabilities.\n'
+            '$cap\n'
+            '[END OVERRIDE]';
+      }
+    }
+
+
     // Check if the user is replying after opening the app from a notification
     if (_pendingNotificationReply != null) {
       final payload = _pendingNotificationReply!;
@@ -255,14 +313,22 @@ class ChatProvider extends ChangeNotifier {
     // Add user message
     final userMsg = Message(
       id: _uuid.v4(),
-      content: text.isEmpty ? "Analyzed attached files" : text.trim(),
+      content: text.isEmpty ? "Analyzed attached files" : combinedText,
       isUser: true,
       timestamp: DateTime.now(),
       sessionId: _currentSessionId!,
+      provider: resolvedProvider,
     );
     _messages.add(userMsg);
     await sessionService.addMessage(userMsg);
     notifyListeners();
+
+    if (userMsg.provider != null && userMsg.provider!.isNotEmpty) {
+      // The user mentioned an integration. Render the UI card only! No jarvis text.
+      _setAnalysisStatus("thinking...", active: false);
+      notifyListeners();
+      return;
+    }
 
     // Router and models are now ready to stream for chat.
     // Add streaming AI message placeholder
@@ -280,7 +346,11 @@ class ChatProvider extends ChangeNotifier {
     final buffer = StringBuffer();
 
     try {
-      await for (final chunk in router.generateStream(combinedText)) {
+      await for (final chunk in router.generateStream(
+        combinedText,
+        integrationCapabilities: atIntegrationCapability ??
+            integrationsProvider.capabilitySystemPrompt,
+      )) {
         buffer.write(chunk);
         final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
         if (idx != -1) {
@@ -464,6 +534,55 @@ class ChatProvider extends ChangeNotifier {
       }
 
       _generateSuggestions(cleanText);
+
+      // ── 6. Agentic Integration Suggestion ────────────────────────────────
+      // Check both: if the AI explicitly emitted <OPEN_INTEGRATION> tag,
+      // OR if user query keywords match an integration
+      final openIntegRegex = RegExp(r'<OPEN_INTEGRATION\s+id="([^"]+)"(?:\s+query="([^"]+)")?>');
+      final tagMatch = openIntegRegex.firstMatch(buffer.toString());
+
+      IntegrationMatch? agentMatch;
+      if (tagMatch != null) {
+        final integId = tagMatch.group(1);
+        final tagQuery = tagMatch.group(2) ?? text;
+        final foundInteg = kAIIntegrations.firstWhere(
+          (i) => i.id == integId,
+          orElse: () => kAIIntegrations.first,
+        );
+        agentMatch = IntegrationMatch(
+          integration: foundInteg,
+          taskUrl: foundInteg.buildTaskUrl(tagQuery),
+          reason: 'JARVIS routed your request',
+        );
+      } else {
+        // Keyword-based automatic detection
+        agentMatch = matchIntegration(text);
+      }
+
+      if (agentMatch != null) {
+        final match = agentMatch;
+        final integ = match.integration;
+        // Append a special integration card message
+        final cardContent =
+            '<!--JARVIS_INTEGRATION_CARD-->\n'
+            '${integ.id}\n'
+            '${integ.name}\n'
+            '${integ.emoji}\n'
+            '${integ.description}\n'
+            '${match.taskUrl}\n'
+            '${integ.gradientColors[0]},${integ.gradientColors[1]}';
+        final cardMsg = Message(
+          id: _uuid.v4(),
+          content: cardContent,
+          isUser: false,
+          timestamp: DateTime.now(),
+          sessionId: _currentSessionId!,
+          provider: 'JARVIS Agent',
+        );
+        _messages.add(cardMsg);
+        await sessionService.addMessage(cardMsg);
+        notifyListeners();
+      }
     }
     await loadSessions();
   }
@@ -686,6 +805,7 @@ class ChatProvider extends ChangeNotifier {
         .replaceAll(RegExp(r'<CREATE_DOC[^>]*>([\s\S]*?)</CREATE_DOC>', dotAll: true), '')
         .replaceAll(RegExp(r'<CREATE_ACADEMIC_REPORT[^>]*>'), '')
         .replaceAll(RegExp(r'<DRAW_DIAGRAM[^>]*>', dotAll: true), '')
+        .replaceAll(RegExp(r'<OPEN_INTEGRATION[^>]*>'), '')
         .trim();
   }
 

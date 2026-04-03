@@ -5,6 +5,9 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../theme/jarvis_theme.dart';
 import '../features/chat/chat_provider.dart';
 import '../features/vibecode/vibecode_screen.dart';
+import '../features/integrations/integrations_screen.dart';
+import '../features/integrations/integrations_provider.dart';
+import '../features/integrations/integrations_model.dart';
 
 class ChatInputBar extends StatefulWidget {
   final Function(String) onSubmit;
@@ -27,10 +30,37 @@ class _ChatInputBarState extends State<ChatInputBar> {
   bool _isListening = false;
   bool _speechAvailable = false;
 
+  // @ mention picker state
+  bool _showAtPicker = false;
+  String _atQuery = '';
+
   @override
   void initState() {
     super.initState();
     _initSpeech();
+    _controller.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    final text = _controller.text;
+    final cursor = _controller.selection.baseOffset;
+    // Find if there's an unclosed @ before cursor
+    if (cursor > 0 && cursor <= text.length) {
+      final before = text.substring(0, cursor);
+      final atIdx = before.lastIndexOf('@');
+      if (atIdx >= 0) {
+        final afterAt = before.substring(atIdx + 1);
+        // Only show if no space after @
+        if (!afterAt.contains(' ')) {
+          setState(() {
+            _showAtPicker = true;
+            _atQuery = afterAt.toLowerCase();
+          });
+          return;
+        }
+      }
+    }
+    setState(() => _showAtPicker = false);
   }
 
   Future<void> _initSpeech() async {
@@ -149,6 +179,36 @@ class _ChatInputBarState extends State<ChatInputBar> {
           subtitle: 'Manage web search & AI powers',
           onTap: onToolsClick,
         ),
+        const SizedBox(height: 12),
+        _ActionTile(
+          icon: Icons.extension_rounded,
+          title: 'Integrations',
+          subtitle: 'Connect & use external AI platforms',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    const IntegrationsScreen(),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 1),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    )),
+                    child: child,
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 400),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 20),
       ],
     );
@@ -192,40 +252,97 @@ class _ChatInputBarState extends State<ChatInputBar> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: JarvisColors.border, width: 0.5),
           ),
-          child: SwitchListTile(
-            value: provider.webSearchEnabled,
-            onChanged: (val) {
-              provider.toggleWebSearch(val);
-              setModalState(() {});
-            },
-            secondary: const Icon(
-              Icons.public_rounded,
-              color: JarvisColors.accentPrimary,
-            ),
-            title: const Text(
-              "Web Search",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+          child: Column(
+            children: [
+              SwitchListTile(
+                value: provider.router.zeeraEnabled,
+                onChanged: (val) {
+                  provider.router.setZeeraEnabled(val);
+                  setModalState(() {});
+                },
+                secondary: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Colors.amber,
+                ),
+                title: const Text(
+                  "ZEERA Mode",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: const Text(
+                  "Dual-Model Collaborative Intelligence",
+                  style: TextStyle(color: JarvisColors.textMuted, fontSize: 11),
+                ),
+                activeThumbColor: Colors.amber,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
               ),
-            ),
-            subtitle: const Text(
-              "Allow JARVIS to check real-time results",
-              style: TextStyle(color: JarvisColors.textMuted, fontSize: 12),
-            ),
-            activeThumbColor: JarvisColors.accentPrimary,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
+              const Divider(height: 1, color: JarvisColors.border),
+              SwitchListTile(
+                value: provider.webSearchEnabled,
+                onChanged: (val) {
+                  provider.toggleWebSearch(val);
+                  setModalState(() {});
+                },
+                secondary: const Icon(
+                  Icons.public_rounded,
+                  color: JarvisColors.accentPrimary,
+                ),
+                title: const Text(
+                  "Web Search",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: const Text(
+                  "Allow JARVIS to check real-time results",
+                  style: TextStyle(color: JarvisColors.textMuted, fontSize: 12),
+                ),
+                activeThumbColor: JarvisColors.accentPrimary,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            "More tools coming soon...",
-            style: TextStyle(color: JarvisColors.textMuted, fontSize: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: JarvisColors.surfaceElevated,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: JarvisColors.border, width: 0.5),
+          ),
+          child: Column(
+            children: [
+              ListTile(
+                onTap: () {
+                  Navigator.pop(context);
+                  _controller.text = "@arena Generate an image of: ";
+                  _focusNode.requestFocus();
+                },
+                leading: const Icon(Icons.image_rounded, color: Colors.purpleAccent),
+                title: const Text("Image Generator", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text("Powered autonomously by Arena.ai", style: TextStyle(color: JarvisColors.textMuted, fontSize: 12)),
+              ),
+              const Divider(height: 1, color: JarvisColors.border),
+              ListTile(
+                onTap: () {
+                  Navigator.pop(context);
+                  _controller.text = "@arena Generate a video of: ";
+                  _focusNode.requestFocus();
+                },
+                leading: const Icon(Icons.movie_creation_rounded, color: Colors.blueAccent),
+                title: const Text("Video Generator", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text("Powered autonomously by Arena.ai", style: TextStyle(color: JarvisColors.textMuted, fontSize: 12)),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 20),
@@ -241,7 +358,177 @@ class _ChatInputBarState extends State<ChatInputBar> {
       return;
     }
     _controller.clear();
+    
+    // Explicitly drop focus if it's an integration command so InAppWebView gets native input
+    if (text.startsWith('@')) {
+      _focusNode.unfocus();
+    }
+    
+    setState(() => _showAtPicker = false);
     widget.onSubmit(text);
+  }
+
+  /// Insert @integrationId into text at current cursor
+  void _selectAtIntegration(AIIntegration integration) {
+    final text = _controller.text;
+    final cursor = _controller.selection.baseOffset;
+    if (cursor < 0) return;
+    final before = text.substring(0, cursor);
+    final atIdx = before.lastIndexOf('@');
+    final after = text.substring(cursor);
+    final newText = '${text.substring(0, atIdx)}@${integration.id} $after';
+    _controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(
+          offset: atIdx + integration.id.length + 2),
+    );
+    setState(() => _showAtPicker = false);
+    _focusNode.requestFocus();
+  }
+
+  /// Build the @ mention picker that appears above the input
+  Widget _buildAtPicker(IntegrationsProvider intProv) {
+    final connected = intProv.connectedIntegrations;
+    final all = kAIIntegrations;
+    // Show connected first, then all matching the query
+    final filtered = [
+      ...connected,
+      ...all.where((a) => !connected.any((c) => c.id == a.id)),
+    ].where((i) =>
+            _atQuery.isEmpty ||
+            i.id.contains(_atQuery) ||
+            i.name.toLowerCase().contains(_atQuery))
+        .toList();
+
+    if (filtered.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 200),
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F0F1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: JarvisColors.accentPrimary.withValues(alpha: 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: JarvisColors.accentPrimary.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+            child: Row(
+              children: [
+                const Text('⚡',
+                    style: TextStyle(fontSize: 11)),
+                const SizedBox(width: 4),
+                const Text(
+                  '@Integrations',
+                  style: TextStyle(
+                    color: JarvisColors.accentPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'JARVIS routes task to integration',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              itemCount: filtered.length,
+              itemBuilder: (_, i) {
+                final item = filtered[i];
+                final isConnected = intProv.isConnected(item.id);
+                final color = Color(item.gradientColors[0]);
+                return GestureDetector(
+                  onTap: () => _selectAtIntegration(item),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: color.withValues(alpha: 0.2), width: 0.7),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(item.emoji,
+                            style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                item.category,
+                                style: TextStyle(
+                                  color: color.withValues(alpha: 0.7),
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isConnected)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF22C55E)
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: const Color(0xFF22C55E)
+                                      .withValues(alpha: 0.4)),
+                            ),
+                            child: const Text(
+                              'Connected',
+                              style: TextStyle(
+                                color: Color(0xFF22C55E),
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -256,9 +543,12 @@ class _ChatInputBarState extends State<ChatInputBar> {
   Widget build(BuildContext context) {
     return Consumer<ChatProvider>(
       builder: (context, chatProvider, _) {
+        final intProv = context.watch<IntegrationsProvider>();
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // @ mention picker overlay
+            if (_showAtPicker) _buildAtPicker(intProv),
             // Analysis indicator
             if (chatProvider.isAnalyzing)
               Container(

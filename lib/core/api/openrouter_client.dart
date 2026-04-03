@@ -2,30 +2,35 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart'; // Added for kIsWeb
 
-/// NVIDIA NIM API (OpenAI-compatible)
-class NvidiaApiClient {
-  static const String _remoteUrl = 'https://integrate.api.nvidia.com/v1';
-  static const String _proxyUrl  = '/api/nvidia';
+/// OpenRouter API (OpenAI-compatible)
+class OpenRouterClient {
+  static const String _remoteUrl = 'https://openrouter.ai/api/v1';
+  static const String _proxyUrl  = '/api/openrouter';
   
   String get _baseUrl {
     if (kIsWeb) {
       final baseUri = Uri.base;
-      return baseUri.resolve(_proxyUrl).toString().replaceAll(RegExp(r'/$'), '');
+      // In web, handle proxy gracefully or directly return OpenRouter if no proxy setup
+      // Usually, openrouter allows CORS from anywhere via HTTP-Referer, but in case they need proxy:
+      try {
+        if (baseUri.host.isEmpty) return _remoteUrl;
+        return baseUri.resolve(_proxyUrl).toString().replaceAll(RegExp(r'/$'), '');
+      } catch (_) {
+        return _remoteUrl;
+      }
     }
     return _remoteUrl;
   }
   
   final String apiKey;
   final String model;
-  final String _sanitizedKey;
 
-  NvidiaApiClient({
-    required String apiKey,
+  OpenRouterClient({
+    required this.apiKey,
     required this.model,
-  }) : apiKey = apiKey.trim(),
-       _sanitizedKey = apiKey.trim();
+  });
 
-  String get _cleanKey => _sanitizedKey;
+  String get _cleanKey => apiKey.trim();
 
   Future<List<String>> fetchModels() async {
     try {
@@ -38,25 +43,28 @@ class NvidiaApiClient {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'User-Agent': 'JARVIS-AI-Flutter',
+          'HTTP-Referer': 'https://jarvis.ai', // Optional: Replace with actual referrer
+          'X-Title': 'JARVIS', // Optional
         },
       ).timeout(const Duration(seconds: 10));
 
       if (res.statusCode != 200) {
-        debugPrint('[Nvidia] Models fetch failed: ${res.statusCode} - ${res.body}');
-        throw Exception('NVIDIA model fetch failed (${res.statusCode}): ${res.body}');
+        debugPrint('[OpenRouter] Models fetch failed: ${res.statusCode} - ${res.body}');
+        throw Exception('OpenRouter model fetch failed (${res.statusCode}): ${res.body}');
       }
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final models = (data['data'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       return models.map((m) => m['id'] as String).toList();
     } catch (e) {
-      debugPrint('[Nvidia] Models fetch error: $e');
+      debugPrint('[OpenRouter] Models fetch error: $e');
       rethrow;
     }
   }
 
   Future<String> generate(String prompt, {String? systemPrompt, int? maxTokens, String? imageBase64}) async {
     final List<Map<String, dynamic>> messages = [];
-    if (systemPrompt != null) {
+    
+    if (systemPrompt != null && systemPrompt.isNotEmpty) {
       messages.add({'role': 'system', 'content': systemPrompt});
     }
 
@@ -78,38 +86,42 @@ class NvidiaApiClient {
     try {
       if (_cleanKey.isEmpty) throw Exception('API Key is empty');
 
-      final res = await http.post(
-        Uri.parse('$_baseUrl/chat/completions'),
-        headers: {
-          'Authorization': 'Bearer $_cleanKey',
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': 'JARVIS-AI-Flutter',
-        },
-        body: jsonEncode({
+        final body = <String, dynamic>{
           'model': model,
           'messages': messages,
-          'temperature': 0.5,
-          'top_p': 1.0,
-          'max_tokens': maxTokens ?? 2048,
-        }),
-      ).timeout(const Duration(seconds: 180));
+        };
+        
+        // Removed max_tokens completely so OpenRouter handles native limit bounds.
+        // body['max_tokens'] = ...
+
+        final res = await http.post(
+          Uri.parse('$_baseUrl/chat/completions'),
+          headers: {
+            'Authorization': 'Bearer $_cleanKey',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'JARVIS-AI-Flutter',
+            'HTTP-Referer': 'https://jarvis.ai', // Optional: Replace with actual referrer
+            'X-Title': 'JARVIS', // Optional
+          },
+          body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 45));
 
       if (res.statusCode != 200) {
-        debugPrint('[Nvidia] Generate failed: ${res.statusCode} - ${res.body}');
-        throw Exception('NVIDIA error ${res.statusCode}: ${res.body}');
+        debugPrint('[OpenRouter] Generate failed: ${res.statusCode} - ${res.body}');
+        throw Exception('OpenRouter error ${res.statusCode}: ${res.body}');
       }
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       return data['choices']?[0]?['message']?['content'] as String? ?? '';
     } catch (e) {
-      debugPrint('[Nvidia] Generate error: $e');
+      debugPrint('[OpenRouter] Generate error: $e');
       rethrow;
     }
   }
 
   Stream<String> generateStream(String prompt, {String? systemPrompt, int? maxTokens}) async* {
     final List<Map<String, dynamic>> messages = [];
-    if (systemPrompt != null) {
+    if (systemPrompt != null && systemPrompt.isNotEmpty) {
       messages.add({'role': 'system', 'content': systemPrompt});
     }
     messages.add({'role': 'user', 'content': prompt});
@@ -123,25 +135,25 @@ class NvidiaApiClient {
       req.headers['Content-Type'] = 'application/json';
       req.headers['Accept'] = 'text/event-stream';
       req.headers['User-Agent'] = 'JARVIS-AI-Flutter';
+      req.headers['HTTP-Referer'] = 'https://jarvis.ai'; // Optional: Replace with actual referrer
+      req.headers['X-Title'] = 'JARVIS'; // Optional
       
-      req.body = jsonEncode({
+      final body = <String, dynamic>{
         'model': model,
         'messages': messages,
-        'temperature': 0.5,
-        'top_p': 1.0,
-        'max_tokens': maxTokens ?? 2048,
         'stream': true,
-      });
+      };
+      
+      req.body = jsonEncode(body);
 
-      final resp = await client.send(req).timeout(const Duration(seconds: 180));
+      final resp = await client.send(req).timeout(const Duration(seconds: 20));
       
       if (resp.statusCode != 200) {
         final errBody = await resp.stream.bytesToString();
-        debugPrint('[Nvidia] Stream failed: ${resp.statusCode} - $errBody');
-        throw Exception('NVIDIA stream error ${resp.statusCode}: $errBody');
+        debugPrint('[OpenRouter] Stream failed: ${resp.statusCode} - $errBody');
+        throw Exception('OpenRouter stream error ${resp.statusCode}: $errBody');
       }
 
-      // Proactively handle potential empty or slow streams
       await for (final line in resp.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter())) {
@@ -156,21 +168,18 @@ class NvidiaApiClient {
           try {
             final data = jsonDecode(jsonStr) as Map<String, dynamic>;
             final choice = data['choices']?[0];
-            // Support both 'delta' (streaming) and 'message' (fallback) structures
             final text = choice?['delta']?['content'] as String? ?? 
                          choice?['text'] as String? ?? 
                          choice?['delta']?['text'] as String?;
             
             if (text != null && text.isNotEmpty) yield text;
           } catch (e) {
-            debugPrint('[Nvidia] JSON parse error: $e for line: $trimmedLine');
+            debugPrint('[OpenRouter] JSON parse error: $e for line: $trimmedLine');
           }
-        } else {
-          debugPrint('[Nvidia] Non-data line received: $trimmedLine');
         }
       }
     } catch (e) {
-      debugPrint('[Nvidia] Stream error: $e');
+      debugPrint('[OpenRouter] Stream error: $e');
       rethrow;
     } finally {
       client.close();

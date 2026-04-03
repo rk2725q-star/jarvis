@@ -25,6 +25,7 @@ class JarvisColors {
   static const Color nvidiaColor = Color(0xFF76B900);
   static const Color deepseekColor = Color(0xFF6366F1);
   static const Color localColor = Color(0xFFED8936);
+  static const Color openRouterColor = Color(0xFFA855F7);
 
   // Status
   static const Color success = Color(0xFF48BB78);

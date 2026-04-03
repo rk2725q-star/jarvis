@@ -215,6 +215,10 @@ RULES:
       // ── PHASE 1: DEEP INTENT ANALYSIS ──────────────────
       _log(BuildPhase.ideation, '🧠 Analyzing intent and technology requirements...', 0.08);
 
+      final history = chatHistory.length > 1
+          ? chatHistory.map((m) => '${m.role.toUpperCase()}: ${m.content}').join('\n')
+          : 'No previous history.';
+
       final intentSummary = await _callAI(
         system: '''You are a senior full-stack architect. Analyze the user's request.
 A "Complete App" MUST include:
@@ -228,9 +232,10 @@ Output JSON only:
   "app_type": "...",
   "tech_stack": [...],
   "required_logic": ["navigation", "state management", "form handling", "real data simulation"],
-  "suggested_files": ["index.html", "style.css", "app.js", "data_service.js"]
+  "suggested_files": ["index.html", "style.css", "app.js", "data_service.js"],
+  "terminal_commands": ["npm create vite@latest .", "npm install framer-motion"]
 }''',
-        user: userPrompt,
+        user: 'History Context:\n$history\n\nNew Build Request: $userPrompt',
       );
 
       Map<String, dynamic> intent = {};
@@ -242,7 +247,24 @@ Output JSON only:
           'tech_stack': ['html', 'css', 'js'],
           'suggested_files': ['index.html', 'style.css', 'app.js'],
           'ui_style': 'glassmorphism',
+          'terminal_commands': [],
         };
+      }
+
+      // Simulate initial terminal configuration
+      final initCmds = (intent['terminal_commands'] as List?)?.cast<String>() ?? [];
+      for (int i = 0; i < initCmds.length; i++) {
+        final cmd = initCmds[i];
+        final progress = 0.10 + ((i / initCmds.length) * 0.05);
+        _log(BuildPhase.generation, '\$ $cmd', progress);
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (cmd.contains('npm') || cmd.contains('yarn')) {
+          _log(BuildPhase.generation, '  > fetching packages & resolving tree...', progress + 0.02);
+          await Future.delayed(const Duration(milliseconds: 800));
+          _log(BuildPhase.generation, '  > success! packages installed', progress + 0.04);
+        } else {
+          _log(BuildPhase.generation, '  > executed ok', progress + 0.02);
+        }
       }
 
       // ── PHASE 2: ARCHITECTURE PLAN ─────────────────────
@@ -352,17 +374,23 @@ Output JSON only:
     try {
       _log(BuildPhase.ideation, '🔍 Analyzing modification scope...', 0.15);
 
+      // Formulate past chat context
+      final history = chatHistory.length > 1
+          ? chatHistory.map((m) => '${m.role.toUpperCase()}: ${m.content}').join('\n')
+          : 'No previous history.';
+
       // Identify WHICH files need to change
       final impactAnalysis = await _callAI(
-        system: '''Analyze existing files and user request. Return JSON ONLY:
+        system: '''Analyze existing files, conversation history, and user request. Return JSON ONLY:
 {
   "files_to_modify": ["index.html"],
   "files_to_add": [],
   "files_to_delete": [],
-  "modification_summary": "brief description"
+  "modification_summary": "brief description",
+  "terminal_commands": ["npm install some-package"]
 }''',
         user:
-            'Files: ${currentProject!.files.map((f) => f.path).join(", ")}\nRequest: $userRequest',
+            'History: $history\n\nFiles: ${currentProject!.files.map((f) => f.path).join(", ")}\nRequest: $userRequest',
       );
 
       Map<String, dynamic> impact = {};
@@ -379,6 +407,25 @@ Output JSON only:
       final filesToModify = (impact['files_to_modify'] as List?)?.cast<String>() ?? [];
       final filesToAdd = (impact['files_to_add'] as List?)?.cast<String>() ?? [];
       final filesToDelete = (impact['files_to_delete'] as List?)?.cast<String>() ?? [];
+      final terminalCmds = (impact['terminal_commands'] as List?)?.cast<String>() ?? [];
+
+      // Simulate terminal commands
+      for (int i = 0; i < terminalCmds.length; i++) {
+        final cmd = terminalCmds[i];
+        final progress = 0.15 + ((i / terminalCmds.length) * 0.05);
+        _log(BuildPhase.generation, '\$ $cmd', progress);
+        
+        // Simulate real-time dependency download logs
+        if (cmd.contains('install') || cmd.contains('add')) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          _log(BuildPhase.generation, '  > fetching packages...', progress + 0.01);
+          await Future.delayed(const Duration(milliseconds: 800));
+          _log(BuildPhase.generation, '  > added ${(cmd.length * 3)} packages, audited 100+ packages in 1s', progress + 0.03);
+        } else {
+          await Future.delayed(const Duration(milliseconds: 500));
+          _log(BuildPhase.generation, '  > executed successfully', progress + 0.02);
+        }
+      }
 
       // Delete files
       for (final path in filesToDelete) {

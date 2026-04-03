@@ -21,6 +21,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _scrollController = ScrollController();
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  int _lastMessageCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -65,7 +67,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return Consumer<ChatProvider>(
       builder: (context, chatProvider, child) {
         // Auto-scroll on new messages
-        if (chatProvider.isGenerating || chatProvider.messages.isNotEmpty) {
+        if (chatProvider.isGenerating || chatProvider.messages.length > _lastMessageCount) {
+          _lastMessageCount = chatProvider.messages.length;
           _scrollToBottom();
         }
 
@@ -93,7 +96,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               child: ListView.builder(
                                 controller: _scrollController,
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
                                   vertical: 16,
                                 ),
                                 itemCount: chatProvider.messages.length,

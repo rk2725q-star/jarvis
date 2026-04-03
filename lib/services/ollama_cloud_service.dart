@@ -273,7 +273,7 @@ class OllamaCloudService {
           'Content-Type':  'application/json',
         },
         body: body,
-      ).timeout(const Duration(seconds: 45)); 
+      ).timeout(const Duration(seconds: 120)); 
     } else {
       res = await _client.post(
         Uri.parse('$_localUrl/api/chat'),

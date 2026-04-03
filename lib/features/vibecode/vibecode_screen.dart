@@ -6,6 +6,9 @@ import 'vibecode_controller.dart';
 import 'widgets/chat_panel.dart';
 import 'widgets/preview_panel.dart';
 import 'widgets/file_explorer.dart';
+import 'widgets/github_dialog.dart';
+import 'widgets/vercel_dialog.dart';
+import 'widgets/supabase_dialog.dart';
 
 class VibeCodeScreen extends StatefulWidget {
   const VibeCodeScreen({super.key});
@@ -98,6 +101,25 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
               size: 20,
             ),
             onPressed: () => setState(() => _showLogs = !_showLogs),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.rocket_launch_rounded, color: Colors.white70, size: 20),
+            color: const Color(0xFF1E1E2E),
+            tooltip: 'Deploy & Connect',
+            onSelected: (val) {
+              if (val == 'vercel') {
+                showDialog(context: context, builder: (_) => const VercelDialog());
+              } else if (val == 'github') {
+                showDialog(context: context, builder: (_) => const GithubDialog());
+              } else if (val == 'supabase') {
+                showDialog(context: context, builder: (_) => const SupabaseDialog());
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'vercel', child: Text('▲ Deploy to Vercel', style: TextStyle(color: Colors.white))),
+              const PopupMenuItem(value: 'github', child: Text('🐙 Push to GitHub', style: TextStyle(color: Colors.white))),
+              const PopupMenuItem(value: 'supabase', child: Text('⚡ Connect Supabase', style: TextStyle(color: Colors.white))),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.tune_rounded, color: Colors.white70, size: 20),

@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,6 +18,9 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import '../../theme/jarvis_theme.dart';
 import '../../models/message.dart';
+import 'integration_card_bubble.dart';
+import '../../features/integrations/integrations_model.dart';
+import '../../features/integrations/integration_browser_screen.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -36,10 +41,179 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (message.isUser) {
+      if (message.provider != null && message.provider!.isNotEmpty) {
+        return Column(
+          children: [
+            _UserBubble(message: message),
+            _InlineIntegrationBrowser(integrationId: message.provider!, query: message.content),
+          ],
+        );
+      }
       return _UserBubble(message: message);
+    } else if (IntegrationCardBubble.isIntegrationCard(message.content)) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
+        child: IntegrationCardBubble(rawContent: message.content),
+      );
     } else {
       return _AIBubble(message: message, providerColor: _providerColor(message.provider));
     }
+  }
+}
+
+class _InlineIntegrationBrowser extends StatefulWidget {
+  final String integrationId;
+  final String query;
+
+  const _InlineIntegrationBrowser({required this.integrationId, required this.query});
+
+  @override
+  State<_InlineIntegrationBrowser> createState() => _InlineIntegrationBrowserState();
+}
+
+class _InlineIntegrationBrowserState extends State<_InlineIntegrationBrowser> {
+  bool _hasInjected = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final integration = kAIIntegrations.cast<AIIntegration?>().firstWhere(
+          (i) => i?.id == widget.integrationId,
+          orElse: () => null,
+        );
+    if (integration == null) return const SizedBox.shrink();
+
+    final launchUrl = integration.buildTaskUrl(widget.query);
+
+    return Container(
+      width: double.infinity,
+      height: MediaQuery.of(context).size.height * 0.68,
+      margin: const EdgeInsets.only(top: 8, bottom: 24, left: 4, right: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0F),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: JarvisColors.border, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: integration.gradientColors.isNotEmpty 
+                ? Color(integration.gradientColors.first).withValues(alpha: 0.1)
+                : Colors.black26,
+            blurRadius: 20,
+          )
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri(launchUrl)),
+            gestureRecognizers: {
+              Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
+              Factory<HorizontalDragGestureRecognizer>(() => HorizontalDragGestureRecognizer()),
+              Factory<ScaleGestureRecognizer>(() => ScaleGestureRecognizer()),
+            },
+            initialSettings: InAppWebViewSettings(
+              useWideViewPort: true,
+              loadWithOverviewMode: true,
+              javaScriptEnabled: true,
+              transparentBackground: true,
+              preferredContentMode: UserPreferredContentMode.MOBILE,
+              supportZoom: true,
+            ),
+            onLoadStop: (controller, url) async {
+              if (!_hasInjected && widget.query.isNotEmpty) {
+                _hasInjected = true;
+                
+                // Human-like typewriting simulation to bypass detection and wait 2 seconds
+                String query = widget.query.replaceAll('"', '\\"').replaceAll('\n', '\\n');
+                String script = '''
+                  (async function() {
+                    const humanType = async (el, text) => {
+                      el.focus();
+                      for (let char of text) {
+                        document.execCommand('insertText', false, char);
+                        await new Promise(r => setTimeout(r, 30 + Math.random() * 70));
+                      }
+                      el.dispatchEvent(new Event('input', { bubbles: true }));
+                      el.dispatchEvent(new Event('change', { bubbles: true }));
+                    };
+
+                    await new Promise(r => setTimeout(r, 2000)); // Initial 2s delay as requested
+
+                    let selectors = [
+                      '#prompt-textarea', 'textarea', 'input[type="text"]', 
+                      '[contenteditable="true"]', '.chat-input', '.text-area'
+                    ];
+                    
+                    let tf = null;
+                    for(let s of selectors) {
+                      tf = document.querySelector(s);
+                      if(tf) break;
+                    }
+
+                    if(tf) {
+                      await humanType(tf, "$query");
+                      await new Promise(r => setTimeout(r, 1000));
+
+                      let btnSelectors = [
+                        'button[data-testid="send-button"]', 'button[type="submit"]',
+                        'button.send-button', '.submit-button', 'button svg'
+                      ];
+
+                      let btn = null;
+                      for(let bs of btnSelectors) {
+                        let candidate = document.querySelector(bs);
+                        if(candidate) {
+                          if(candidate.tagName === 'svg') btn = candidate.parentElement;
+                          else btn = candidate;
+                          break;
+                        }
+                      }
+                      
+                      if(!btn) {
+                        let btns = Array.from(document.querySelectorAll('button'));
+                        btn = btns.find(b => b.innerText.toLowerCase().match(/send|submit|generate|create|battle/));
+                      }
+
+                      if(btn) btn.click();
+                      else tf.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+                    }
+                  })();
+                ''';
+                await controller.evaluateJavascript(source: script);
+              }
+            },
+          ),
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => IntegrationBrowserScreen(integration: integration)),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Row(
+                  children: [
+                    Text(integration.emoji, style: const TextStyle(fontSize: 14)),
+                    const SizedBox(width: 6),
+                    Text(integration.name, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.open_in_new, color: Colors.white54, size: 12),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0, curve: Curves.easeOut);
   }
 }
 
@@ -55,7 +229,7 @@ class _UserBubble extends StatelessWidget {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.78,
         ),
-        margin: const EdgeInsets.only(left: 48, bottom: 12),
+        margin: const EdgeInsets.only(left: 48, bottom: 12, right: 16),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           gradient: JarvisColors.primaryGradient,
@@ -104,7 +278,7 @@ class _AIBubble extends StatelessWidget {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.98,
         ),
-        margin: const EdgeInsets.only(right: 8, bottom: 16),
+        margin: const EdgeInsets.only(right: 8, bottom: 16, left: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

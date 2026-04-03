@@ -1,18 +1,20 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../api/gemini_client.dart';
-import '../api/nvidia_client.dart';
-import '../../services/ollama_cloud_service.dart';
-import '../../services/google_docs_service.dart';
-import '../api/local_model_client.dart';
-import '../memory/memory_service.dart';
-import '../security/secure_storage_service.dart';
-import '../file_processor/file_processor.dart';
+import 'package:jarvis_ai/core/api/nvidia_client.dart';
+import 'package:jarvis_ai/core/api/gemini_client.dart';
+import 'package:jarvis_ai/core/api/openrouter_client.dart';
+import 'package:jarvis_ai/core/api/local_model_client.dart';
+import 'package:jarvis_ai/services/ollama_cloud_service.dart';
+import 'package:jarvis_ai/services/google_docs_service.dart';
+import 'package:jarvis_ai/core/memory/memory_service.dart';
+import 'package:jarvis_ai/core/security/secure_storage_service.dart';
+import 'package:jarvis_ai/core/api/anthropic_client.dart';
+import 'package:jarvis_ai/core/file_processor/file_processor.dart';
 
-enum AIProvider { llamaCpp, gemini, ollama, ollamaCloud, nvidia }
+enum AIProvider { llamaCpp, gemini, ollama, ollamaCloud, nvidia, openRouter, zeera, anthropic }
 
-enum IntentMode { simple, normal, deep, comparison, agentic, project }
+enum IntentMode { simple, normal, deep, comparison, agentic, project, inquisitiveProject }
 
 class ProviderStatus {
   final AIProvider provider;
@@ -39,6 +41,12 @@ class ProviderStatus {
         return 'Ollama Cloud';
       case AIProvider.nvidia:
         return 'NVIDIA';
+      case AIProvider.openRouter:
+        return 'OpenRouter';
+      case AIProvider.zeera:
+        return 'Zeera (Dual-Model)';
+      case AIProvider.anthropic:
+        return 'Anthropic';
     }
   }
 }
@@ -79,16 +87,99 @@ class AIRouter extends ChangeNotifier {
     AIProvider.ollama: true,
     AIProvider.ollamaCloud: true,
     AIProvider.nvidia: true,
+    AIProvider.openRouter: true,
+    AIProvider.zeera: false,
+    AIProvider.anthropic: true,
   };
 
   // Selected models per provider
   final Map<AIProvider, String?> _selectedModels = {};
+  
+  // Zeera Specific Configuration
+  bool _zeeraEnabled = false;
+  int _zeeraRounds = 1;
+  AIProvider _zeeraProviderA = AIProvider.nvidia;
+  AIProvider _zeeraProviderB = AIProvider.ollamaCloud;
+  String? _zeeraModelA;
+  String? _zeeraModelB;
+  String? _zeeraSynthesisModel;
+
+  bool get zeeraEnabled => _zeeraEnabled;
+  int get zeeraRounds => _zeeraRounds;
+  AIProvider get zeeraProviderA => _zeeraProviderA;
+  AIProvider get zeeraProviderB => _zeeraProviderB;
+  String? get zeeraModelA => _zeeraModelA;
+  String? get zeeraModelB => _zeeraModelB;
+  String? get zeeraSynthesisModel => _zeeraSynthesisModel;
+
+  void setZeeraEnabled(bool enabled) {
+    _zeeraEnabled = enabled;
+    notifyListeners();
+    _saveZeeraConfig();
+  }
+
+  void setZeeraRounds(int rounds) {
+    _zeeraRounds = rounds;
+    notifyListeners();
+    _saveZeeraConfig();
+  }
+
+  void setZeeraProviderA(AIProvider provider) {
+    _zeeraProviderA = provider;
+    notifyListeners();
+    _saveZeeraConfig();
+  }
+
+  void setZeeraProviderB(AIProvider provider) {
+    _zeeraProviderB = provider;
+    notifyListeners();
+    _saveZeeraConfig();
+  }
+
+  void setZeeraModels(String? a, String? b) {
+    _zeeraModelA = a;
+    _zeeraModelB = b;
+    notifyListeners();
+    _saveZeeraConfig();
+  }
+
+  void setZeeraSynthesisModel(String? model) {
+    _zeeraSynthesisModel = model;
+    notifyListeners();
+    _saveZeeraConfig();
+  }
+
+  Future<void> _saveZeeraConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('zeera_enabled', _zeeraEnabled);
+    await prefs.setInt('zeera_rounds', _zeeraRounds);
+    await prefs.setString('zeera_provider_a', _zeeraProviderA.name);
+    await prefs.setString('zeera_provider_b', _zeeraProviderB.name);
+    if (_zeeraModelA != null) await prefs.setString('zeera_model_a', _zeeraModelA!);
+    if (_zeeraModelB != null) await prefs.setString('zeera_model_b', _zeeraModelB!);
+    if (_zeeraSynthesisModel != null) await prefs.setString('zeera_synthesis_model', _zeeraSynthesisModel!);
+  }
+
+  Future<void> _loadZeeraConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    _zeeraEnabled = prefs.getBool('zeera_enabled') ?? false;
+    _zeeraRounds = prefs.getInt('zeera_rounds') ?? 1;
+    final pa = prefs.getString('zeera_provider_a');
+    final pb = prefs.getString('zeera_provider_b');
+    if (pa != null) _zeeraProviderA = AIProvider.values.firstWhere((e) => e.name == pa, orElse: () => AIProvider.nvidia);
+    if (pb != null) _zeeraProviderB = AIProvider.values.firstWhere((e) => e.name == pb, orElse: () => AIProvider.ollamaCloud);
+    _zeeraModelA = prefs.getString('zeera_model_a');
+    _zeeraModelB = prefs.getString('zeera_model_b');
+    _zeeraSynthesisModel = prefs.getString('zeera_synthesis_model');
+  }
 
   // Ordered fallback chain: Gemini -> Ollama Cloud -> Ollama -> NVIDIA -> llama.cpp
   List<AIProvider> get _fallbackChain => [
         AIProvider.gemini,
         AIProvider.ollamaCloud,
         AIProvider.ollama,
+        AIProvider.openRouter,
+        AIProvider.anthropic,
         AIProvider.nvidia,
         AIProvider.llamaCpp,
       ].where((p) => _providerEnabled[p] == true).toList();
@@ -104,6 +195,7 @@ class AIRouter extends ChangeNotifier {
       _providerEnabled[p] = prefs.getBool('provider_${p.name}_enabled') ?? true;
       _selectedModels[p]  = prefs.getString('provider_${p.name}_model');
     }
+    await _loadZeeraConfig();
     notifyListeners();
 
     // Proactively load keys from environment if missing in storage
@@ -122,8 +214,10 @@ class AIRouter extends ChangeNotifier {
     // Check for each provider's key in environment defines
     const providers = {
       'nvidia': 'NVIDIA_API_KEY',
+      'openRouter': 'OPENROUTER_API_KEY',
       'ollamaCloud': 'OLLAMA_CLOUD_API_KEY',
       'gemini': 'GEMINI_API_KEY',
+      'anthropic': 'ANTHROPIC_API_KEY',
     };
 
     for (var entry in providers.entries) {
@@ -135,6 +229,12 @@ class AIRouter extends ChangeNotifier {
           await _secureStorage.saveApiKey(entry.key, envKey);
         }
       }
+    }
+
+    // Auto-detect keys logic here if needed, but avoid hardcoded invalid keys
+    final antKey = await _secureStorage.getApiKey('anthropic');
+    if (antKey == null || antKey.isEmpty) {
+       debugPrint('[AIRouter] Anthropic key missing - user must provide in settings');
     }
   }
 
@@ -376,7 +476,6 @@ RULE 12: GOOGLE DOCS (docx)
     ];
 
 
-
     if (agenticKeywords.any((kw) => text.contains(kw))) {
       return IntentMode.agentic;
     }
@@ -387,7 +486,10 @@ RULE 12: GOOGLE DOCS (docx)
     if (text.contains('explain') || text.contains('why') || text.contains('how') || text.length > 50) {
       return IntentMode.deep;
     }
-    if (text.contains('build') || text.contains('create app') || text.contains('website') || text.contains('vibecode')) {
+    if (text.contains('build') || text.contains('create') || text.contains('implement') || text.contains('website') || text.contains('vibecode')) {
+      // INQUISITIVE CHECK: If the request is too simple (e.g., "build a chatbot"), 
+      // return a specialized "NeedInfo" mode to trigger questioning.
+      if (text.split(' ').length < 10) return IntentMode.inquisitiveProject;
       return IntentMode.project;
     }
     return IntentMode.normal;
@@ -422,6 +524,9 @@ RULE 12: GOOGLE DOCS (docx)
       case IntentMode.project:
         instructions = "You are in Developer Mode. Provide architectural guidance and high-level steps for building this app or website. Suggest suitable technologies and layouts.";
         break;
+      case IntentMode.inquisitiveProject:
+        instructions = "The user wants to build a project but has been vague. You MUST ask for: 1. Frontend preference, 2. Backend/Language, 3. Database choice, 4. Any required third-party integrations (Payment, Auth, etc.).";
+        break;
     }
 
     // Inject current precise real-world time in Tamil Nadu (IST)
@@ -449,6 +554,12 @@ RULE 12: GOOGLE DOCS (docx)
     return (system: systemStr, user: userInput);
   }
 
+  /// Inject live integration capability prompts into the system string
+  String injectCapabilities(String systemStr, String capabilities) {
+    if (capabilities.isEmpty) return systemStr;
+    return '$systemStr$capabilities';
+  }
+
   int _getMaxTokens(String input) {
     final mode = detectIntent(input);
     switch (mode) {
@@ -458,17 +569,41 @@ RULE 12: GOOGLE DOCS (docx)
       case IntentMode.comparison: return 8192;
       case IntentMode.agentic: return 10240;
       case IntentMode.project: return 10240;
+      case IntentMode.inquisitiveProject: return 2048;
     }
   }
 
   /// Smart streaming generator with automatic fallback
-  Stream<String> generateStream(String userInput, {String? systemPrompt, bool isVoiceMode = false}) async* {
+  Stream<String> generateStream(String prompt, {String? systemPrompt, String? imageBase64, int? maxTokens, bool isVoiceMode = false, String integrationCapabilities = ''}) async* {
+    _activeProvider = null;
+    
+    // Check if Zeera logic should trigger
+    // Check if Zeera logic should trigger
+    if (_zeeraEnabled || _selectedModels[AIProvider.zeera] != null) {
+      if (_zeeraEnabled) {
+         yield* _generateZeeraStream(prompt, systemPrompt: systemPrompt);
+         return;
+      }
+    }
+
+    final mode = detectIntent(prompt);
+    if (mode == IntentMode.inquisitiveProject) {
+      _isGenerating = false;
+      yield "I'm ready to build this project for you! To ensure a **100% complete, ready-to-deploy** result using the **Zeera Meta-Intelligence Layer**, please specify:\n\n"
+            "1. **Frontend:** (e.g., React, Next.js, Flutter, HTML/CSS)\n"
+            "2. **Backend:** (e.g., Node.js, Python/Flask, Go, Bun)\n"
+            "3. **Database:** (e.g., PostgreSQL, MongoDB, Supabase, Firebase)\n"
+            "4. **Specific Features:** (e.g., Stripe, Google Maps, Auth.js)\n\n"
+            "Once you provide these details, I will generate the **entire** codebase in a single response.";
+      return;
+    }
+
     _isGenerating = true;
     _setStatus('Thinking...');
 
     // DETECT LANGUAGE PREFERENCE CHANGE: If the user says "talk in tamil" etc. 
     // we save it to high importance memory immediately to ensure the next prompt has it!
-    final normalized = userInput.toLowerCase();
+    final normalized = prompt.toLowerCase();
     if (normalized.contains('talk in tamil') || normalized.contains('தமிழ் பேச') || normalized.contains('provide response in tamil')) {
        _memory.addMemory(
          content: "USER PREFERENCE: Talk in PURE TAMIL characters from now on. DO NOT switch back to English until explicitly told.",
@@ -483,12 +618,12 @@ RULE 12: GOOGLE DOCS (docx)
        );
     }
 
-    final maxTokens = isVoiceMode ? 512 : _getMaxTokens(userInput);
+    final maxTokensVal = maxTokens ?? (isVoiceMode ? 512 : _getMaxTokens(prompt));
     
     // Build separated prompts
-    var promptPair = _buildAdaptivePrompt(userInput, isVoiceMode: isVoiceMode);
+    var promptPair = _buildAdaptivePrompt(prompt, isVoiceMode: isVoiceMode);
     if (systemPrompt != null) {
-      promptPair = (system: '$baseSystemPrompt\n$systemPrompt', user: userInput);
+      promptPair = (system: '$baseSystemPrompt\n$systemPrompt', user: prompt);
     }
         
     // For voice mode, prioritize absolute speed: Nvidia -> Ollama -> Gemini
@@ -507,6 +642,7 @@ RULE 12: GOOGLE DOCS (docx)
 
     String currentUserPrompt = promptPair.user;
     final totalBuffer = StringBuffer();
+    final List<String> errorLog = [];
 
     for (int i = 0; i < chain.length; i++) {
       final provider = chain[i];
@@ -521,10 +657,12 @@ RULE 12: GOOGLE DOCS (docx)
            currentUserPrompt = "${promptPair.user}\n\n[CONTINUATION CONTEXT]\nAssistant has already generated: \"${totalBuffer.toString()}\"\n\nCONTINUE the response exactly where it left off. Do NOT repeat or restart.";
         }
 
-        final stream = await _tryStreamProvider(provider, currentUserPrompt, systemPrompt: promptPair.system, maxTokens: maxTokens);
+        final stream = await _tryStreamProvider(provider, currentUserPrompt, systemPrompt: promptPair.system, maxTokens: maxTokensVal);
         if (stream == null) {
+          errorLog.add('${_providerName(provider)}: Null or Unavailable');
           if (i == chain.length - 1 && totalBuffer.isEmpty) {
-             throw Exception('All providers unavailable');
+             final errDetails = errorLog.join(" | ");
+             throw Exception('All providers unavailable.\nDetails: $errDetails');
           }
           continue;
         }
@@ -549,9 +687,9 @@ RULE 12: GOOGLE DOCS (docx)
         _setStatus('Done via ${_providerName(provider)}');
         
         // Auto-save significant responses to memory
-        if (totalBuffer.length > 50 && detectIntent(userInput) != IntentMode.simple) {
+        if (totalBuffer.length > 50 && detectIntent(prompt) != IntentMode.simple) {
            _memory.addMemory(
-             content: "User Preference: When user asked '$userInput', JARVIS responded with info about '${totalBuffer.toString().substring(0, 80)}...'",
+             content: "User Preference: When user asked '$prompt', JARVIS responded with info about '${totalBuffer.toString().substring(0, 80)}...'",
              importance: 0.6,
            );
         }
@@ -560,10 +698,13 @@ RULE 12: GOOGLE DOCS (docx)
         return;
       } catch (e) {
         debugPrint('[AIRouter] Error with provider ${_providerName(provider)}: $e');
+        errorLog.add('${_providerName(provider)} failed: $e');
+        
         if (i == chain.length - 1 && totalBuffer.isEmpty) {
           _isGenerating = false;
-          _setStatus('Error: $e');
-          yield "⚠️ All providers failed. $e";
+          _setStatus('All providers failed');
+          final errDetails = errorLog.join("\n• ");
+          yield "⚠️ All providers failed.\n\nFallback traces:\n• $errDetails";
         }
       } finally {
         _isGenerating = false;
@@ -660,9 +801,10 @@ RULE 12: GOOGLE DOCS (docx)
     final List<AIProvider> providers = [];
     if (providerOverride != null) providers.add(providerOverride);
     
-    // Fallback/Default chain: Gemini -> NVIDIA -> Ollama Cloud -> Ollama Local
+    // Fallback/Default chain: Gemini -> OpenRouter -> NVIDIA -> Ollama Cloud -> Ollama Local
     providers.addAll([
       AIProvider.gemini,
+      AIProvider.openRouter,
       AIProvider.nvidia,
       AIProvider.ollamaCloud,
       AIProvider.ollama,
@@ -692,6 +834,9 @@ RULE 12: GOOGLE DOCS (docx)
 
   Future<String?> _tryProvider(AIProvider provider, String prompt, {String? systemPrompt, int? maxTokens, String? imageBase64}) async {
     switch (provider) {
+      case AIProvider.zeera:
+        // Synthesis engine doesn't use standard _tryProvider for its recursive loop
+        return null;
       case AIProvider.llamaCpp:
         // Local model doesn't support vision; skip if image needed
         if (imageBase64 != null) return null;
@@ -775,17 +920,13 @@ RULE 12: GOOGLE DOCS (docx)
         if (key == null || key.trim().isEmpty) return null;
         var model = _selectedModels[AIProvider.nvidia];
         
-        // Force vision model if necessary
-        if (imageBase64 != null && model != null && !model.contains('vision')) {
-           model = null; // force refetching below
-        }
-
         // Dynamic fetch if no model is selected or forced null
         if (model == null || model.isEmpty) {
           final models = await NvidiaApiClient(apiKey: key, model: '').fetchModels();
           model = _pickBestModel(models, hint: imageBase64 != null ? 'vision' : 'llama-3.1');
           if (model.isEmpty && models.isNotEmpty) model = models.first;
         }
+
         if (model.isEmpty) return null;
         try {
           return await NvidiaApiClient(apiKey: key, model: model).generate(
@@ -796,6 +937,50 @@ RULE 12: GOOGLE DOCS (docx)
           );
         } catch (e) {
           debugPrint('[Nvidia] Vision/Chat error: $e');
+          return null;
+        }
+
+      case AIProvider.openRouter:
+        final key = await _secureStorage.getApiKey('openRouter');
+        if (key == null || key.trim().isEmpty) return null;
+        var model = _selectedModels[AIProvider.openRouter];
+        
+        // Dynamic fetch if no model is selected
+        if (model == null || model.isEmpty) {
+          final models = await OpenRouterClient(apiKey: key, model: '').fetchModels();
+          model = _pickBestModel(models, hint: imageBase64 != null ? 'vision' : 'auto');
+          if (model.isEmpty && models.isNotEmpty) model = models.first;
+        }
+        if (model.isEmpty) return null;
+        try {
+          return await OpenRouterClient(apiKey: key, model: model).generate(
+            prompt,
+            systemPrompt: systemPrompt,
+            maxTokens: maxTokens,
+            imageBase64: imageBase64,
+          );
+        } catch (e) {
+          debugPrint('[OpenRouter] Vision/Chat error: $e');
+          return null;
+        }
+
+      case AIProvider.anthropic:
+        final key = await _secureStorage.getApiKey('anthropic');
+        final trimmedKey = key?.trim() ?? '';
+        if (trimmedKey.isEmpty) {
+          debugPrint('[AIRouter] Anthropic skipped - no key set');
+          return null;
+        }
+        debugPrint('[AIRouter] Attempting Anthropic key="${trimmedKey.substring(0, 10)}..."');
+        var model = _selectedModels[AIProvider.anthropic] ?? 'claude-3-5-sonnet-20241022';
+        try {
+          return await AnthropicApiClient(apiKey: trimmedKey, model: model).generate(
+            prompt,
+            systemPrompt: systemPrompt,
+            maxTokens: maxTokens ?? _getMaxTokens(prompt),
+          );
+        } catch (e) {
+          debugPrint('[Anthropic] Chat error: $e');
           return null;
         }
     }
@@ -819,7 +1004,7 @@ RULE 12: GOOGLE DOCS (docx)
         if (model == null || model.isEmpty) {
           model = 'gemini-1.5-flash'; // High-speed default for zero thinking time
         }
-        return GeminiApiClient(apiKey: key, model: model).generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens);
+        return GeminiApiClient(apiKey: key, model: model).generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
 
       case AIProvider.ollama:
         final localUrl = await _secureStorage.getBaseUrl('ollamaLocal') ?? 'http://127.0.0.1:11434';
@@ -869,8 +1054,140 @@ RULE 12: GOOGLE DOCS (docx)
           if (model.isEmpty && models.isNotEmpty) model = models.first;
         }
         if (model.isEmpty) return null;
-        return NvidiaApiClient(apiKey: key, model: model).generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens);
+        return NvidiaApiClient(apiKey: key, model: model).generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
+
+      case AIProvider.openRouter:
+        final key = await _secureStorage.getApiKey('openRouter');
+        if (key == null || key.trim().isEmpty) return null;
+        var model = _selectedModels[AIProvider.openRouter];
+        // Dynamic fetch if no model is selected
+        if (model == null || model.isEmpty) {
+          final models = await OpenRouterClient(apiKey: key, model: '').fetchModels();
+          model = _pickBestModel(models, hint: 'auto');
+          if (model.isEmpty && models.isNotEmpty) model = models.first;
+        }
+        if (model.isEmpty) return null;
+        return OpenRouterClient(apiKey: key, model: _selectedModels[AIProvider.openRouter] ?? 'auto').generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
+
+      case AIProvider.anthropic:
+        final key = await _secureStorage.getApiKey('anthropic');
+        final trimmedKey = key?.trim() ?? '';
+        if (trimmedKey.isEmpty) {
+          debugPrint('[AIRouter] Anthropic Stream skipped - no key set');
+          return null;
+        }
+        debugPrint('[AIRouter] Starting Anthropic Stream key="${trimmedKey.substring(0, 10)}..."');
+        return AnthropicApiClient(apiKey: trimmedKey, model: _selectedModels[AIProvider.anthropic] ?? 'claude-3-5-sonnet-20241022').generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
+      case AIProvider.zeera:
+        // Handled via _generateZeeraStream directly
+        return null;
     }
+  }
+
+  Stream<String> _generateZeeraStream(String prompt, {String? systemPrompt}) async* {
+    _activeProvider = AIProvider.zeera;
+    _activeModel = 'ZEERA';
+    _setStatus('ZEERA — Initializing Dual-Model Intelligence...');
+
+    bool isProject = prompt.toLowerCase().contains('build') || 
+                    prompt.toLowerCase().contains('project') || 
+                    prompt.toLowerCase().contains('architecture');
+
+    final List<Map<String, String>> dialogueHistory = [];
+    final int totalRounds = isProject ? 3 : _zeeraRounds; // Deeper reasoning for projects
+    
+    // Resolve dynamic names for collaborators based on current settings
+    final String modelAName = _selectedModels[_zeeraProviderA] ?? 
+                             (_zeeraProviderA == AIProvider.anthropic ? 'Claude-3.5' : _providerName(_zeeraProviderA));
+    final String modelBName = _selectedModels[_zeeraProviderB] ?? 
+                             (_zeeraProviderB == AIProvider.nvidia ? 'Llama-3.1-70B' : _providerName(_zeeraProviderB));
+
+    if (isProject) {
+      yield '[ZEERA — ABSOLUTE PROJECT MODE: Initiating Massive 40,000-Token Synthesis...]\n\n';
+      systemPrompt = "${systemPrompt ?? ''}\n\n[ABSOLUTE DEPLOYMENT PROTOCOL]\nYou are tasked with generating a 100% COMPLETE, production-ready project.\n1. DO NOT use placeholders or 'implement logic here' comments.\n2. EXCLUSIVE FORMAT: Output every file using the header '--- FILE: <path> ---' followed by the code block.\n3. Include frontend, backend, database schemas, and README.md with deployment instructions.\n4. DO NOT provide conversational summaries unless explicitly requested.\n5. START with a 'project_info.json' describing the architecture.";
+    } else {
+      yield '[ZEERA — COLLABORATIVE INTELLIGENCE: $modelAName & $modelBName Synchronizing...]\n\n';
+    }
+
+    for (int i = 1; i <= totalRounds; i++) {
+      // ROUND N: MODEL A (Internal Analysis)
+      _setStatus('ZEERA — $modelAName ↔ $modelBName: Analyzing Round $i...');
+      
+      String promptA = "User Context: $prompt\n\nDialogue History:\n${_formatDialogue(dialogueHistory)}\n\nYou are $modelAName. Analyze the user request and provide your expert perspective, building on any previous dialogue.";
+      final respA = await _tryProvider(_zeeraProviderA, promptA, systemPrompt: systemPrompt);
+      
+      if (respA != null) {
+        dialogueHistory.add({'role': modelAName, 'content': respA});
+      } else {
+        yield '[⚠️ ZEERA RECOVERY: $modelAName Connection Lost. $modelBName continuing exclusive analysis...]\n\n';
+      }
+
+      // ROUND N: MODEL B (Internal Synthesis)
+      _setStatus('ZEERA — $modelAName ↔ $modelBName: Designing Round $i...');
+
+      String promptB = "User Context: $prompt\n\nDialogue History:\n${_formatDialogue(dialogueHistory)}\n\nYou are $modelBName. Critically evaluate previous insights and offer complementary or contradictory perspectives to deepen the reasoning.";
+      final respB = await _tryProvider(_zeeraProviderB, promptB, systemPrompt: systemPrompt);
+
+      if (respB != null) {
+        dialogueHistory.add({'role': modelBName, 'content': respB});
+      } else {
+        yield '[⚠️ ZEERA RECOVERY: $modelBName Connection Lost. Finalizing with current context...]\n\n';
+      }
+    }
+
+    // FINAL SYNTHESIS
+    // yield '\n\n**[ZEERA — SYNTHESIZING FINAL RESPONSE]**\n'; // Removed: Silent mode
+    _setStatus('ZEERA — Orchestrating final synthesis...');
+
+    final synthKey = await _secureStorage.getApiKey('zeeraSynthesis');
+    if (synthKey == null || synthKey.isEmpty) {
+      yield '\n❌ Zeera synthesis failed: Zeera Synthesis Key (Nvidia) not found. Please add your key in settings.';
+      return;
+    }
+
+    final synthModel = _zeeraSynthesisModel ?? 'meta/llama-3.1-405b-instruct';
+    final nvidiaSynth = NvidiaApiClient(apiKey: synthKey, model: synthModel);
+
+    final String synthesisPrompt = """
+User Input: $prompt
+
+COLLABORATIVE DIALOGUE LOG (EXPERT PERSPECTIVES):
+${_formatDialogue(dialogueHistory)}
+
+CRITICAL TASK: You are ZEERA (Z-Level Executive Intelligence), the meta-orchestration layer for JARVIS. 
+Your primary directive is to synthesize the disparate, high-complexity reasoning strings provided in the dialogue log into a SINGLE, DEFINITIVE, and SUPERIOR RESPONSE.
+
+QUALITY & VISUALIZATION PROTOCOLS:
+1. **Contextual Visualization:** You MUST interleave high-fidelity Mermaid diagrams (Flowcharts, Class Diagrams, Entity Relationship Diagrams) DIRECTLY within your text and code blocks. These diagrams must be 'real'—accurately reflecting the specific architecture of the user's query.
+2. **Topnotch Reasoning:** Resolve all contradictions found in the logs with objective, high-order logic.
+3. **Extreme Context Output:** If the user requires a full project (e.g., 20k lines of code) or complex debugging, you MUST provide the complete, optimized, and production-ready implementation in this single response. Do not use placeholders. 
+4. **Eliminate Redundancy:** Do NOT repeat the background context or reasoning steps from the logs. Output ONLY the refined, smarter truth.
+5. **Technical Precision:** Incorporate all security and performance edge-cases discussed in the collaborative dialogue.
+6. **Executive Tone:** Maintain a premium, executive, and powerful tone. Avoid conversational filler.
+
+FINISH INSTRUCTION: Output the full, high-complexity synthesized response now, including all code modules and contextual diagrams.
+""";
+
+    try {
+      final stream = nvidiaSynth.generateStream(
+        synthesisPrompt, 
+        systemPrompt: "You are ZEERA, an Absolute Meta-Intelligence AI. Provide a 100% COMPLETE, production-ready, ready-to-deploy final synthesis. NO PLACEHOLDERS. NO TRUNCATION.",
+        maxTokens: 40000, // Absolute threshold for massive 20k+ line deployments
+      );
+
+      await for (final chunk in stream) {
+        yield chunk;
+      }
+    } catch (e) {
+      yield '\n❌ Synthesis Engine Error: $e';
+    }
+    
+    _setStatus('ZEERA — Response Complete');
+  }
+
+  String _formatDialogue(List<Map<String, String>> history) {
+    if (history.isEmpty) return "None.";
+    return history.map((m) => "[${m['role']}]: ${m['content']}").join('\n\n---\n\n');
   }
 
   /// Helper to pick the "best" model from a list, prioritizing hints or common defaults.
@@ -940,11 +1257,23 @@ RULE 12: GOOGLE DOCS (docx)
           final key = await _secureStorage.getApiKey('nvidia');
           if (key == null || key.isEmpty) return [];
           return await NvidiaApiClient(apiKey: key, model: '').fetchModels();
+        case AIProvider.openRouter:
+          final key = await _secureStorage.getApiKey('openRouter');
+          if (key == null || key.isEmpty) return [];
+          return await OpenRouterClient(apiKey: key, model: '').fetchModels();
+        case AIProvider.anthropic:
+          final key = await _secureStorage.getApiKey('anthropic');
+          if (key == null || key.isEmpty) return [];
+          return await AnthropicApiClient(apiKey: key).fetchModels();
         case AIProvider.llamaCpp:
-          return ['LLaMA-3', 'Mistral'];
+          return ['LLaMA-3', 'Mistral']; 
+        case AIProvider.zeera:
+          final key = await _secureStorage.getApiKey('zeeraSynthesis');
+          if (key == null || key.isEmpty) return [];
+          return await NvidiaApiClient(apiKey: key, model: '').fetchModels();
       }
     } catch (e) {
-      debugPrint('[AIRouter] fetchModels $provider error: $e');
+      debugPrint('[AIRouter] Failed to fetch models for ${provider.name}: $e');
       return [];
     }
   }
@@ -971,7 +1300,16 @@ RULE 12: GOOGLE DOCS (docx)
   }
 
   String _providerName(AIProvider p) {
-    return p.name[0].toUpperCase() + p.name.substring(1);
+    switch (p) {
+      case AIProvider.llamaCpp: return 'llama.cpp';
+      case AIProvider.gemini: return 'Gemini';
+      case AIProvider.ollama: return 'Ollama (Local)';
+      case AIProvider.ollamaCloud: return 'Ollama Cloud';
+      case AIProvider.nvidia: return 'NVIDIA';
+      case AIProvider.openRouter: return 'OpenRouter';
+      case AIProvider.zeera: return 'Zeera';
+      case AIProvider.anthropic: return 'Anthropic';
+    }
   }
 }
 
