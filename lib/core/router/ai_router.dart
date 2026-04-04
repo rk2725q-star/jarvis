@@ -1045,16 +1045,28 @@ RULE 12: GOOGLE DOCS (docx)
 
       case AIProvider.nvidia:
         final key = await _secureStorage.getApiKey('nvidia');
-        if (key == null || key.trim().isEmpty) return null;
-        var model = _selectedModels[AIProvider.nvidia];
-        // Dynamic fetch if no model is selected
-        if (model == null || model.isEmpty) {
-          final models = await NvidiaApiClient(apiKey: key, model: '').fetchModels();
-          model = _pickBestModel(models, hint: 'llama-3.1');
-          if (model.isEmpty && models.isNotEmpty) model = models.first;
+        final trimmedNvKey = key?.trim() ?? '';
+        if (trimmedNvKey.isEmpty) {
+          debugPrint('[NVIDIA Stream] No API key - skipping');
+          return null;
         }
-        if (model.isEmpty) return null;
-        return NvidiaApiClient(apiKey: key, model: model).generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
+        var model = _selectedModels[AIProvider.nvidia];
+        // Only auto-fetch if user has NOT selected a model
+        if (model == null || model.isEmpty) {
+          try {
+            final models = await NvidiaApiClient(apiKey: trimmedNvKey, model: '').fetchModels();
+            model = _pickBestModel(models, hint: 'llama-3.1');
+            if ((model.isEmpty) && models.isNotEmpty) model = models.first;
+          } catch (e) {
+            debugPrint('[NVIDIA Stream] Model fetch failed: $e');
+          }
+        }
+        if (model == null || model.isEmpty) {
+          debugPrint('[NVIDIA Stream] No model available - skipping');
+          return null;
+        }
+        debugPrint('[NVIDIA Stream] Using model: $model, key prefix: ${trimmedNvKey.substring(0, 8)}...');
+        return NvidiaApiClient(apiKey: trimmedNvKey, model: model).generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
 
       case AIProvider.openRouter:
         final key = await _secureStorage.getApiKey('openRouter');
@@ -1084,104 +1096,341 @@ RULE 12: GOOGLE DOCS (docx)
     }
   }
 
+  /// Call Model A (NVIDIA) using STREAMING collect — never times out on slow models like kimi-k2.5.
+  /// The SSE connection stays alive as tokens trickle in, so 3-minute models work perfectly.
+  Future<String?> _callZeeraProviderA(String prompt, {String? systemPrompt}) async {
+    final key = await _secureStorage.getApiKey('nvidia');
+    final trimmedKey = key?.trim() ?? '';
+    if (trimmedKey.isEmpty) {
+      debugPrint('[Zeera-A] NVIDIA key missing');
+      return null;
+    }
+    final model = _zeeraModelA ?? _selectedModels[AIProvider.nvidia] ?? 'nvidia/llama-3.1-nemotron-ultra-253b-v1';
+    debugPrint('[Zeera-A] Calling NVIDIA model: $model (stream-collect)');
+    try {
+      // Use generateCollect() — SSE stream internally, no hard wall-clock timeout on body
+      final result = await NvidiaApiClient(apiKey: trimmedKey, model: model)
+          .generateCollect(prompt, systemPrompt: systemPrompt, maxTokens: 8192);
+      return result.isEmpty ? null : result;
+    } catch (e) {
+      debugPrint('[Zeera-A] NVIDIA failed: $e');
+      return null;
+    }
+  }
+
+  /// Call Model B (Ollama Cloud or NVIDIA fallback) using stream-collect for timeout immunity.
+  Future<String?> _callZeeraProviderB(String prompt, {String? systemPrompt}) async {
+    final modelB = _zeeraModelB ?? _selectedModels[AIProvider.ollamaCloud];
+    debugPrint('[Zeera-B] Calling Ollama Cloud model: ${modelB ?? "default"}');
+
+    // Try Ollama Cloud first
+    try {
+      final messages = [
+        if (systemPrompt != null) OllamaChatMessage(role: 'system', content: systemPrompt),
+        OllamaChatMessage(role: 'user', content: prompt),
+      ];
+      // Collect stream for timeout immunity
+      final sb = StringBuffer();
+      await for (final chunk in _ollamaService.chatStream(
+          messages: messages, model: modelB, useCloudOverride: true)) {
+        sb.write(chunk);
+      }
+      final result = sb.toString().trim();
+      if (result.isNotEmpty) return result;
+    } catch (e) {
+      debugPrint('[Zeera-B] Ollama Cloud failed: $e');
+    }
+
+    // Fallback: NVIDIA with Model B using generateCollect
+    final key = await _secureStorage.getApiKey('nvidia');
+    final trimmedKey = key?.trim() ?? '';
+    if (trimmedKey.isEmpty) return null;
+    final nvModelB = _zeeraModelB ?? _selectedModels[AIProvider.nvidia] ?? 'deepseek-ai/deepseek-r1';
+    try {
+      debugPrint('[Zeera-B] Fallback to NVIDIA: $nvModelB');
+      final result = await NvidiaApiClient(apiKey: trimmedKey, model: nvModelB)
+          .generateCollect(prompt, systemPrompt: systemPrompt, maxTokens: 8192);
+      return result.isEmpty ? null : result;
+    } catch (e2) {
+      debugPrint('[Zeera-B] NVIDIA fallback also failed: $e2');
+      return null;
+    }
+  }
+
+  // ============================================================
+  // ZEERA — TRUE COLLABORATIVE INTELLIGENCE ENGINE v2.0
+  // Models TALK TO EACH OTHER: A reads B's output and responds,
+  // B reads A's response and refines. This creates genuine synthesis.
+  // ============================================================
   Stream<String> _generateZeeraStream(String prompt, {String? systemPrompt}) async* {
     _activeProvider = AIProvider.zeera;
     _activeModel = 'ZEERA';
     _setStatus('ZEERA — Initializing Dual-Model Intelligence...');
 
-    bool isProject = prompt.toLowerCase().contains('build') || 
-                    prompt.toLowerCase().contains('project') || 
+    // Resolve display names
+    final String modelAName = _zeeraModelA ?? _selectedModels[AIProvider.nvidia] ?? 'NVIDIA Brain';
+    final String modelBName = _zeeraModelB ?? _selectedModels[AIProvider.ollamaCloud] ?? 'Ollama Brain';
+
+    bool isProject = prompt.toLowerCase().contains('build') ||
+                    prompt.toLowerCase().contains('create') ||
+                    prompt.toLowerCase().contains('make a') ||
+                    prompt.toLowerCase().contains('develop') ||
+                    prompt.toLowerCase().contains('app') ||
+                    prompt.toLowerCase().contains('website') ||
+                    prompt.toLowerCase().contains('project') ||
                     prompt.toLowerCase().contains('architecture');
 
     final List<Map<String, String>> dialogueHistory = [];
-    final int totalRounds = isProject ? 3 : _zeeraRounds; // Deeper reasoning for projects
-    
-    // Resolve dynamic names for collaborators based on current settings
-    final String modelAName = _selectedModels[_zeeraProviderA] ?? 
-                             (_zeeraProviderA == AIProvider.anthropic ? 'Claude-3.5' : _providerName(_zeeraProviderA));
-    final String modelBName = _selectedModels[_zeeraProviderB] ?? 
-                             (_zeeraProviderB == AIProvider.nvidia ? 'Llama-3.1-70B' : _providerName(_zeeraProviderB));
+    final int totalRounds = isProject ? 2 : _zeeraRounds;
+
+    final String zeeraSystemPrompt = systemPrompt ?? 
+        'You are an expert AI collaborating with another AI model to provide the best possible response. Be concise and technical.';
 
     if (isProject) {
-      yield '[ZEERA — ABSOLUTE PROJECT MODE: Initiating Massive 40,000-Token Synthesis...]\n\n';
-      systemPrompt = "${systemPrompt ?? ''}\n\n[ABSOLUTE DEPLOYMENT PROTOCOL]\nYou are tasked with generating a 100% COMPLETE, production-ready project.\n1. DO NOT use placeholders or 'implement logic here' comments.\n2. EXCLUSIVE FORMAT: Output every file using the header '--- FILE: <path> ---' followed by the code block.\n3. Include frontend, backend, database schemas, and README.md with deployment instructions.\n4. DO NOT provide conversational summaries unless explicitly requested.\n5. START with a 'project_info.json' describing the architecture.";
+      yield '**[ZEERA — ABSOLUTE PROJECT SYNTHESIS]**\n🧠 **$modelAName** ↔ **$modelBName** — True Cross-Model Collaboration\n🎯 Building 100% production-ready, deploy-ready codebase...\n\n';
+      
+      final deploySystemPrompt = '''You are part of the ZEERA Absolute Deployment Engine — the most powerful AI code synthesis system.
+MISSION: Generate 100% COMPLETE, production-ready, immediately deployable code.
+RULES (STRICT):
+- NO placeholders, NO "// implement this", NO "TODO" comments ever.
+- Every file must be 100% complete and runnable.
+- Output EACH FILE in its own separate block:
+
+```filename: path/to/file.ext
+<complete file content here>
+```
+
+- Include ALL files: frontend, backend, DB schemas, Docker files, .env.example, nginx config, README with exact deploy steps.
+- Code must compile and run without any changes.
+- Use current, stable versions of all packages.
+- Handle all edge cases, errors, and security issues.''';
+
+      // === ROUND 1: Model A designs the complete architecture ===
+      _setStatus('ZEERA — $modelAName designing complete architecture...');
+      final archPrompt = '''**TASK:** Design the COMPLETE, PRODUCTION-READY architecture for: "$prompt"
+
+You MUST specify:
+1. **Tech Stack** — exact versions of every framework, library, runtime
+2. **Complete folder structure** — every directory and file that will exist
+3. **Database schema** — every table/collection with all fields, types, constraints, indexes
+4. **All API endpoints** — method, path, request body, response body
+5. **Environment variables** — every env var needed with example values
+6. **Docker/deployment config** — what services are needed
+7. **Authentication flow** — exactly how auth works step by step
+8. **Key implementation details** — any complex logic Model B must implement
+
+Be extremely detailed. Model B will write ALL the code based on your architecture.''';
+
+      final archResp = await _callZeeraProviderA(archPrompt, systemPrompt: deploySystemPrompt);
+      if (archResp != null && archResp.isNotEmpty) {
+        dialogueHistory.add({'role': modelAName, 'content': archResp});
+        yield '## 🏗️ [$modelAName — Architecture Design]\n\n$archResp\n\n---\n\n';
+      } else {
+        yield '⚠️ $modelAName architecture pass failed. $modelBName will self-architect...\n\n';
+      }
+
+      // === ROUND 2: Model B READS A's architecture and implements EVERYTHING ===
+      _setStatus('ZEERA — $modelBName implementing ALL code files...');
+      final implContext = dialogueHistory.isNotEmpty 
+          ? dialogueHistory.last['content']! 
+          : 'Project: $prompt — implement a complete production-ready version.';
+      
+      final implPrompt = '''**ARCHITECTURE FROM $modelAName:**
+$implContext
+
+**YOUR TASK:** Write the COMPLETE, PRODUCTION-READY code for EVERY file in the architecture above.
+
+CRITICAL RULES:
+- Write 100% of each file — no placeholder, no "see above", no truncation
+- Use the EXACT file format with proper ``` code fences:
+
+```filename: path/to/exact/file.ext
+<COMPLETE file content>
+```
+
+- Start with the most important files: main config, DB schema, server entry points
+- Then all routes, controllers, services, middleware
+- Then ALL frontend components (every page, component, hook, store)
+- Then all Docker/config files, .env.example, README
+
+Remember: A developer should be able to copy each block and run `docker-compose up` to get a working app.''';
+
+      final implResp = await _callZeeraProviderB(implPrompt, systemPrompt: deploySystemPrompt);
+      if (implResp != null && implResp.isNotEmpty) {
+        dialogueHistory.add({'role': modelBName, 'content': implResp});
+        yield '## 💻 [$modelBName — Full Code Implementation]\n\n$implResp\n\n---\n\n';
+      } else {
+        yield '⚠️ $modelBName implementation pass failed.\n\n';
+      }
+
+      // === ROUND 3: Model A REVIEWS B's code and adds/fixes anything missing ===
+      if (dialogueHistory.length >= 2) {
+        _setStatus('ZEERA — $modelAName reviewing and completing gaps...');
+        final reviewPrompt = '''You designed this architecture:
+${dialogueHistory[0]['content']}
+
+$modelBName implemented this code:
+${dialogueHistory[1]['content']}
+
+**YOUR TASK:** Review $modelBName's implementation and:
+1. Identify ANY missing files, incomplete implementations, or bugs
+2. Write the COMPLETE code for ANY missing pieces
+3. Fix any bugs you see
+4. Add any configuration or deployment files that are missing
+5. Ensure the app will work 100% out of the box
+
+Output ONLY the additional/fixed files using:
+```filename: path/to/file.ext
+<complete fixed content>
+```
+
+If everything is complete, write a deployment checklist instead.''';
+
+        final reviewResp = await _callZeeraProviderA(reviewPrompt, systemPrompt: deploySystemPrompt);
+        if (reviewResp != null && reviewResp.isNotEmpty) {
+          dialogueHistory.add({'role': '$modelAName-Review', 'content': reviewResp});
+          yield '## 🔍 [$modelAName — Code Review & Gap Fill]\n\n$reviewResp\n\n---\n\n';
+        }
+      }
+
     } else {
-      yield '[ZEERA — COLLABORATIVE INTELLIGENCE: $modelAName & $modelBName Synchronizing...]\n\n';
+      // === COLLABORATIVE REASONING MODE (non-project) ===
+      yield '**[ZEERA — COLLABORATIVE INTELLIGENCE]**\n🧠 **$modelAName** ↔ **$modelBName** — Each model reads the other\'s output\n\n';
+
+      for (int i = 1; i <= totalRounds; i++) {
+        // === Model A turn — reads ALL previous dialogue ===
+        _setStatus('ZEERA — $modelAName thinking (Round $i of $totalRounds)...');
+
+        final promptA = i == 1
+            ? '''You are collaborating with another AI ($modelBName) to answer: "$prompt"
+
+Provide your BEST, most thorough analysis. Be specific, give examples, go deep.
+Your response will be shared with $modelBName who will build upon or critique it.'''
+            : '''You are collaborating with $modelBName to answer: "$prompt"
+
+$modelBName's previous response:
+---
+${dialogueHistory.last['content']}
+---
+
+Now: (1) Build upon the strong points, (2) Correct any errors you see, (3) Add what is missing, (4) Synthesize into a stronger answer.
+Be direct about disagreements and explain why.''';
+
+        final respA = await _callZeeraProviderA(promptA, systemPrompt: zeeraSystemPrompt);
+        if (respA != null && respA.isNotEmpty) {
+          dialogueHistory.add({'role': modelAName, 'content': respA});
+          yield '\n**[$modelAName — Round $i]**\n$respA\n\n';
+        } else {
+          yield '⚠️ $modelAName unavailable in Round $i.\n';
+        }
+
+        // === Model B turn — explicitly reads Model A's latest response ===
+        _setStatus('ZEERA — $modelBName responding (Round $i of $totalRounds)...');
+
+        final lastAResp = dialogueHistory.isNotEmpty ? dialogueHistory.last['content'] : '';
+        final promptB = '''You are collaborating with $modelAName to answer: "$prompt"
+
+$modelAName just said:
+---
+$lastAResp
+---
+
+Your job: (1) Agree with what is correct, (2) Challenge what is wrong with evidence, (3) Add dimensions $modelAName missed, (4) Push toward the most complete, accurate answer possible.
+This is a collaborative reasoning session — be rigorous and specific.''';
+
+        final respB = await _callZeeraProviderB(promptB, systemPrompt: zeeraSystemPrompt);
+        if (respB != null && respB.isNotEmpty) {
+          dialogueHistory.add({'role': modelBName, 'content': respB});
+          yield '\n**[$modelBName — Round $i Response]**\n$respB\n\n';
+        } else {
+          yield '⚠️ $modelBName unavailable in Round $i.\n';
+        }
+      }
     }
 
-    for (int i = 1; i <= totalRounds; i++) {
-      // ROUND N: MODEL A (Internal Analysis)
-      _setStatus('ZEERA — $modelAName ↔ $modelBName: Analyzing Round $i...');
-      
-      String promptA = "User Context: $prompt\n\nDialogue History:\n${_formatDialogue(dialogueHistory)}\n\nYou are $modelAName. Analyze the user request and provide your expert perspective, building on any previous dialogue.";
-      final respA = await _tryProvider(_zeeraProviderA, promptA, systemPrompt: systemPrompt);
-      
-      if (respA != null) {
-        dialogueHistory.add({'role': modelAName, 'content': respA});
-      } else {
-        yield '[⚠️ ZEERA RECOVERY: $modelAName Connection Lost. $modelBName continuing exclusive analysis...]\n\n';
-      }
+    // === FINAL META-SYNTHESIS ===
+    _setStatus('ZEERA — Meta-synthesis in progress...');
 
-      // ROUND N: MODEL B (Internal Synthesis)
-      _setStatus('ZEERA — $modelAName ↔ $modelBName: Designing Round $i...');
-
-      String promptB = "User Context: $prompt\n\nDialogue History:\n${_formatDialogue(dialogueHistory)}\n\nYou are $modelBName. Critically evaluate previous insights and offer complementary or contradictory perspectives to deepen the reasoning.";
-      final respB = await _tryProvider(_zeeraProviderB, promptB, systemPrompt: systemPrompt);
-
-      if (respB != null) {
-        dialogueHistory.add({'role': modelBName, 'content': respB});
-      } else {
-        yield '[⚠️ ZEERA RECOVERY: $modelBName Connection Lost. Finalizing with current context...]\n\n';
-      }
-    }
-
-    // FINAL SYNTHESIS
-    // yield '\n\n**[ZEERA — SYNTHESIZING FINAL RESPONSE]**\n'; // Removed: Silent mode
-    _setStatus('ZEERA — Orchestrating final synthesis...');
-
-    final synthKey = await _secureStorage.getApiKey('zeeraSynthesis');
-    if (synthKey == null || synthKey.isEmpty) {
-      yield '\n❌ Zeera synthesis failed: Zeera Synthesis Key (Nvidia) not found. Please add your key in settings.';
+    if (dialogueHistory.isEmpty) {
+      yield '\n❌ Both models failed. Check NVIDIA API key and Ollama Cloud settings.';
+      _setStatus('ZEERA — Failed');
       return;
     }
 
-    final synthModel = _zeeraSynthesisModel ?? 'meta/llama-3.1-405b-instruct';
-    final nvidiaSynth = NvidiaApiClient(apiKey: synthKey, model: synthModel);
+    final nvidiaKey = (await _secureStorage.getApiKey('nvidia'))?.trim() ?? '';
+    if (nvidiaKey.isEmpty) {
+      yield '\n\n**[ZEERA — COMBINED OUTPUT]**\n\n';
+      for (final entry in dialogueHistory) {
+        yield '### ${entry['role']}\n${entry['content']}\n\n';
+      }
+      _setStatus('ZEERA — Complete');
+      return;
+    }
 
-    final String synthesisPrompt = """
-User Input: $prompt
+    final synthModel = _zeeraSynthesisModel ?? _selectedModels[AIProvider.nvidia] ?? 'nvidia/llama-3.1-nemotron-ultra-253b-v1';
+    debugPrint('[Zeera-Synthesis] Final synthesis via: $synthModel');
+    
+    final synthesisSystemPrompt = isProject
+        ? '''You are ZEERA — the world's most advanced AI code synthesis engine.
+You receive outputs from two AI models collaborating on a software project.
+Your job: produce the SINGLE MOST COMPLETE, PRODUCTION-READY final version.
+RULES:
+- Merge the best parts of both models' outputs
+- Fill ALL gaps — every file must be 100% complete
+- Format: each file in its OWN separate code block:
+```filename: path/to/file
+<complete content>
+```
+- Include a deployment checklist at the end
+- ZERO placeholders, ZERO truncation, ZERO TODO comments'''
+        : '''You are ZEERA — a meta-intelligence that synthesizes collaborative AI dialogue into the definitive answer.
+RULES:
+- Read the full dialogue between $modelAName and $modelBName
+- Extract the highest-quality insights from each
+- Resolve contradictions with clear reasoning
+- Produce a response that is BETTER than either model alone
+- Be comprehensive yet clear\n- Use markdown formatting for readability''';
 
-COLLABORATIVE DIALOGUE LOG (EXPERT PERSPECTIVES):
+    final synthesisPrompt = isProject
+        ? '''User wants to build: "$prompt"
+
+Here is the collaborative output from $modelAName and $modelBName:
+
 ${_formatDialogue(dialogueHistory)}
 
-CRITICAL TASK: You are ZEERA (Z-Level Executive Intelligence), the meta-orchestration layer for JARVIS. 
-Your primary directive is to synthesize the disparate, high-complexity reasoning strings provided in the dialogue log into a SINGLE, DEFINITIVE, and SUPERIOR RESPONSE.
+SYNTHESIZE: Produce the FINAL, COMPLETE, DEPLOYABLE codebase.
+Every file must be in its own ```filename: path/to/file``` block.
+Start with README and deployment instructions, then all code files.
+Absolutely NO truncation or placeholders.'''
+        : '''User Question: "$prompt"
 
-QUALITY & VISUALIZATION PROTOCOLS:
-1. **Contextual Visualization:** You MUST interleave high-fidelity Mermaid diagrams (Flowcharts, Class Diagrams, Entity Relationship Diagrams) DIRECTLY within your text and code blocks. These diagrams must be 'real'—accurately reflecting the specific architecture of the user's query.
-2. **Topnotch Reasoning:** Resolve all contradictions found in the logs with objective, high-order logic.
-3. **Extreme Context Output:** If the user requires a full project (e.g., 20k lines of code) or complex debugging, you MUST provide the complete, optimized, and production-ready implementation in this single response. Do not use placeholders. 
-4. **Eliminate Redundancy:** Do NOT repeat the background context or reasoning steps from the logs. Output ONLY the refined, smarter truth.
-5. **Technical Precision:** Incorporate all security and performance edge-cases discussed in the collaborative dialogue.
-6. **Executive Tone:** Maintain a premium, executive, and powerful tone. Avoid conversational filler.
+Collaborative dialogue between $modelAName and $modelBName:
+${_formatDialogue(dialogueHistory)}
 
-FINISH INSTRUCTION: Output the full, high-complexity synthesized response now, including all code modules and contextual diagrams.
-""";
+Synthesize this into the single best, most complete answer possible.
+Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
 
     try {
-      final stream = nvidiaSynth.generateStream(
-        synthesisPrompt, 
-        systemPrompt: "You are ZEERA, an Absolute Meta-Intelligence AI. Provide a 100% COMPLETE, production-ready, ready-to-deploy final synthesis. NO PLACEHOLDERS. NO TRUNCATION.",
-        maxTokens: 40000, // Absolute threshold for massive 20k+ line deployments
-      );
+      yield '\n\n---\n## 🧬 [ZEERA FINAL SYNTHESIS — $synthModel]\n\n';
+      if (isProject) {
+        yield '> 📋 **Each file is in its own code block. Copy the content of each block to create the file.**\n\n';
+      }
+      final stream = NvidiaApiClient(apiKey: nvidiaKey, model: synthModel)
+          .generateStream(synthesisPrompt, systemPrompt: synthesisSystemPrompt, maxTokens: 16000);
 
       await for (final chunk in stream) {
         yield chunk;
       }
+      yield '\n\n---\n✅ **ZEERA synthesis complete.**';
     } catch (e) {
-      yield '\n❌ Synthesis Engine Error: $e';
+      debugPrint('[Zeera-Synthesis] Error: $e');
+      yield '\n\n**[ZEERA — Recovery Mode]** Outputting best model response:\n\n';
+      // Output all collected dialogue as the final answer
+      for (final entry in dialogueHistory) {
+        yield '### ${entry['role']}\n${entry['content']}\n\n---\n\n';
+      }
     }
-    
+
     _setStatus('ZEERA — Response Complete');
   }
 

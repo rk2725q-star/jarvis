@@ -107,6 +107,16 @@ class NvidiaApiClient {
     }
   }
 
+  /// Collect a full response using SSE streaming internally.
+  /// This avoids hard timeouts since data keeps flowing even for slow models like kimi-k2.5.
+  Future<String> generateCollect(String prompt, {String? systemPrompt, int? maxTokens}) async {
+    final buffer = StringBuffer();
+    await for (final chunk in generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens)) {
+      buffer.write(chunk);
+    }
+    return buffer.toString();
+  }
+
   Stream<String> generateStream(String prompt, {String? systemPrompt, int? maxTokens}) async* {
     final List<Map<String, dynamic>> messages = [];
     if (systemPrompt != null) {
