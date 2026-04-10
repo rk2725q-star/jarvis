@@ -2,6 +2,7 @@ package com.jarvis.jarvis_ai
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import android.text.TextUtils
 import io.flutter.embedding.android.FlutterActivity
@@ -10,6 +11,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val ACCESSIBILITY_CHANNEL = "jarvis.ai.os/accessibility"
+    private val FILE_OPEN_CHANNEL = "jarvis.ai.os/file_open"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -166,6 +168,65 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // ── File Open Channel: called from Flutter to get the initial file path ──
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPEN_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getInitialFile" -> {
+                        val path = resolveFilePath(intent)
+                        result.success(path)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // Notify Flutter of the new file while app is already open
+        val path = resolveFilePath(intent)
+        if (path != null && flutterEngine != null) {
+            MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, FILE_OPEN_CHANNEL)
+                .invokeMethod("openFile", path)
+        }
+    }
+
+    /** Resolve the real file path from a VIEW intent (handles both file:// and content:// URIs) */
+    private fun resolveFilePath(intent: Intent?): String? {
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        val uri: Uri = intent.data ?: return null
+        return when (uri.scheme) {
+            "file" -> uri.path
+            "content" -> {
+                // Copy content URI to a temp file Flutter can read
+                try {
+                    val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
+                    val ext = mimeTypeToExt(mimeType)
+                    val tmpFile = java.io.File(cacheDir, "jarvis_open_${System.currentTimeMillis()}$ext")
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        tmpFile.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    tmpFile.absolutePath
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            else -> null
+        }
+    }
+
+    private fun mimeTypeToExt(mime: String): String = when {
+        mime.contains("pdf") -> ".pdf"
+        mime.contains("word") || mime.contains("msword") -> ".docx"
+        mime.contains("powerpoint") || mime.contains("presentation") -> ".pptx"
+        mime.contains("excel") || mime.contains("spreadsheet") -> ".xlsx"
+        mime.contains("text/plain") -> ".txt"
+        mime.contains("image/jpeg") -> ".jpg"
+        mime.contains("image/png") -> ".png"
+        mime.contains("image/") -> ".jpg"
+        else -> ".bin"
     }
 
     private fun isServiceEnabled(context: Context, service: Class<*>): Boolean {

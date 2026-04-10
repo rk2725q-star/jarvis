@@ -91,7 +91,7 @@ class NvidiaApiClient {
           'messages': messages,
           'temperature': 0.5,
           'top_p': 1.0,
-          'max_tokens': maxTokens ?? 2048,
+          'max_tokens': maxTokens ?? 8192, // Raised from 2048
         }),
       ).timeout(const Duration(seconds: 180));
 
@@ -139,7 +139,7 @@ class NvidiaApiClient {
         'messages': messages,
         'temperature': 0.5,
         'top_p': 1.0,
-        'max_tokens': maxTokens ?? 2048,
+        'max_tokens': maxTokens ?? 8192, // Raised from 2048
         'stream': true,
       });
 

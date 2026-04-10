@@ -82,6 +82,7 @@ dependencies:
   image: ^4.3.0
   googleapis: ^16.0.0
   googleapis_auth: ^2.0.0
+  receive_sharing_intent: ^1.8.1
 
 dev_dependencies:
   flutter_test:

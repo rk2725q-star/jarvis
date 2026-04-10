@@ -148,6 +148,13 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void attachFile(String path) {
+    if (!_attachedFilePaths.contains(path)) {
+      _attachedFilePaths.add(path);
+      notifyListeners();
+    }
+  }
+
   Future<void> sendMessage(String text) async {
     if (_currentSessionId == null) return;
     if (text.trim().isEmpty && _attachedFilePaths.isEmpty) return;
@@ -170,33 +177,9 @@ class ChatProvider extends ChangeNotifier {
         resolvedProvider = intId;
         combinedText = combinedText.substring(atMatch.end).trim();
       }
-    } else {
-      // Autonomous Decision Maker (JARVIS decides best tool if connected)
-      final lowerText = combinedText.toLowerCase();
-      int highestMatches = 0;
-
-      // New: Project/Design autonomous trigger - PRIORITIZE ZEERA first as requested
-      if (lowerText.contains('build') || lowerText.contains('project') || lowerText.contains('architecture') || lowerText.contains('complete app')) {
-         // Force Zeera mode for high-complexity builds to ensure JARVIS does the work first
-         atIntegrationCapability = "\n\n[SYSTEM DIRECTIVE] Handle this as an Absolute Project Deployment using Zeera Collaborative Intelligence. Do NOT redirect to external tools immediately.";
-      }
-
-        for (final intg in integrationsProvider.connectedIntegrations) {
-          // Normal keyword matching...
-          final nameMatch = lowerText.contains(intg.name.toLowerCase());
-          int matchCount = nameMatch ? 3 : 0; 
-
-          for (final kw in intg.keywords) {
-            if (lowerText.contains(kw.toLowerCase())) matchCount++;
-          }
-
-          if (matchCount >= 2 && matchCount > highestMatches) {
-            highestMatches = matchCount;
-            targetIntg = intg;
-            resolvedProvider = intg.id;
-          }
-      }
     }
+    // NOTE: Autonomous keyword-based integration routing is intentionally disabled.
+    // Integrations are ONLY triggered when the user explicitly uses @mention.
 
     if (targetIntg != null && resolvedProvider != null) {
       final cap = kIntegrationCapabilityPrompts[resolvedProvider];
@@ -268,6 +251,27 @@ class ChatProvider extends ChangeNotifier {
       NotificationService().skipRoutineForToday('sleep');
     }
 
+    // --- Inject Short-Term Chat History ---
+    final recentHistory = _messages.where((m) => !m.isStreaming).toList();
+    // Get last 6 messages to provide immediate conversational context
+    final recentMemories = recentHistory.length > 6 ? recentHistory.sublist(recentHistory.length - 6) : recentHistory;
+    
+    if (recentMemories.isNotEmpty) {
+      final historyStr = recentMemories.map((m) {
+        final str = m.content;
+        // Truncate ultra-long individual messages to 30000 chars, but this still allows large pastes to remain in short-term memory
+        final displayStr = str.length > 30000 ? '${str.substring(0, 30000)}\n\n...(TRUNCATED FOR MEMORY)...' : str;
+        return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
+      }).join('\n\n---\n\n');
+      
+      String finalHistory = historyStr;
+      // Cap entire injected short-term context to ~60000 chars to avoid model overflow for standard APIs
+      if (finalHistory.length > 60000) {
+        finalHistory = "...\n${finalHistory.substring(finalHistory.length - 60000)}";
+      }
+      combinedText = "[RECENT CHAT HISTORY]\n$finalHistory\n\n[CURRENT USER QUERY]\n$combinedText";
+    }
+
     // ── 1. Set Status ────────────────────────
     bool hasImages = _attachedFilePaths.any(
       (p) =>
@@ -310,10 +314,12 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
     }
 
-    // Add user message
+    // Add user message — store ORIGINAL text only (not the history-injected combinedText)
+    // combinedText (with [RECENT CHAT HISTORY]) is only sent to the AI, never displayed
+    final displayText = text.isEmpty ? "Analyzed attached files" : text.trim();
     final userMsg = Message(
       id: _uuid.v4(),
-      content: text.isEmpty ? "Analyzed attached files" : combinedText,
+      content: displayText,
       isUser: true,
       timestamp: DateTime.now(),
       sessionId: _currentSessionId!,
@@ -348,8 +354,10 @@ class ChatProvider extends ChangeNotifier {
     try {
       await for (final chunk in router.generateStream(
         combinedText,
-        integrationCapabilities: atIntegrationCapability ??
-            integrationsProvider.capabilitySystemPrompt,
+        // CRITICAL FIX: Only pass integration capabilities when user explicitly
+        // @mentioned an integration. Passing capabilitySystemPrompt to ALL messages
+        // was causing JARVIS to autonomously open integrations without user request.
+        integrationCapabilities: atIntegrationCapability ?? '',
       )) {
         buffer.write(chunk);
         final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
@@ -554,10 +562,9 @@ class ChatProvider extends ChangeNotifier {
           taskUrl: foundInteg.buildTaskUrl(tagQuery),
           reason: 'JARVIS routed your request',
         );
-      } else {
-        // Keyword-based automatic detection
-        agentMatch = matchIntegration(text);
       }
+      // NOTE: Keyword-based automatic integration detection is DISABLED.
+      // Integration cards only appear when AI explicitly requests via <OPEN_INTEGRATION> tag.
 
       if (agentMatch != null) {
         final match = agentMatch;

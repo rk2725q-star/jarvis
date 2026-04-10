@@ -146,7 +146,7 @@ class OpenRouterClient {
       
       req.body = jsonEncode(body);
 
-      final resp = await client.send(req).timeout(const Duration(seconds: 20));
+      final resp = await client.send(req).timeout(const Duration(seconds: 300)); // Raised from 20s to allow long responses
       
       if (resp.statusCode != 200) {
         final errBody = await resp.stream.bytesToString();

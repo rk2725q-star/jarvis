@@ -67,7 +67,7 @@ class GeminiApiClient {
         },
       'generationConfig': {
         'temperature': 0.4, // Lower for agentic precision
-        'maxOutputTokens': maxTokens ?? 256, // Short for action decisions
+        'maxOutputTokens': maxTokens ?? 8192, // Default 8192 — was erroneously 256
       }
     };
   }
@@ -116,7 +116,7 @@ class GeminiApiClient {
     final body = jsonEncode(_buildBody(
       prompt: prompt,
       systemPrompt: systemPrompt,
-      maxTokens: maxTokens ?? 2048,
+      maxTokens: maxTokens ?? 8192, // Raised from 2048
       imageBase64: imageBase64,
     ));
 

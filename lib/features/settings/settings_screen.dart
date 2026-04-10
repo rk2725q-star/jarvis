@@ -8,6 +8,7 @@ import 'package:jarvis_ai/core/memory/memory_service.dart';
 import 'package:jarvis_ai/features/chat/chat_provider.dart';
 import 'memory_manager_screen.dart';
 import 'provider_settings_tile.dart';
+import 'ai_providers_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -49,10 +50,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Providers section
+                  // AI Providers reference link
                   _SectionHeader(title: 'AI Providers', icon: Icons.hub_rounded),
                   const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIProvidersScreen())),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [JarvisColors.accentPrimary.withValues(alpha: 0.12), JarvisColors.accentSecondary.withValues(alpha: 0.06)],
+                          begin: Alignment.topLeft, end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: JarvisColors.accentPrimary.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40, height: 40,
+                            decoration: BoxDecoration(
+                              color: JarvisColors.accentPrimary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.hub_rounded, color: JarvisColors.accentPrimary, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Browse All AI Providers', style: TextStyle(color: JarvisColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
+                                SizedBox(height: 2),
+                                Text('Get API keys, view docs, compare 7 providers + 200+ models', style: TextStyle(color: JarvisColors.textMuted, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: JarvisColors.textMuted),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
 
+                  // Provider API key settings
+                  _SectionHeader(title: 'API Keys', icon: Icons.vpn_key_rounded),
+                  const SizedBox(height: 12),
                   Consumer<AIRouter>(
                     builder: (context, router, _) {
                       return Column(

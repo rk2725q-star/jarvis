@@ -35,6 +35,9 @@ class AnthropicApiClient {
     
     // Fallback if API fails or isn't supported yet
     return [
+      'claude-sonnet-4-5',
+      'claude-opus-4-5',
+      'claude-3-7-sonnet-20250219',
       'claude-3-5-sonnet-20241022',
       'claude-3-5-haiku-20241022',
       'claude-3-opus-20240229',
@@ -43,7 +46,7 @@ class AnthropicApiClient {
     ];
   }
 
-  Stream<String> generateStream(String prompt, {String? systemPrompt, int maxTokens = 4096}) async* {
+  Stream<String> generateStream(String prompt, {String? systemPrompt, int maxTokens = 16000}) async* {
     final client = http.Client();
     try {
       debugPrint('[Anthropic] key (prefix)="${apiKey.substring(0, 10)}..." model=$model (Stream)');
@@ -92,7 +95,7 @@ class AnthropicApiClient {
     }
   }
 
-  Future<String> generate(String prompt, {String? systemPrompt, int maxTokens = 4096}) async {
+  Future<String> generate(String prompt, {String? systemPrompt, int maxTokens = 16000}) async {
     debugPrint('[Anthropic] key (prefix)="${apiKey.substring(0, 10)}..." model=$model (Static)');
     final response = await http.post(
       Uri.parse('$baseUrl/messages'),

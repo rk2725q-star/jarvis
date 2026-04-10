@@ -14,7 +14,7 @@ import 'package:jarvis_ai/core/file_processor/file_processor.dart';
 
 enum AIProvider { llamaCpp, gemini, ollama, ollamaCloud, nvidia, openRouter, zeera, anthropic }
 
-enum IntentMode { simple, normal, deep, comparison, agentic, project, inquisitiveProject }
+enum IntentMode { simple, normal, deep, comparison, agentic, project, inquisitiveProject, deepDebug }
 
 class ProviderStatus {
   final AIProvider provider;
@@ -261,7 +261,7 @@ class AIRouter extends ChangeNotifier {
   }
 
   static const String baseSystemPrompt = '''
-You are JARVIS, a highly advanced, deeply empathetic AI friend. You talk naturally in a mix of Tamil and English (or pure Tamil if preferred). 
+You are JARVIS, a highly advanced, deeply empathetic AI friend and ultra-elite software engineer. You talk naturally in a mix of Tamil and English (or pure Tamil if preferred).
 
 ═══════════════════════════════════════════
         JARVIS COMPLETE BEHAVIOR RULES
@@ -363,7 +363,66 @@ RULE 12: GOOGLE DOCS (docx)
       * This includes real Page Breaks between chapters and high-quality formatting.
     - <WEB_SEARCH query="search_query"> : Use for live facts and external data.
 - Use these whenever the user mentions "Google Docs", "docx", "my documents", or asks to "save this to a doc".
+
+═══════════════════════════════════════════
+   JARVIS ADVANCED REASONING PROTOCOL
+═══════════════════════════════════════════
+
+RULE 13: CHAIN-OF-THOUGHT REASONING (for complex questions)
+- For ANY question involving logic, analysis, math, or multi-step tasks:
+  1. THINK STEP BY STEP internally before answering
+  2. Break down the problem: identify inputs, constraints, edge cases
+  3. Consider multiple approaches, pick the optimal one
+  4. Validate your answer before presenting it
+- Do NOT show raw "thinking" to user. Show only the polished final answer.
+- Exception: if user says "think step by step" → show your reasoning.
+
+RULE 14: REAL-TIME INFORMATION MANDATE
+- JARVIS has live web search via <WEB_SEARCH query="...">
+- MANDATORY to use web search for:
+  • Current news, events, sports scores, stock prices
+  • Tamil Nadu/India holidays, festivals, government news
+  • Movie releases, OTT releases, cricket scores
+  • Weather, traffic, trending topics
+  • Anything the user says "latest", "current", "today", "now", "recent"
+- After searching: synthesize results into 2-3 crisp lines, add source URL.
+
+RULE 15: INTEGRATION CONTROL
+- CRITICAL: JARVIS MUST NEVER open or suggest integrations unless the user EXPLICITLY says "@integrationname" 
+- DO NOT auto-detect keywords like "WhatsApp" or "Instagram" and open integrations
+- Integrations: ONLY triggered by @mention from user, NEVER by JARVIS autonomously
+
+═══════════════════════════════════════════
+   JARVIS MASTER CODING STANDARD
+═══════════════════════════════════════════
+
+RULE 16: WORLD-CLASS CODE QUALITY
+When generating code, JARVIS operates at the level of a Principal Engineer at Google/Meta:
+- **COMPLETE CODE ONLY**: Never write partial code, TODOs, or "implement later"
+- **PRODUCTION READY**: All error handling, edge cases, null safety covered
+- **TYPED**: Always use proper types — never `dynamic` unless absolutely necessary
+- **DOCUMENTED**: Critical functions get docstring comments
+- **OPTIMIZED**: Choose the right data structures and algorithms first
+- **TESTED MENTALLY**: Trace through your code once before outputting
+- **MODERN**: Use the latest stable APIs, not deprecated ones
+- **SECURE**: Never expose secrets, always validate inputs
+
+RULE 17: DEEP DEBUG MODE (for 5000+ line code analysis)
+When user sends large code for review/debugging:
+- **LINE-BY-LINE SCAN**: Read every line, do NOT skim
+- **EXHAUSTIVE BUG LIST**: Find ALL bugs — not just obvious ones
+- **SEVERITY RATING**: Critical → High → Medium → Low
+- **EXACT LOCATIONS**: "Line ~N, Function X(), File Y.dart"
+- **COMPLETE FIXED CODE**: Output the ENTIRE corrected file — never say "rest is same"
+- **NO TOKEN LIMIT MINDSET**: Write as many tokens as needed. Completeness > Brevity.
+- **ITERATIVE ANALYSIS**:
+  Step 1: Structural scan (null safety, types, imports)
+  Step 2: Logic scan (conditionals, loops, state management)
+  Step 3: Async scan (await/async misuse, race conditions)
+  Step 4: API misuse scan (deprecated calls, wrong params)
+  Step 5: Security scan (hardcoded secrets, injection risks)
 ''';
+
 
   /// Initialize Google Docs if credentials exist
   Future<void> _initGoogleDocs() async {
@@ -461,35 +520,79 @@ RULE 12: GOOGLE DOCS (docx)
 
   IntentMode detectIntent(String input) {
     final text = input.toLowerCase().trim();
-    // Agentic triggers: any OS / app / device interaction task
+
+    // ── Extract only the [CURRENT USER QUERY] section for intent detection ──────
+    // When chat history is injected, the input becomes very large and confuses
+    // intent detection. We strip [RECENT CHAT HISTORY] for a clean analysis.
+    String queryText = text;
+    final queryMarker = '[current user query]';
+    final markerIdx = text.lastIndexOf(queryMarker);
+    if (markerIdx != -1) {
+      queryText = text.substring(markerIdx + queryMarker.length).trim();
+    }
+
+    // ── Agentic triggers: OS / app / device interaction task ──────────────────
+    // NOTE: Only explicit @mention interactions should trigger integrations,
+    // so these agentic keywords are only for OS-level automation, NOT for
+    // opening web integrations autonomously.
     const agenticKeywords = [
-      'whatsapp', 'send', 'message', 'call', 'open', 'launch', 'go to',
-      'post', 'tweet', 'instagram', 'facebook', 'telegram', 'gmail', 'email',
-      'turn on', 'turn off', 'toggle', 'enable', 'disable', 'set',
-      'search', 'find', 'navigate', 'scroll', 'tap', 'click', 'type',
-      'screenshot', 'take a photo', 'record', 'play', 'stop', 'pause',
-      'book', 'order', 'pay', 'transfer', 'check', 'read', 'reply',
-      'wifi', 'bluetooth', 'brightness', 'volume', 'ringtone', 'alarm',
-      'contact', 'calendar', 'reminder', 'note', 'file', 'download',
-      'install', 'uninstall', 'settings', 'notification', 'battery',
-      'docx', 'doc', 'google doc', 'assignment', 'save to doc',
+      'whatsapp', 'send message', 'make a call', 'launch app',
+      'turn on', 'turn off', 'toggle wifi', 'toggle bluetooth',
+      'take a screenshot', 'take a photo', 'record video',
+      'brightness', 'volume', 'ringtone', 'alarm',
+      'docx', 'google doc', 'save to doc',
     ];
 
-
-    if (agenticKeywords.any((kw) => text.contains(kw))) {
+    if (agenticKeywords.any((kw) => queryText.contains(kw))) {
       return IntentMode.agentic;
     }
-    if (text.length < 8) return IntentMode.simple;
-    if (text.contains('vs') || text.contains('compare') || text.contains('difference')) {
+    if (queryText.length < 8) return IntentMode.simple;
+
+    // ── DEEP DEBUG detection (upgraded) ────────────────────────────────────────
+    // Detect if the user is asking for code debugging/analysis.
+    // Key signals:
+    //   1. Debug keywords in the query
+    //   2. Large code blocks (``` markers with many newlines)
+    //   3. Explicit "step by step", "all bugs", "deeply analyze" in query
+    final bool hasDebugKeywords = 
+        queryText.contains('debug') || queryText.contains('bug') || queryText.contains('fix') ||
+        queryText.contains('error') || queryText.contains('issue') || queryText.contains('crash') ||
+        queryText.contains('exception') || queryText.contains('audit') ||
+        queryText.contains('review code') || queryText.contains('find bug') ||
+        queryText.contains('analyze') || queryText.contains('lines');
+
+    // Count lines in the FULL input (including pasted code)
+    final int totalLines = input.split('\n').length;
+    final bool hasLargeCodeBlock = input.contains('```') ||
+        totalLines > 100 ||   // 100+ line paste
+        input.length > 8000;  // ~2000 tokens of raw content
+
+    final bool hasDeepDebugIntent = 
+        queryText.contains('all bug') || queryText.contains('step by step') ||
+        queryText.contains('deeply') || queryText.contains('completely') || 
+        queryText.contains('every bug') || queryText.contains('all errors') ||
+        queryText.contains('full debug') || queryText.contains('10k') ||
+        queryText.contains('5k') || queryText.contains('deeply analyse') ||
+        queryText.contains('deeply analyze');
+
+    if (hasDebugKeywords && (hasLargeCodeBlock || hasDeepDebugIntent)) {
+      return IntentMode.deepDebug;
+    }
+    // Also trigger deepDebug for very large code pastes even without explicit keywords
+    if (totalLines > 500 && input.contains('```')) {
+      return IntentMode.deepDebug;
+    }
+
+    if (queryText.contains('vs') || queryText.contains('compare') || queryText.contains('difference')) {
       return IntentMode.comparison;
     }
-    if (text.contains('explain') || text.contains('why') || text.contains('how') || text.length > 50) {
+    if (queryText.contains('explain') || queryText.contains('why') || queryText.contains('how') || queryText.length > 50) {
       return IntentMode.deep;
     }
-    if (text.contains('build') || text.contains('create') || text.contains('implement') || text.contains('website') || text.contains('vibecode')) {
+    if (queryText.contains('build') || queryText.contains('create') || queryText.contains('implement') || queryText.contains('website') || queryText.contains('vibecode')) {
       // INQUISITIVE CHECK: If the request is too simple (e.g., "build a chatbot"), 
       // return a specialized "NeedInfo" mode to trigger questioning.
-      if (text.split(' ').length < 10) return IntentMode.inquisitiveProject;
+      if (queryText.split(' ').length < 10) return IntentMode.inquisitiveProject;
       return IntentMode.project;
     }
     return IntentMode.normal;
@@ -522,10 +625,76 @@ RULE 12: GOOGLE DOCS (docx)
         instructions = "Compare clearly using advanced metrics. Use a Markdown table for presentation.";
         break;
       case IntentMode.project:
-        instructions = "You are in Developer Mode. Provide architectural guidance and high-level steps for building this app or website. Suggest suitable technologies and layouts.";
+        instructions = '''You are in Senior Full-Stack Developer Mode.
+- Generate COMPLETE, production-ready, deployable code. No placeholders, no TODOs.
+- Output ALL files needed (main file, all components, config files, package.json/pubspec.yaml).
+- Use best practices: error handling, loading states, input validation.
+- If the response requires 5000+ tokens, write it all in ONE single response. Do NOT truncate.
+- After all code, provide a short "How to Run" section.''';
         break;
       case IntentMode.inquisitiveProject:
         instructions = "The user wants to build a project but has been vague. You MUST ask for: 1. Frontend preference, 2. Backend/Language, 3. Database choice, 4. Any required third-party integrations (Payment, Auth, etc.).";
+        break;
+      case IntentMode.deepDebug:
+        final lineCount = userInput.split('\n').length;
+        instructions = '''
+You are JARVIS in DEEP DEBUG MODE — the most elite, thorough code auditor in existence.
+You are analyzing approximately $lineCount lines of code. Your mission: find EVERY SINGLE BUG.
+
+⚠️ CRITICAL RULE: If there are 130 bugs in the code, you MUST find all 130.
+Finding 40 out of 130 is a FAILURE. This is non-negotiable.
+
+━━━ PHASE 1: STRUCTURAL SCAN ━━━
+- Scan ALL imports: unused, missing, circular dependencies
+- Check ALL class/function signatures: return types, parameter types
+- Identify null safety violations: ! on nullable, missing null checks
+- Check ALL variable declarations: uninitialized, wrong types
+- Find ALL syntax errors, unclosed brackets, missing semicolons
+
+━━━ PHASE 2: LOGIC SCAN ━━━
+- Trace ALL conditional branches (if/else/switch) for edge cases
+- Check ALL loop conditions: off-by-one, infinite loops, wrong bounds
+- Verify ALL boolean logic: &&, ||, negations, operator precedence
+- Validate ALL state management: mutation without notify, stale state
+- Check ALL list/map operations: index out of bounds, null keys
+
+━━━ PHASE 3: ASYNC/CONCURRENCY SCAN ━━━
+- Find ALL missing await keywords before async calls
+- Identify setState() called after dispose()
+- Find unhandled Futures and Streams
+- Detect race conditions in parallel operations
+- Check ALL try/catch blocks: empty catches, wrong exception types
+
+━━━ PHASE 4: API & FRAMEWORK SCAN ━━━
+- Identify ALL deprecated API calls (include the replacement exactly)
+- Find widget lifecycle misuse (BuildContext across async gaps)
+- Check Provider/ChangeNotifier: notifyListeners() missing or redundant
+- Validate ALL navigator operations: back navigation, route args
+
+━━━ PHASE 5: PERFORMANCE & SECURITY ━━━
+- Find unnecessary rebuilds, expensive operations in build()
+- Identify memory leaks: undisposed controllers, uncancelled subscriptions
+- Check ALL hardcoded secrets or API keys in source
+- Validate ALL user inputs: unsanitized data, injection risks
+
+OUTPUT FORMAT — FOLLOW EXACTLY:
+For EACH bug: 🐛 BUG #[N] [SEVERITY: 🔴Critical/🟠High/🟡Medium/🟢Low]
+📍 Location: [FileName.dart, Line ~X, Function: functionName()]
+❌ Problem: [Exact description of what is wrong]
+✅ Fix: [Complete corrected code snippet]
+💡 Root cause: [Why this bug exists]
+
+After all bugs:
+📋 BUG SUMMARY: Total: [N] | 🔴Critical: [N] | 🟠High: [N] | 🟡Medium: [N] | 🟢Low: [N]
+
+Then output the COMPLETE FIXED FILE(S) with all fixes applied.
+Mark every fix: // 🔧 FIXED: [description]
+
+NON-NEGOTIABLE RULES:
+- NEVER truncate. 10,000 line file → output all 10,000 corrected lines.
+- NEVER say "rest is the same" — always write the complete file.
+- The response length has NO UPPER LIMIT in DeepDebug mode.
+- More bugs found = better performance. Aim for COMPLETENESS.''';
         break;
     }
 
@@ -564,12 +733,13 @@ RULE 12: GOOGLE DOCS (docx)
     final mode = detectIntent(input);
     switch (mode) {
       case IntentMode.simple: return 2048;
-      case IntentMode.normal: return 4096;
-      case IntentMode.deep: return 10240;
+      case IntentMode.normal: return 8192;
+      case IntentMode.deep: return 16384;
       case IntentMode.comparison: return 8192;
-      case IntentMode.agentic: return 10240;
-      case IntentMode.project: return 10240;
+      case IntentMode.agentic: return 16384;
+      case IntentMode.project: return 32768;
       case IntentMode.inquisitiveProject: return 2048;
+      case IntentMode.deepDebug: return 65536; // Max possible — exhaustive debug
     }
   }
 
