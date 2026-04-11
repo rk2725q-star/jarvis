@@ -20,10 +20,14 @@ import 'features/vibecode/vibecode_controller.dart';
 import 'services/google_docs_service.dart';
 import 'features/assignment/assignment_provider.dart';
 import 'features/integrations/integrations_provider.dart';
+import 'package:flutter_file_view/flutter_file_view.dart';
 import 'app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Pre-initialize X5 engine check (non-blocking)
+  FlutterFileView.init();
 
   // System UI
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(

@@ -379,36 +379,15 @@ class _SessionTile extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      session.title,
-                      style: TextStyle(
-                        color: isActive ? JarvisColors.textPrimary : JarvisColors.textSecondary,
-                        fontSize: 13,
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (session.lastMessage != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        // Strip markdown/special chars from preview
-                        session.lastMessage!
-                            .replaceAll(RegExp(r'\*+|#{1,6}\s|`+'), '')
-                            .replaceAll(RegExp(r'\[RECENT CHAT HISTORY\].*\[CURRENT USER QUERY\]', dotAll: true), '')
-                            .trim(),
-                        style: const TextStyle(
-                          color: JarvisColors.textMuted,
-                          fontSize: 11,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
+                child: Text(
+                  session.title,
+                  style: TextStyle(
+                    color: isActive ? JarvisColors.textPrimary : JarvisColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

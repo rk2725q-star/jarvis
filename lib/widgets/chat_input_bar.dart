@@ -23,34 +23,48 @@ class ChatInputBar extends StatefulWidget {
   State<ChatInputBar> createState() => _ChatInputBarState();
 }
 
-class _ChatInputBarState extends State<ChatInputBar> {
+class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderStateMixin {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   bool _speechAvailable = false;
+  bool _hasText = false;
 
   // @ mention picker state
   bool _showAtPicker = false;
   String _atQuery = '';
+
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
     _initSpeech();
     _controller.addListener(_onTextChanged);
+    _focusNode.addListener(() => setState(() {}));
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
   }
 
   void _onTextChanged() {
     final text = _controller.text;
+    final hasText = text.trim().isNotEmpty;
+    if (hasText != _hasText) setState(() => _hasText = hasText);
+
     final cursor = _controller.selection.baseOffset;
-    // Find if there's an unclosed @ before cursor
     if (cursor > 0 && cursor <= text.length) {
       final before = text.substring(0, cursor);
       final atIdx = before.lastIndexOf('@');
       if (atIdx >= 0) {
         final afterAt = before.substring(atIdx + 1);
-        // Only show if no space after @
         if (!afterAt.contains(' ')) {
           setState(() {
             _showAtPicker = true;
@@ -79,6 +93,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
         onResult: (result) {
           setState(() {
             _controller.text = result.recognizedWords;
+            _controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: _controller.text.length),
+            );
           });
           if (result.finalResult) {
             setState(() => _isListening = false);
@@ -358,17 +375,16 @@ class _ChatInputBarState extends State<ChatInputBar> {
       return;
     }
     _controller.clear();
-    
-    // Explicitly drop focus if it's an integration command so InAppWebView gets native input
+    setState(() {
+      _hasText = false;
+      _showAtPicker = false;
+    });
     if (text.startsWith('@')) {
       _focusNode.unfocus();
     }
-    
-    setState(() => _showAtPicker = false);
     widget.onSubmit(text);
   }
 
-  /// Insert @integrationId into text at current cursor
   void _selectAtIntegration(AIIntegration integration) {
     final text = _controller.text;
     final cursor = _controller.selection.baseOffset;
@@ -386,11 +402,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
     _focusNode.requestFocus();
   }
 
-  /// Build the @ mention picker that appears above the input
   Widget _buildAtPicker(IntegrationsProvider intProv) {
     final connected = intProv.connectedIntegrations;
     final all = kAIIntegrations;
-    // Show connected first, then all matching the query
     final filtered = [
       ...connected,
       ...all.where((a) => !connected.any((c) => c.id == a.id)),
@@ -426,8 +440,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
             child: Row(
               children: [
-                const Text('⚡',
-                    style: TextStyle(fontSize: 11)),
+                const Text('⚡', style: TextStyle(fontSize: 11)),
                 const SizedBox(width: 4),
                 const Text(
                   '@Integrations',
@@ -472,13 +485,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     ),
                     child: Row(
                       children: [
-                        Text(item.emoji,
-                            style: const TextStyle(fontSize: 16)),
+                        Text(item.emoji, style: const TextStyle(fontSize: 16)),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 item.name,
@@ -536,6 +547,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
     _controller.dispose();
     _focusNode.dispose();
     _speech.cancel();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -549,14 +561,12 @@ class _ChatInputBarState extends State<ChatInputBar> {
           children: [
             // @ mention picker overlay
             if (_showAtPicker) _buildAtPicker(intProv),
+
             // Analysis indicator
             if (chatProvider.isAnalyzing)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 16,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 color: JarvisColors.accentPrimary.withValues(alpha: 0.1),
                 child: Row(
                   children: [
@@ -565,9 +575,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       height: 14,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(
-                          JarvisColors.accentPrimary,
-                        ),
+                        valueColor: AlwaysStoppedAnimation(JarvisColors.accentPrimary),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -587,10 +595,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
             if (chatProvider.attachedFilePaths.isNotEmpty)
               Container(
                 height: 50,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: chatProvider.attachedFilePaths.length,
@@ -599,10 +604,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     final fileName = path.split(Platform.pathSeparator).last;
                     return Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: JarvisColors.surfaceElevated,
                         borderRadius: BorderRadius.circular(12),
@@ -610,27 +612,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.description_rounded,
-                            size: 14,
-                            color: JarvisColors.textMuted,
-                          ),
+                          const Icon(Icons.description_rounded, size: 14, color: JarvisColors.textMuted),
                           const SizedBox(width: 6),
-                          Text(
-                            fileName,
-                            style: const TextStyle(
-                              color: JarvisColors.textSecondary,
-                              fontSize: 11,
-                            ),
-                          ),
+                          Text(fileName, style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 11)),
                           const SizedBox(width: 4),
                           GestureDetector(
                             onTap: () => chatProvider.unattachFile(path),
-                            child: const Icon(
-                              Icons.close_rounded,
-                              size: 14,
-                              color: JarvisColors.error,
-                            ),
+                            child: const Icon(Icons.close_rounded, size: 14, color: JarvisColors.error),
                           ),
                         ],
                       ),
@@ -639,83 +627,52 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 ),
               ),
 
+            // ── Main full-width input bar ───────────────────────────────────
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                border: const Border(
-                  top: BorderSide(color: JarvisColors.border, width: 0.5),
-                ),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: JarvisColors.border, width: 0.5)),
               ),
               child: SafeArea(
                 top: false,
-                child: Row(
-                  children: [
-                    // File picker button
-                    IconButton(
-                      icon: const Icon(
-                        Icons.add_rounded,
-                        color: JarvisColors.textSecondary,
-                      ),
-                      onPressed: () => _showActionMenu(chatProvider),
-                      tooltip: 'Actions',
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: _focusNode.hasFocus
+                        ? const Color(0xFF1A1A2E)
+                        : const Color(0xFF141420),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: _focusNode.hasFocus
+                          ? JarvisColors.accentPrimary.withValues(alpha: 0.6)
+                          : JarvisColors.border.withValues(alpha: 0.5),
+                      width: 1.2,
                     ),
-                    const SizedBox(width: 4),
-
-                    // Voice input button
-                    if (_speechAvailable)
-                      GestureDetector(
-                        onTap: _toggleListening,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _isListening
-                                ? JarvisColors.accentPrimary.withValues(
-                                    alpha: 0.2,
-                                  )
-                                : JarvisColors.surfaceElevated,
-                            border: Border.all(
-                              color: _isListening
-                                  ? JarvisColors.accentPrimary
-                                  : JarvisColors.border,
-                              width: 1,
-                            ),
-                          ),
-                          child: Icon(
-                            _isListening ? Icons.mic : Icons.mic_none_rounded,
-                            color: _isListening
-                                ? JarvisColors.accentPrimary
-                                : JarvisColors.textMuted,
-                            size: 20,
-                          ),
-                        ),
+                    boxShadow: _focusNode.hasFocus
+                        ? [
+                            BoxShadow(
+                              color: JarvisColors.accentPrimary.withValues(alpha: 0.12),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            )
+                          ]
+                        : [],
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // + button inside bar
+                      _InBarButton(
+                        onTap: () => _showActionMenu(chatProvider),
+                        child: const Icon(Icons.add_rounded, color: JarvisColors.textSecondary, size: 22),
                       ),
-                    const SizedBox(width: 10),
 
-                    // Text field
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _focusNode.hasFocus
-                              ? JarvisColors.surfaceElevated
-                              : Colors.black26,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: _focusNode.hasFocus
-                                ? JarvisColors.accentPrimary.withValues(
-                                    alpha: 0.5,
-                                  )
-                                : JarvisColors.border.withValues(alpha: 0.3),
-                            width: 1,
-                          ),
-                        ),
+                      // Text field - takes remaining space
+                      Expanded(
                         child: TextField(
                           controller: _controller,
                           focusNode: _focusNode,
-                          maxLines: 4,
+                          maxLines: 5,
                           minLines: 1,
                           style: const TextStyle(
                             color: JarvisColors.textPrimary,
@@ -725,74 +682,108 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           cursorColor: JarvisColors.accentPrimary,
                           decoration: const InputDecoration(
                             hintText: 'Ask JARVIS...',
-                            hintStyle: TextStyle(
-                              color: JarvisColors.textMuted,
-                              fontSize: 14,
-                            ),
+                            hintStyle: TextStyle(color: JarvisColors.textMuted, fontSize: 14),
                             border: InputBorder.none,
                             filled: false,
                             fillColor: Colors.transparent,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
+                            contentPadding: EdgeInsets.symmetric(vertical: 12),
+                            isDense: true,
                           ),
                           onSubmitted: (_) => _send(),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
 
-                    // Send button
-                    GestureDetector(
-                      onTap: widget.isGenerating ? null : _send,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: widget.isGenerating
-                              ? null
-                              : JarvisColors.primaryGradient,
-                          color: widget.isGenerating
-                              ? JarvisColors.surfaceElevated
-                              : null,
-                          boxShadow: widget.isGenerating
-                              ? null
-                              : [
-                                  BoxShadow(
-                                    color: JarvisColors.accentPrimary
-                                        .withValues(alpha: 0.4),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                        ),
-                        child: widget.isGenerating
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation(
-                                    JarvisColors.accentPrimary,
-                                  ),
+                      // Mic button inside bar
+                      if (_speechAvailable)
+                        _InBarButton(
+                          onTap: _toggleListening,
+                          child: AnimatedBuilder(
+                            animation: _pulseAnimation,
+                            builder: (_, child) {
+                              return Transform.scale(
+                                scale: _isListening ? _pulseAnimation.value : 1.0,
+                                child: Icon(
+                                  _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                                  color: _isListening
+                                      ? JarvisColors.accentPrimary
+                                      : JarvisColors.textMuted,
+                                  size: 22,
                                 ),
-                              )
-                            : const Icon(
-                                Icons.arrow_upward_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
+                              );
+                            },
+                          ),
+                        ),
+
+                      // Send button inside bar (gradient pill when active)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 5, bottom: 5),
+                        child: GestureDetector(
+                          onTap: widget.isGenerating ? null : _send,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: (!widget.isGenerating && _hasText)
+                                  ? JarvisColors.primaryGradient
+                                  : null,
+                              color: (!widget.isGenerating && _hasText)
+                                  ? null
+                                  : JarvisColors.surfaceElevated,
+                              boxShadow: (!widget.isGenerating && _hasText)
+                                  ? [
+                                      BoxShadow(
+                                        color: JarvisColors.accentPrimary.withValues(alpha: 0.4),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      )
+                                    ]
+                                  : null,
+                            ),
+                            child: widget.isGenerating
+                                ? const Padding(
+                                    padding: EdgeInsets.all(10),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation(JarvisColors.accentPrimary),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.arrow_upward_rounded,
+                                    color: _hasText ? Colors.white : JarvisColors.textMuted,
+                                    size: 20,
+                                  ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+// ── Small button inside the input bar ────────────────────────────────────────
+class _InBarButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _InBarButton({required this.onTap, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        child: child,
+      ),
     );
   }
 }
@@ -820,45 +811,38 @@ class _ActionTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            border: Border.all(color: JarvisColors.border, width: 0.5),
+            color: JarvisColors.surfaceElevated,
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: JarvisColors.border, width: 0.5),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: JarvisColors.accentPrimary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
+                  color: JarvisColors.accentPrimary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: JarvisColors.accentPrimary, size: 24),
+                child: Icon(icon, color: JarvisColors.accentPrimary, size: 20),
               ),
               const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: JarvisColors.textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            color: JarvisColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            color: JarvisColors.textMuted, fontSize: 12)),
+                  ],
+                ),
               ),
-              const Spacer(),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: JarvisColors.textMuted,
-              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: JarvisColors.textMuted, size: 20),
             ],
           ),
         ),

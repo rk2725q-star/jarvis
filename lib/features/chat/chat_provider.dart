@@ -692,16 +692,49 @@ class ChatProvider extends ChangeNotifier {
   int _estimateTokenCount(String text) => (text.length / 4).ceil();
 
   void _generateSuggestions(String lastAiResponse) {
-    final response = lastAiResponse.toLowerCase();
-    if (response.contains('code') || response.contains('programming')) {
-      _currentSuggestions = ['Explain this code', 'Optimize it', 'Add comments'];
-    } else if (response.contains('story') || response.contains('write')) {
-      _currentSuggestions = ['Continue the story', 'Make it darker', 'Change the ending'];
-    } else {
-      _currentSuggestions = ['Tell me more', 'Explain in detail', 'Summarize this'];
+    final r = lastAiResponse.toLowerCase();
+    final List<String> suggestions = [];
+
+    // ── Code/Tech ──────────────────────────────────────────────
+    if (r.contains('code') || r.contains('function') || r.contains('class ') ||
+        r.contains('algorithm') || r.contains('programming') || r.contains('bug')) {
+      suggestions.addAll(['Optimize this code', 'Explain step by step', 'Add error handling', 'Write unit tests', 'Show me an example']);
     }
+    // ── Story / Creative ───────────────────────────────────────
+    else if (r.contains('story') || r.contains('chapter') || r.contains('character') ||
+        r.contains('plot') || r.contains('write') || r.contains('poem')) {
+      suggestions.addAll(['Continue the story', 'Add a plot twist', 'Describe the setting', 'Write dialogue', 'Make it shorter']);
+    }
+    // ── Math / Science ─────────────────────────────────────────
+    else if (r.contains('equation') || r.contains('formula') || r.contains('calculate') ||
+        r.contains('math') || r.contains('physics') || r.contains('chemistry')) {
+      suggestions.addAll(['Show the solution steps', 'Give a real-world example', 'Simplify this', 'Related concepts', 'Practice problems']);
+    }
+    // ── Research / Topic ───────────────────────────────────────
+    else if (r.contains('research') || r.contains('study') || r.contains('according') ||
+        r.contains('history') || r.contains('discovered') || r.contains('theory')) {
+      suggestions.addAll(['Tell me more', 'Key takeaways', 'Compare perspectives', 'Cite sources', 'Summarize this']);
+    }
+    // ── Planning / Task ────────────────────────────────────────
+    else if (r.contains('plan') || r.contains('schedule') || r.contains('task') ||
+        r.contains('step') || r.contains('goal') || r.contains('project')) {
+      suggestions.addAll(['Break it into steps', 'Set reminders', 'Prioritize tasks', 'Add a timeline', 'Start with the first step']);
+    }
+    // ── Health / Fitness ───────────────────────────────────────
+    else if (r.contains('health') || r.contains('exercise') || r.contains('diet') ||
+        r.contains('calories') || r.contains('workout') || r.contains('nutrition')) {
+      suggestions.addAll(['Weekly plan', 'Beginner tips', 'Track progress', 'Common mistakes', 'Expert advice']);
+    }
+    // ── Generic fallback – still context-driven ────────────────
+    else {
+      suggestions.addAll(['Tell me more', 'Explain in detail', 'Give an example', 'Summarize this', 'Any alternatives?']);
+    }
+
+    // Cap at 5
+    _currentSuggestions = suggestions.take(5).toList();
     notifyListeners();
   }
+
 
   Future<void> _parseAndScheduleReminders(String text) async {
     try {

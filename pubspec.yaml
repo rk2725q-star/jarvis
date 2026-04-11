@@ -62,14 +62,14 @@ dependencies:
 
   # File Parsing
   file_picker: ^8.1.0
-  syncfusion_flutter_pdf: ^24.1.41
+  syncfusion_flutter_pdf: ^33.1.47
   docx_to_text: ^1.0.1
   archive: ^3.4.9
   google_mlkit_text_recognition: ^0.13.0
 
 
   # Vibration
-  vibration: ^2.0.1
+  vibration: ^3.1.8
   # URL launcher
   url_launcher: ^6.3.0
   # Native sharing
@@ -83,6 +83,14 @@ dependencies:
   googleapis: ^16.0.0
   googleapis_auth: ^2.0.0
   receive_sharing_intent: ^1.8.1
+  syncfusion_flutter_pdfviewer: ^33.1.47
+  open_filex: ^4.7.0
+  video_player: ^2.11.1
+  just_audio: ^0.10.5
+  flutter_file_view: ^2.2.1
+
+dependency_overrides:
+  dio: ^5.7.0
 
 dev_dependencies:
   flutter_test:
