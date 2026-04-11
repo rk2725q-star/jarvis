@@ -36,7 +36,7 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
   // Timers
   Timer? _silenceTimer;
   Timer? _heartbeatTimer;
-  static const int _silenceMs = 2000; 
+  static const int _silenceMs = 3000;
 
   // Animation Controllers
   late AnimationController _pulseCtrl;

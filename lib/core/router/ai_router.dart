@@ -796,10 +796,9 @@ NON-NEGOTIABLE RULES:
       promptPair = (system: '$baseSystemPrompt\n$systemPrompt', user: prompt);
     }
         
-    // For voice mode, prioritize absolute speed: Nvidia -> Ollama -> Gemini
+    // For voice mode, prioritize absolute speed: Nvidia ONLY.
     final chain = isVoiceMode 
-        ? [AIProvider.nvidia, AIProvider.ollama, AIProvider.ollamaCloud, AIProvider.gemini]
-            .where((p) => _providerEnabled[p] == true).toList()
+        ? [AIProvider.nvidia]
         : _fallbackChain;
 
     if (chain.isEmpty) {

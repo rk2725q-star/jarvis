@@ -684,6 +684,8 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                             hintText: 'Ask JARVIS...',
                             hintStyle: TextStyle(color: JarvisColors.textMuted, fontSize: 14),
                             border: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            enabledBorder: InputBorder.none,
                             filled: false,
                             fillColor: Colors.transparent,
                             contentPadding: EdgeInsets.symmetric(vertical: 12),
