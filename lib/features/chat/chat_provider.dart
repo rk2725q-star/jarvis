@@ -834,6 +834,7 @@ class ChatProvider extends ChangeNotifier {
 
   String _stripTags(String text) {
     return text
+        .replaceAll(RegExp(r'<think>[\s\S]*?(?:</think>|$)', caseSensitive: false), '')
         .replaceAll(RegExp(r'<SCHEDULE_REMINDER[^>]*>'), '')
         .replaceAll(RegExp(r'<CANCEL_REMINDER[^>]*>'), '')
         .replaceAll(RegExp(r'<SKIP_ROUTINE[^>]*>'), '')

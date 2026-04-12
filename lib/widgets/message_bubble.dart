@@ -6,7 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_latex/flutter_markdown_latex.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:jarvis_ai/features/chat/chat_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -336,6 +338,16 @@ class _AIBubble extends StatelessWidget {
                           ] else ...[
                             MarkdownBody(
                               data: _cleanResponse(message.content),
+                              builders: {
+                                'latex': LatexElementBuilder(
+                                  textStyle: TextStyle(color: JarvisColors.textPrimary),
+                                  textScaleFactor: 1.1,
+                                ),
+                              },
+                              extensionSet: md.ExtensionSet(
+                                [LatexBlockSyntax(), ...md.ExtensionSet.gitHubFlavored.blockSyntaxes],
+                                [LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
+                              ),
                               styleSheet: MarkdownStyleSheet(
                                 p: GoogleFonts.outfit(
                                   color: JarvisColors.textPrimary,
