@@ -59,6 +59,7 @@ dependencies:
 
   # Path provider
   path_provider: ^2.1.5
+  path: ^1.9.0
 
   # File Parsing
   file_picker: ^8.1.0
