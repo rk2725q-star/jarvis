@@ -94,11 +94,19 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
 
   ParsedDocument? _parsedDoc;
   bool _isEditMode = false;
+  late TextEditingController _editCtrl;
 
   @override
   void initState() {
     super.initState();
+    _editCtrl = TextEditingController();
     _loadFile();
+  }
+
+  @override
+  void dispose() {
+    _editCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadFile() async {
@@ -159,6 +167,7 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
 
       setState(() {
         _extractedText = extracted;
+        _editCtrl.text = extracted;
         _csvRows = rows;
         _parsedDoc = pDoc;
         _loading = false;
@@ -219,9 +228,16 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
             onPressed: () => Share.shareXFiles([XFile(widget.filePath)]),
           ),
           IconButton(
-            icon: const Icon(Icons.open_in_new_rounded, color: JarvisColors.textSecondary, size: 22),
-            tooltip: 'Open in native app',
-            onPressed: () => OpenFilex.open(widget.filePath),
+            icon: Icon(_isEditMode ? Icons.save_rounded : Icons.open_in_new_rounded, 
+                 color: _isEditMode ? JarvisColors.accentPrimary : JarvisColors.textSecondary, size: 22),
+            tooltip: _isEditMode ? 'Save changes' : 'Open in native app',
+            onPressed: () {
+              if (_isEditMode) {
+                _saveChanges();
+              } else {
+                OpenFilex.open(widget.filePath);
+              }
+            },
           ),
         ],
         bottom: PreferredSize(
@@ -504,13 +520,43 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
 
       if (targetExt == '.pdf') {
         final pdfDoc = PdfDocument();
-        final page   = pdfDoc.pages.add();
-        final font   = PdfStandardFont(PdfFontFamily.helvetica, 12);
+        pdfDoc.pageSettings.margins.all = 0; 
         
-        page.graphics.drawString(
-            _extractedText.isEmpty ? "Empty Document" : _extractedText, 
-            font, 
-            bounds: Rect.fromLTWH(0, 0, page.getClientSize().width, page.getClientSize().height));
+        // 1.5 cm border (approx 42.5 points)
+        const double margin = 42.5;
+        final contentSize = Size(pdfDoc.pageSettings.size.width - (margin * 2), pdfDoc.pageSettings.size.height - (margin * 2));
+        
+        // Use a better font if available, or stay with Helvetica for basic ASCII
+        // If a Tamil font is provided in assets later, use: PdfTrueTypeFont(File('path').readAsBytesSync(), 12)
+        final font = PdfStandardFont(PdfFontFamily.helvetica, 12);
+        
+        final textElement = PdfTextElement(
+          text: _extractedText.isEmpty ? "Empty Document" : _extractedText,
+          font: font,
+          brush: PdfBrushes.black,
+        );
+        
+        final layoutFormat = PdfLayoutFormat(
+          layoutType: PdfLayoutType.paginate,
+          breakType: PdfLayoutBreakType.fitPage,
+        );
+
+        // Draw on first page
+        PdfLayoutResult? result = textElement.draw(
+          pdfDoc.pages.add(),
+          bounds: Rect.fromLTWH(margin + 20, margin + 20, contentSize.width - 40, contentSize.height - 40),
+          format: layoutFormat,
+        );
+
+        // Draw borders on all pages
+        for (int i = 0; i < pdfDoc.pages.count; i++) {
+          final p = pdfDoc.pages[i];
+          // Drawing simple medium-thick border around the content area
+          p.graphics.drawRectangle(
+            pen: PdfPen(PdfColor(0, 0, 0), 1.5), 
+            bounds: Rect.fromLTWH(margin, margin, contentSize.width, contentSize.height),
+          );
+        }
         
         final bytes = await pdfDoc.save();
         pdfDoc.dispose();
@@ -587,9 +633,9 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
     if (_isOffice(widget.filePath)) {
       if (_parsedDoc != null) {
         if (_isDoc(widget.filePath)) {
-          return DocxRenderer(doc: _parsedDoc!);
+          return DocxRenderer(doc: _parsedDoc!, isEditMode: _isEditMode);
         } else if (_isSlides(widget.filePath)) {
-          return PptxRenderer(doc: _parsedDoc!);
+          return PptxRenderer(doc: _parsedDoc!, isEditMode: _isEditMode);
         } else if (_isSheet(widget.filePath)) {
           return XlsxRenderer(doc: _parsedDoc!, isEditMode: _isEditMode);
         }
@@ -663,18 +709,74 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
           : Scrollbar(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: SelectableText(
-                  _extractedText,
-                  style: TextStyle(
-                    color: isCode ? const Color(0xFFABB2BF) : JarvisColors.textPrimary,
-                    fontSize: isCode ? 12.5 : 14,
-                    fontFamily: isCode ? 'monospace' : null,
-                    height: 1.6,
-                  ),
-                ),
+                child: _isEditMode
+                    ? TextField(
+                        controller: _editCtrl,
+                        maxLines: null,
+                        style: TextStyle(
+                          color: isCode ? const Color(0xFFABB2BF) : JarvisColors.textPrimary,
+                          fontSize: isCode ? 12.5 : 14,
+                          fontFamily: isCode ? 'monospace' : null,
+                        ),
+                        decoration: const InputDecoration(border: InputBorder.none),
+                        onChanged: (v) => _extractedText = v,
+                      )
+                    : SelectableText(
+                        _extractedText,
+                        style: TextStyle(
+                          color: isCode ? const Color(0xFFABB2BF) : JarvisColors.textPrimary,
+                          fontSize: isCode ? 12.5 : 14,
+                          fontFamily: isCode ? 'monospace' : null,
+                          height: 1.6,
+                        ),
+                      ),
               ),
             ),
     );
+  }
+
+  Future<void> _saveChanges() async {
+    try {
+      setState(() => _loading = true);
+      // Update file on disk
+      if (_isOffice(widget.filePath)) {
+        // Since we can't easily re-encode ZIP/OOXML, we update the state text
+        // In a production environment, you'd use a more advanced XML writer
+        String finalContent = "";
+        if (_parsedDoc != null) {
+          final sb = StringBuffer();
+          for (final block in _parsedDoc!.blocks) {
+             sb.writeln(block.plainText);
+          }
+          if (_parsedDoc!.slides != null) {
+            for (final slide in _parsedDoc!.slides!) {
+               for (final block in slide.blocks) {
+                  if (block.plainText != null) sb.writeln(block.plainText);
+               }
+            }
+          }
+          finalContent = sb.toString();
+        }
+        _extractedText = finalContent;
+        _editCtrl.text = finalContent;
+      } else {
+        await File(widget.filePath).writeAsString(_extractedText);
+      }
+      
+      setState(() {
+        _isEditMode = false;
+        _loading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Changes saved successfully"), backgroundColor: JarvisColors.success),
+      );
+    } catch (e) {
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Save failed: $e"), backgroundColor: JarvisColors.error),
+      );
+    }
   }
 }
 

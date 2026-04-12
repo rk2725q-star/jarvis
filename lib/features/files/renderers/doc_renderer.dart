@@ -33,7 +33,8 @@ class DocTheme {
 
 class DocxRenderer extends StatelessWidget {
   final ParsedDocument doc;
-  const DocxRenderer({super.key, required this.doc});
+  final bool isEditMode;
+  const DocxRenderer({super.key, required this.doc, this.isEditMode = false});
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +156,18 @@ class _DocPage extends StatelessWidget {
   }
 
   Widget _buildBlock(DocBlock block) {
+    if (isEditMode && block.type != BlockType.image && block.type != BlockType.table) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: TextField(
+          controller: TextEditingController(text: block.plainText),
+          maxLines: null,
+          style: const TextStyle(fontSize: 13.5, color: DocTheme.textPrimary, height: 1.5),
+          decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+          onChanged: (v) => block.plainText = v,
+        ),
+      );
+    }
     switch (block.type) {
       case BlockType.heading1:   return _Heading1Widget(block: block);
       case BlockType.heading2:   return _Heading2Widget(block: block);
@@ -716,7 +729,8 @@ class _RichTextWidget extends StatelessWidget {
 
 class PptxRenderer extends StatefulWidget {
   final ParsedDocument doc;
-  const PptxRenderer({super.key, required this.doc});
+  final bool isEditMode;
+  const PptxRenderer({super.key, required this.doc, this.isEditMode = false});
 
   @override
   State<PptxRenderer> createState() => _PptxRendererState();
@@ -856,7 +870,7 @@ class _PptxRendererState extends State<PptxRenderer> {
         controller: _pageCtrl,
         onPageChanged: (i) => setState(() => _current = i),
         itemCount: slides.length,
-        itemBuilder: (_, i) => _SlideView(slide: slides[i]),
+        itemBuilder: (_, i) => _SlideView(slide: slides[i], isEditMode: widget.isEditMode),
       ),
     );
   }
@@ -980,7 +994,8 @@ class _PptxRendererState extends State<PptxRenderer> {
 // ─── Full Slide View ──────────────────────────────────────────────────────────
 class _SlideView extends StatelessWidget {
   final ParsedSlide slide;
-  const _SlideView({required this.slide});
+  final bool isEditMode;
+  const _SlideView({required this.slide, this.isEditMode = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1057,12 +1072,12 @@ class _SlideView extends StatelessWidget {
           child: images.isNotEmpty
               ? Row(
                   children: [
-                    Expanded(child: _SlideTextColumn(heading: heading, body: body)),
+                    Expanded(child: _SlideTextColumn(heading: heading, body: body, isEditMode: isEditMode)),
                     const SizedBox(width: 20),
                     Expanded(child: _SlideImages(images: images)),
                   ],
                 )
-              : _SlideTextColumn(heading: heading, body: body),
+              : _SlideTextColumn(heading: heading, body: body, isEditMode: isEditMode),
         ),
 
         // Slide number
@@ -1084,7 +1099,8 @@ class _SlideView extends StatelessWidget {
 class _SlideTextColumn extends StatelessWidget {
   final List<DocBlock> heading;
   final List<DocBlock> body;
-  const _SlideTextColumn({required this.heading, required this.body});
+  final bool isEditMode;
+  const _SlideTextColumn({required this.heading, required this.body, this.isEditMode = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1093,15 +1109,22 @@ class _SlideTextColumn extends StatelessWidget {
       children: [
         ...heading.map((b) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _RichTextWidget(
-                runs: b.runs,
-                defaultStyle: TextStyle(
-                  fontSize: b.type == BlockType.heading1 ? 24 : 18,
-                  fontWeight: FontWeight.bold,
-                  color: DocTheme.textPrimary,
-                  height: 1.3,
-                ),
-              ),
+              child: isEditMode 
+                ? TextField(
+                    controller: TextEditingController(text: b.plainText),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: DocTheme.textPrimary),
+                    decoration: const InputDecoration(border: InputBorder.none),
+                    onChanged: (v) => b.plainText = v,
+                  )
+                : _RichTextWidget(
+                    runs: b.runs,
+                    defaultStyle: TextStyle(
+                      fontSize: b.type == BlockType.heading1 ? 24 : 18,
+                      fontWeight: FontWeight.bold,
+                      color: DocTheme.textPrimary,
+                      height: 1.3,
+                    ),
+                  ),
             )),
         if (heading.isNotEmpty)
           Container(
@@ -1114,7 +1137,15 @@ class _SlideTextColumn extends StatelessWidget {
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: body.map((b) => _buildBodyBlock(b)).toList(),
+              children: body.map((b) => isEditMode 
+                ? TextField(
+                    controller: TextEditingController(text: b.plainText),
+                    maxLines: null,
+                    style: const TextStyle(fontSize: 13, color: DocTheme.textPrimary),
+                    decoration: const InputDecoration(border: InputBorder.none),
+                    onChanged: (v) => b.plainText = v,
+                  )
+                : _buildBodyBlock(b)).toList(),
             ),
           ),
         ),
