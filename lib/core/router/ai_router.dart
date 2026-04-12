@@ -841,14 +841,59 @@ NON-NEGOTIABLE RULES:
         notifyListeners();
 
         bool hasStarted = false;
-        await for (final chunk in stream) {
-          if (!hasStarted) {
+        bool inThinkBlock = false;
+        String partialBuffer = "";
+
+        await for (String chunk in stream) {
+          if (!hasStarted && chunk.trim().isNotEmpty) {
             hasStarted = true;
             _setStatus('Streaming from ${_providerName(provider)}');
           }
-          currentBuffer.write(chunk);
-          totalBuffer.write(chunk);
-          yield chunk;
+          
+          partialBuffer += chunk;
+          
+          if (!inThinkBlock && partialBuffer.contains('<think>')) {
+             inThinkBlock = true;
+             final beforeThink = partialBuffer.split('<think>').first;
+             if (beforeThink.isNotEmpty) {
+               yield beforeThink;
+               totalBuffer.write(beforeThink);
+               currentBuffer.write(beforeThink);
+             }
+             partialBuffer = partialBuffer.substring(partialBuffer.indexOf('<think>'));
+          }
+          
+          if (inThinkBlock && partialBuffer.contains('</think>')) {
+             inThinkBlock = false;
+             partialBuffer = partialBuffer.substring(partialBuffer.indexOf('</think>') + 8);
+             if (partialBuffer.startsWith('\n')) partialBuffer = partialBuffer.substring(1);
+          }
+          
+          if (!inThinkBlock) {
+             int possibleTagIdx = partialBuffer.lastIndexOf('<');
+             if (possibleTagIdx != -1 && possibleTagIdx >= partialBuffer.length - 7) {
+                final safeToYield = partialBuffer.substring(0, possibleTagIdx);
+                if (safeToYield.isNotEmpty) {
+                   yield safeToYield;
+                   totalBuffer.write(safeToYield);
+                   currentBuffer.write(safeToYield);
+                }
+                partialBuffer = partialBuffer.substring(possibleTagIdx);
+             } else {
+                if (partialBuffer.isNotEmpty) {
+                   yield partialBuffer;
+                   totalBuffer.write(partialBuffer);
+                   currentBuffer.write(partialBuffer);
+                   partialBuffer = "";
+                }
+             }
+          }
+        }
+
+        if (!inThinkBlock && partialBuffer.isNotEmpty) {
+           yield partialBuffer;
+           totalBuffer.write(partialBuffer);
+           currentBuffer.write(partialBuffer);
         }
 
 

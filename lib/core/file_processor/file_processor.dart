@@ -17,9 +17,9 @@ class FileProcessor {
       return await _readPdf(file);
     } else if (path.toLowerCase().endsWith(".docx")) {
       return await _readDocx(file);
-    } else if (path.toLowerCase().endsWith(".pptx") || path.toLowerCase().endsWith(".odt")) {
+    } else if (path.toLowerCase().endsWith(".pptx") || path.toLowerCase().endsWith(".ppt") || path.toLowerCase().endsWith(".odt") || path.toLowerCase().endsWith(".xlsx") || path.toLowerCase().endsWith(".xls")) {
       return await _readFromZip(file);
-    } else if (path.toLowerCase().endsWith(".txt") || path.toLowerCase().endsWith(".md")) {
+    } else if (path.toLowerCase().endsWith(".txt") || path.toLowerCase().endsWith(".md") || path.toLowerCase().endsWith(".csv")) {
       return await file.readAsString();
     } else if (_isImage(path)) {
       return await _readImage(path);
@@ -60,6 +60,8 @@ class FileProcessor {
     for (final file in archive) {
       if (file.name.contains("document.xml") || // DOCX
           file.name.contains("slide") || // PPTX
+          file.name.contains("sharedStrings.xml") || // XLSX Strings
+          file.name.contains("sheet") || // XLSX Sheets
           file.name.contains("content.xml")) { // ODT/generic
         try {
           final content = utf8.decode(file.content as List<int>, allowMalformed: true);
