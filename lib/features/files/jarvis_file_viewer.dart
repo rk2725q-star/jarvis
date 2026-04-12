@@ -542,8 +542,8 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         );
 
         // Draw on first page
-        PdfLayoutResult? result = textElement.draw(
-          pdfDoc.pages.add(),
+        textElement.draw(
+          page: pdfDoc.pages.add(),
           bounds: Rect.fromLTWH(margin + 20, margin + 20, contentSize.width - 40, contentSize.height - 40),
           format: layoutFormat,
         );
@@ -553,7 +553,7 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
           final p = pdfDoc.pages[i];
           // Drawing simple medium-thick border around the content area
           p.graphics.drawRectangle(
-            pen: PdfPen(PdfColor(0, 0, 0), 1.5), 
+            pen: PdfPen(PdfColor(0, 0, 0), width: 1.5), 
             bounds: Rect.fromLTWH(margin, margin, contentSize.width, contentSize.height),
           );
         }
@@ -768,10 +768,12 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         _loading = false;
       });
       
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Changes saved successfully"), backgroundColor: JarvisColors.success),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Save failed: $e"), backgroundColor: JarvisColors.error),

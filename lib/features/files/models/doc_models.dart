@@ -85,7 +85,7 @@ class DocBlock {
 
   // Text content (paragraph / heading / bullet)
   final List<TextRun> runs;
-  final String? plainText; // fast access
+  String? plainText; // fast access
 
   // Alignment: 'left' | 'center' | 'right' | 'justify'
   final String alignment;
@@ -110,7 +110,7 @@ class DocBlock {
   // Page info
   final int? pageNumber;
 
-  const DocBlock({
+  DocBlock({
     required this.type,
     this.runs = const [],
     this.plainText,

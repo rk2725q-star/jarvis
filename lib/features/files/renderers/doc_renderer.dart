@@ -46,7 +46,7 @@ class DocxRenderer extends StatelessWidget {
           children: [
             _DocInfoBanner(doc: doc),
             const SizedBox(height: 16),
-            _DocPage(blocks: doc.blocks),
+            _DocPage(blocks: doc.blocks, isEditMode: isEditMode),
           ],
         ),
       ),
@@ -130,7 +130,8 @@ class _DocInfoBanner extends StatelessWidget {
 
 class _DocPage extends StatelessWidget {
   final List<DocBlock> blocks;
-  const _DocPage({required this.blocks});
+  final bool isEditMode;
+  const _DocPage({required this.blocks, this.isEditMode = false});
 
   @override
   Widget build(BuildContext context) {
