@@ -25,6 +25,7 @@ import 'renderers/doc_renderer.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:file_picker/file_picker.dart';
 
 // ─── File type helpers ────────────────────────────────────────────────────────
 String _ext(String path) => path.split('.').last.toLowerCase();
@@ -370,69 +371,22 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
   }
 
   void _openEditor() {
-    final editCtrl = TextEditingController(text: _extractedText);
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: JarvisColors.bg,
-        insetPadding: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                   const Icon(Icons.edit_document, color: JarvisColors.accentPrimary),
-                   const SizedBox(width: 12),
-                   const Text('JARVIS Editor', style: TextStyle(color: JarvisColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
-                   const Spacer(),
-                   IconButton(icon: const Icon(Icons.close, color: JarvisColors.textSecondary), onPressed: () => Navigator.pop(context)),
-                ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _JarvisRichEditor(
+          filePath: widget.filePath,
+          initialText: _extractedText,
+          onSave: (newText) {
+            setState(() => _extractedText = newText);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Changes saved'),
+                backgroundColor: JarvisColors.accentPrimary,
+                duration: Duration(seconds: 2),
               ),
-            ),
-            const Divider(height: 1, color: JarvisColors.border),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: editCtrl,
-                  maxLines: null,
-                  expands: true,
-                  style: const TextStyle(color: JarvisColors.textPrimary, fontSize: 14),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: 'Start editing...',
-                    hintStyle: TextStyle(color: JarvisColors.textMuted),
-                  ),
-                ),
-              ),
-            ),
-            const Divider(height: 1, color: JarvisColors.border),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                   TextButton(
-                     onPressed: () => Navigator.pop(context),
-                     child: const Text('Cancel', style: TextStyle(color: JarvisColors.textSecondary)),
-                   ),
-                   const SizedBox(width: 12),
-                   ElevatedButton.icon(
-                     onPressed: () {
-                        setState(() => _extractedText = editCtrl.text);
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File changes saved locally.')));
-                     },
-                     style: ElevatedButton.styleFrom(backgroundColor: JarvisColors.accentPrimary, foregroundColor: Colors.white),
-                     icon: const Icon(Icons.save_rounded, size: 18),
-                     label: const Text('Save Changes'),
-                   )
-                ],
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -1591,6 +1545,571 @@ class _VideoViewerWidgetState extends State<_VideoViewerWidget> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JARVIS RICH EDITOR — Full-screen mobile editor with formatting toolbar,
+// page management, file merge, and instant save
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _JarvisRichEditor extends StatefulWidget {
+  final String filePath;
+  final String initialText;
+  final void Function(String) onSave;
+
+  const _JarvisRichEditor({
+    required this.filePath,
+    required this.initialText,
+    required this.onSave,
+  });
+
+  @override
+  State<_JarvisRichEditor> createState() => _JarvisRichEditorState();
+}
+
+class _JarvisRichEditorState extends State<_JarvisRichEditor> {
+  late TextEditingController _ctrl;
+  late FocusNode _focusNode;
+  late List<String> _pages;
+  int _currentPage = 0;
+  bool _hasUnsaved = false;
+  // Page-separator: a sentinel we use when splitting into pages
+  static const _pageSep = '\n\n--- PAGE BREAK ---\n\n';
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    // Split existing text into pages at page-break markers
+    _pages = widget.initialText
+        .split(RegExp(r'\n\n---\s*PAGE BREAK\s*---\n\n'))
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (_pages.isEmpty) _pages = [''];
+    _ctrl = TextEditingController(text: _pages[_currentPage]);
+    _ctrl.addListener(() {
+      _pages[_currentPage] = _ctrl.text;
+      if (!_hasUnsaved) setState(() => _hasUnsaved = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  /// Switch to a different page — save current page text first
+  void _switchPage(int idx) {
+    _pages[_currentPage] = _ctrl.text;
+    setState(() {
+      _currentPage = idx;
+      _ctrl.text = _pages[_currentPage];
+    });
+    _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
+    _focusNode.requestFocus();
+  }
+
+  void _addPage() {
+    _pages[_currentPage] = _ctrl.text;
+    setState(() {
+      _pages.insert(_currentPage + 1, '');
+      _currentPage += 1;
+      _ctrl.text = '';
+    });
+    _focusNode.requestFocus();
+  }
+
+  void _deletePage() {
+    if (_pages.length <= 1) return;
+    _pages.removeAt(_currentPage);
+    final idx = (_currentPage - 1).clamp(0, _pages.length - 1);
+    setState(() {
+      _currentPage = idx;
+      _ctrl.text = _pages[_currentPage];
+    });
+  }
+
+  void _movePageUp() {
+    if (_currentPage <= 0) return;
+    _pages[_currentPage] = _ctrl.text;
+    final page = _pages.removeAt(_currentPage);
+    _pages.insert(_currentPage - 1, page);
+    setState(() => _currentPage -= 1);
+  }
+
+  void _movePageDown() {
+    if (_currentPage >= _pages.length - 1) return;
+    _pages[_currentPage] = _ctrl.text;
+    final page = _pages.removeAt(_currentPage);
+    _pages.insert(_currentPage + 1, page);
+    setState(() => _currentPage += 1);
+  }
+
+  /// Insert formatting at current cursor position
+  void _insertFormat(String prefix, String suffix, {String? placeholder}) {
+    final sel = _ctrl.selection;
+    final text = _ctrl.text;
+    final selected = sel.isValid && !sel.isCollapsed
+        ? text.substring(sel.start, sel.end)
+        : (placeholder ?? 'text');
+    final newText = text.replaceRange(
+      sel.isValid ? sel.start : text.length,
+      sel.isValid ? sel.end : text.length,
+      '$prefix$selected$suffix',
+    );
+    _ctrl.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(
+        offset: (sel.isValid ? sel.start : text.length) +
+            prefix.length + selected.length,
+      ),
+    );
+    _focusNode.requestFocus();
+  }
+
+  /// Insert block at start of current line
+  void _insertLinePrefix(String prefix) {
+    final sel = _ctrl.selection;
+    final text = _ctrl.text;
+    int lineStart = text.lastIndexOf('\n', sel.start - 1) + 1;
+    final newText = text.replaceRange(lineStart, lineStart, prefix);
+    _ctrl.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: sel.start + prefix.length),
+    );
+    _focusNode.requestFocus();
+  }
+
+  void _saveAndPop() {
+    _pages[_currentPage] = _ctrl.text;
+    final merged = _pages.where((p) => p.trim().isNotEmpty).join(_pageSep);
+    widget.onSave(merged);
+    Navigator.pop(context);
+  }
+
+  /// Import a file and append its text to a new page
+  Future<void> _importFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      type: FileType.any,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final path = result.files.first.path;
+    if (path == null) return;
+    final file = File(path);
+    if (!file.existsSync()) return;
+
+    String importedText;
+    try {
+      importedText = await file.readAsString();
+    } catch (_) {
+      importedText = '[Binary file: ${p.basename(path)}]';
+    }
+
+    _pages[_currentPage] = _ctrl.text;
+    setState(() {
+      _pages.add('--- Imported: ${p.basename(path)} ---\n\n$importedText');
+      _currentPage = _pages.length - 1;
+      _ctrl.text = _pages[_currentPage];
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Imported: ${p.basename(path)}'),
+          backgroundColor: JarvisColors.accentPrimary,
+        ),
+      );
+    }
+  }
+
+  /// Share full merged content
+  Future<void> _share() async {
+    _pages[_currentPage] = _ctrl.text;
+    final merged = _pages.where((p) => p.trim().isNotEmpty).join(_pageSep);
+    // Write to temp file
+    final tempDir = await getTemporaryDirectory();
+    final fname = p.basenameWithoutExtension(widget.filePath);
+    final outPath = '${tempDir.path}/${fname}_edited.txt';
+    await File(outPath).writeAsString(merged);
+    await Share.shareXFiles([XFile(outPath)], text: 'Edited with JARVIS AI');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: JarvisColors.bg,
+      appBar: AppBar(
+        backgroundColor: JarvisColors.surface,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: JarvisColors.textPrimary),
+          onPressed: () {
+            if (_hasUnsaved) {
+              _showUnsavedDialog();
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.edit_document, color: JarvisColors.accentPrimary, size: 18),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('JARVIS Editor',
+                    style: TextStyle(
+                      color: JarvisColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    )),
+                Text(
+                  'Page ${_currentPage + 1} of ${_pages.length}',
+                  style: const TextStyle(color: JarvisColors.textMuted, fontSize: 10),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          // Import file
+          IconButton(
+            icon: const Icon(Icons.upload_file_rounded, color: JarvisColors.textSecondary, size: 22),
+            tooltip: 'Import file / image',
+            onPressed: _importFile,
+          ),
+          // Share
+          IconButton(
+            icon: const Icon(Icons.share_rounded, color: JarvisColors.textSecondary, size: 22),
+            tooltip: 'Share edited file',
+            onPressed: _share,
+          ),
+          // Save
+          TextButton(
+            onPressed: _saveAndPop,
+            style: TextButton.styleFrom(
+              backgroundColor: JarvisColors.accentPrimary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          ),
+          const SizedBox(width: 8),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Divider(height: 0.5, color: JarvisColors.border),
+        ),
+      ),
+      body: Column(
+        children: [
+          // ── Format Toolbar ──────────────────────────────────────
+          _buildFormatToolbar(),
+          // ── Page tab bar ────────────────────────────────────────
+          _buildPageTabBar(),
+          // ── Editor Area ─────────────────────────────────────────
+          Expanded(
+            child: TextField(
+              controller: _ctrl,
+              focusNode: _focusNode,
+              maxLines: null,
+              expands: true,
+              keyboardType: TextInputType.multiline,
+              style: const TextStyle(
+                color: JarvisColors.textPrimary,
+                fontSize: 15,
+                height: 1.6,
+                fontFamily: 'monospace',
+              ),
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 80),
+                border: InputBorder.none,
+                hintText: 'Start typing here... Use the toolbar above to format.',
+                hintStyle: const TextStyle(color: JarvisColors.textMuted, fontSize: 14),
+                fillColor: JarvisColors.bg,
+                filled: true,
+              ),
+            ),
+          ),
+          // ── Bottom Page Actions ──────────────────────────────────
+          _buildPageActions(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormatToolbar() {
+    return Container(
+      height: 46,
+      color: JarvisColors.surface,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            _ToolBtn('H1', () => _insertLinePrefix('# '), tooltip: 'Heading 1'),
+            _ToolBtn('H2', () => _insertLinePrefix('## '), tooltip: 'Heading 2'),
+            _ToolBtn('H3', () => _insertLinePrefix('### '), tooltip: 'Heading 3'),
+            _ToolDivider(),
+            _ToolIconBtn(Icons.format_bold_rounded, () => _insertFormat('**', '**'), tooltip: 'Bold'),
+            _ToolIconBtn(Icons.format_italic_rounded, () => _insertFormat('*', '*'), tooltip: 'Italic'),
+            _ToolIconBtn(Icons.format_strikethrough_rounded, () => _insertFormat('~~', '~~'), tooltip: 'Strikethrough'),
+            _ToolDivider(),
+            _ToolIconBtn(Icons.format_list_bulleted_rounded, () => _insertLinePrefix('- '), tooltip: 'Bullet List'),
+            _ToolIconBtn(Icons.format_list_numbered_rounded, () => _insertLinePrefix('1. '), tooltip: 'Numbered List'),
+            _ToolIconBtn(Icons.code_rounded, () => _insertFormat('`', '`'), tooltip: 'Inline Code'),
+            _ToolIconBtn(Icons.segment_rounded, () => _insertLinePrefix('> '), tooltip: 'Blockquote'),
+            _ToolDivider(),
+            _ToolIconBtn(Icons.horizontal_rule_rounded, () {
+              final pos = _ctrl.selection.isValid ? _ctrl.selection.end : _ctrl.text.length;
+              final newText = '${_ctrl.text.substring(0, pos)}\n\n---\n\n${_ctrl.text.substring(pos)}';
+              _ctrl.text = newText;
+              _ctrl.selection = TextSelection.collapsed(offset: pos + 7);
+            }, tooltip: 'Horizontal Rule'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPageTabBar() {
+    if (_pages.length <= 1) return const SizedBox.shrink();
+    return Container(
+      height: 40,
+      color: JarvisColors.surfaceElevated,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        itemCount: _pages.length + 1, // +1 for "add page" button
+        itemBuilder: (_, i) {
+          if (i == _pages.length) {
+            return GestureDetector(
+              onTap: _addPage,
+              child: Container(
+                margin: const EdgeInsets.only(left: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: JarvisColors.accentPrimary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: JarvisColors.accentPrimary.withValues(alpha: 0.4)),
+                ),
+                child: const Icon(Icons.add_rounded, color: JarvisColors.accentPrimary, size: 18),
+              ),
+            );
+          }
+          final isSelected = i == _currentPage;
+          return GestureDetector(
+            onTap: () => _switchPage(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: isSelected ? JarvisColors.accentPrimary : JarvisColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? JarvisColors.accentPrimary : JarvisColors.border,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  'P${i + 1}',
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : JarvisColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPageActions() {
+    return Container(
+      color: JarvisColors.surface,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      child: Row(
+        children: [
+          // Move page up
+          _ActionChip(
+            icon: Icons.arrow_upward_rounded,
+            label: 'Move Up',
+            onTap: _currentPage > 0 ? _movePageUp : null,
+          ),
+          const SizedBox(width: 8),
+          // Move page down
+          _ActionChip(
+            icon: Icons.arrow_downward_rounded,
+            label: 'Move Down',
+            onTap: _currentPage < _pages.length - 1 ? _movePageDown : null,
+          ),
+          const SizedBox(width: 8),
+          // Add page
+          _ActionChip(
+            icon: Icons.add_rounded,
+            label: 'Add Page',
+            color: JarvisColors.accentPrimary,
+            onTap: _addPage,
+          ),
+          const SizedBox(width: 8),
+          // Delete page
+          _ActionChip(
+            icon: Icons.delete_outline_rounded,
+            label: 'Delete',
+            color: JarvisColors.error,
+            onTap: _pages.length > 1 ? _deletePage : null,
+          ),
+          const Spacer(),
+          // Word / char count
+          Text(
+            '${_ctrl.text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length}w',
+            style: const TextStyle(color: JarvisColors.textMuted, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUnsavedDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: JarvisColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Unsaved Changes',
+            style: TextStyle(color: JarvisColors.textPrimary, fontWeight: FontWeight.w700)),
+        content: const Text('Do you want to save your changes before leaving?',
+            style: TextStyle(color: JarvisColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () { Navigator.pop(context); Navigator.pop(context); },
+            child: const Text('Discard', style: TextStyle(color: JarvisColors.error)),
+          ),
+          TextButton(
+            onPressed: () { Navigator.pop(context); },
+            child: const Text('Continue Editing', style: TextStyle(color: JarvisColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () { Navigator.pop(context); _saveAndPop(); },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: JarvisColors.accentPrimary, foregroundColor: Colors.white),
+            child: const Text('Save & Exit'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Editor Toolbar Helpers ─────────────────────────────────────────────────────
+
+class _ToolBtn extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final String? tooltip;
+
+  const _ToolBtn(this.label, this.onTap, {this.tooltip});
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip ?? label,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: JarvisColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: JarvisColors.border),
+        ),
+        child: Text(label,
+            style: const TextStyle(
+              color: JarvisColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w700)),
+      ),
+    ),
+  );
+}
+
+class _ToolIconBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
+
+  const _ToolIconBtn(this.icon, this.onTap, {this.tooltip});
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip ?? '',
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: JarvisColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: JarvisColors.border),
+        ),
+        child: Icon(icon, color: JarvisColors.textPrimary, size: 18),
+      ),
+    ),
+  );
+}
+
+class _ToolDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 1, height: 24,
+    margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+    color: JarvisColors.border,
+  );
+}
+
+class _ActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? color;
+  final VoidCallback? onTap;
+
+  const _ActionChip({required this.icon, required this.label, this.color, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? JarvisColors.textMuted;
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedOpacity(
+        opacity: enabled ? 1.0 : 0.35,
+        duration: const Duration(milliseconds: 200),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: c.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: c.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: c, size: 14),
+              const SizedBox(width: 4),
+              Text(label, style: TextStyle(color: c, fontSize: 11, fontWeight: FontWeight.w600)),
+            ],
           ),
         ),
       ),

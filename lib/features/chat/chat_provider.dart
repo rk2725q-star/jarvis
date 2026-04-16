@@ -413,15 +413,41 @@ class ChatProvider extends ChangeNotifier {
         if (searchMatch != null) {
           final query = searchMatch.group(1);
           if (query != null) {
-            _setAnalysisStatus("websearch...");
-            final results = await router.webSearch(query);
-            _setAnalysisStatus("thinking...", active: false);
+            _setAnalysisStatus('searching web...');
 
-            final displayResults = _summarizeSearchResults(results);
+            // 1. Fetch real-time results (returns synthesis-ready context block)
+            final searchContext = await router.webSearch(query);
+            _setAnalysisStatus('synthesizing...', active: true);
+
+            // 2. Re-inject results into AI for a proper synthesized answer
+            //    We send ONLY the search context + the original user query.
+            //    This ensures the AI uses REAL data, not hallucinations.
+            final synthesisPrompt = 'The user asked: "$query"\n\n'
+                'Here are the real-time web search results you must use:\n\n'
+                '$searchContext\n\n'
+                'Now give a complete, accurate answer to the user query based strictly on these sources. '
+                'Include the date of each fact. If the query is about today\'s news/scores/prices, mention the exact date.';
+
+            final synthesisBuffer = StringBuffer();
+            await for (final chunk in router.generateStream(
+              synthesisPrompt,
+              systemPrompt: 'You are JARVIS real-time information synthesizer. '
+                  'Summarize the provided web search results into a clear, accurate, '
+                  'well-formatted answer. Cite sources. Do NOT invent data.',
+              maxTokens: 2048,
+            )) {
+              synthesisBuffer.write(chunk);
+            }
+
+            _setAnalysisStatus('done', active: false);
+
             final idxFinish = _messages.indexWhere((m) => m.id == aiMsg.id);
             if (idxFinish != -1) {
               final baseResponse = _stripTags(buffer.toString());
-              final updatedContent = "$baseResponse\n\n🔍 **Searching: $query...**\n$displayResults";
+              final synthesized = synthesisBuffer.toString().trim();
+              final updatedContent = synthesized.isNotEmpty
+                  ? '$baseResponse\n\n**Real-Time Search: $query**\n$synthesized'
+                  : '$baseResponse\n\n$searchContext';
               _messages[idxFinish] = _messages[idxFinish].copyWith(content: updatedContent);
               notifyListeners();
               await sessionService.addMessage(_messages[idxFinish]);
@@ -594,28 +620,8 @@ class ChatProvider extends ChangeNotifier {
     await loadSessions();
   }
 
-  String _summarizeSearchResults(String rawResults) {
-    if (rawResults.isEmpty) return "No results found.";
-    final List<String> lines = rawResults.split('\n');
-    final List<String> summary = [];
-    int count = 0;
-    String? currentTitle;
 
-    for (var line in lines) {
-      if (line.trim().startsWith('• TITLE:')) {
-        currentTitle = line.replaceFirst('• TITLE:', '').trim();
-      } else if (line.trim().startsWith('URL:')) {
-        final url = line.replaceFirst('URL:', '').trim();
-        if (currentTitle != null) {
-          summary.add("• [$currentTitle]($url)");
-          count++;
-          currentTitle = null;
-        }
-      }
-      if (count >= 3) break;
-    }
-    return summary.isNotEmpty ? summary.join('\n') : "Search completed.";
-  }
+
 
   Future<void> sendDiagramMessage(String text) async {
     if (_currentSessionId == null || text.trim().isEmpty) return;

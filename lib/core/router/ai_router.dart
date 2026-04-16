@@ -616,9 +616,32 @@ When user sends large code for review/debugging:
         break;
       case IntentMode.deep:
         final StringBuffer sb = StringBuffer();
-        sb.writeln("Explain in deep scientific detail. Break down logic thoroughly step-by-step.");
-        sb.writeln("- Be creative and invent solutions/architectures if they do not exist.");
-        sb.writeln("- Format neatly with colorful ASCII art diagrams if applicable.");
+        sb.writeln('Generate an EXHAUSTIVE, COMPREHENSIVE, PROFESSIONAL-GRADE response.');
+        sb.writeln('TARGET: 13-15 A4 pages of rich content. Cover the topic with full depth.');
+        sb.writeln('');
+        sb.writeln('STRUCTURE REQUIREMENTS:');
+        sb.writeln('1. Start with a clear introduction / overview section');
+        sb.writeln('2. Use numbered H2 headings for each major topic/subtopic');
+        sb.writeln('3. For each major section include:');
+        sb.writeln('   - Detailed explanation (3-5 paragraphs minimum)');
+        sb.writeln('   - At least one ASCII diagram showing architecture/flow/concept');
+        sb.writeln('   - Real-world examples with specific data/numbers');
+        sb.writeln('   - Step-by-step breakdown where applicable');
+        sb.writeln('4. Include at minimum 2 comparison tables across the response');
+        sb.writeln('5. Add code examples (in triple-backtick blocks) where relevant');
+        sb.writeln('6. End with a conclusion / summary section');
+        sb.writeln('');
+        sb.writeln('DIAGRAM RULES (use ASCII style only):');
+        sb.writeln('- Use +--+ and | for boxes, -- for connections, v/^ for arrows');
+        sb.writeln('- No emoji inside diagrams. Use plain ASCII characters only.');
+        sb.writeln('- Every major concept should have a visual diagram');
+        sb.writeln('');
+        sb.writeln('DEPTH RULES:');
+        sb.writeln('- Do NOT summarize. Explain every claim fully.');
+        sb.writeln('- Include technical specifications, formulas, algorithms');
+        sb.writeln('- Use real-world case studies from India/Tamil Nadu when relevant');
+        sb.writeln('- NO TOKEN LIMIT. Write until the content is COMPLETE and COMPREHENSIVE.');
+        sb.writeln('- Minimum 4000 words. Target 6000-8000 words for full coverage.');
         instructions = sb.toString();
         break;
       case IntentMode.comparison:
@@ -715,13 +738,123 @@ NON-NEGOTIABLE RULES:
 
     final timeContext = "[SYSTEM TIME] Currently it is $timeOfDay. The precise Tamil Nadu (IST) date and time is: ${nowIst.year}-${nowIst.month.toString().padLeft(2, '0')}-${nowIst.day.toString().padLeft(2, '0')} ${hour12.toString().padLeft(2, '0')}:${nowIst.minute.toString().padLeft(2, '0')} $period (ISO: ${nowIst.year}-${nowIst.month.toString().padLeft(2, '0')}-${nowIst.day.toString().padLeft(2, '0')} ${nowIst.hour.toString().padLeft(2, '0')}:${nowIst.minute.toString().padLeft(2, '0')})";
 
-    String voiceConstraint = isVoiceMode 
-        ? "\n[CRITICAL VOICE MODE RULE] You are speaking out loud through a Text-To-Speech engine. You MUST format your response in plain, natural conversational text ONLY. DO NOT use markdown. Most importantly, DO NOT use Tanglish or mix languages. Speak in the language the user is speaking in, or the language they explicitly request. If speaking Tamil, use PURE TAMIL script, not English characters (Tanglish)." 
+    String voiceConstraint = isVoiceMode
+        ? "\n[CRITICAL VOICE MODE RULE] You are speaking out loud through a Text-To-Speech engine. You MUST format your response in plain, natural conversational text ONLY. DO NOT use markdown. Most importantly, DO NOT use Tanglish or mix languages. Speak in the language the user is speaking in, or the language they explicitly request. If speaking Tamil, use PURE TAMIL script, not English characters (Tanglish)."
         : "";
+
+    // ── Dynamic page-count injection ── Visual-aware budget ─────────────────────
+    // Diagrams/tables/code blocks each consume significant page space.
+    // The AI must receive an EXACT layout plan that accounts for visuals.
+    final userPages = _extractPageCount(userInput);
+    if (userPages != null) {
+      instructions = '$instructions\n\n${_buildPagePlan(userPages)}';
+    }
 
     final systemStr = "$baseSystemPrompt$voiceConstraint\n\n$timeContext\n\n[CONTEXT]\n$memCtx\n\n[INSTRUCTION]\n$instructions";
     return (system: systemStr, user: userInput);
   }
+
+  /// Extract explicit page count from user input.
+  /// Recognises: "12 pages", "5-page", "within 8 pages", "10 page PDF", etc.
+  static int? _extractPageCount(String input) {
+    final patterns = [
+      RegExp(r'\bwithin\s+(\d{1,2})\s*pages?\b', caseSensitive: false),
+      RegExp(r'\b(\d{1,2})\s*-\s*page\b', caseSensitive: false),
+      RegExp(r'\b(\d{1,2})\s*pages?\s*(only|max|minimum|pdf|report|document|response|plan|limit|strictly)?\b', caseSensitive: false),
+    ];
+    for (final re in patterns) {
+      final m = re.firstMatch(input);
+      if (m != null) {
+        final raw = m.group(1) ?? m.group(2);
+        final n = int.tryParse(raw ?? '');
+        if (n != null && n >= 1 && n <= 30) return n;
+      }
+    }
+    return null;
+  }
+
+  /// Build a precision page-layout plan for the AI.
+  /// Accounts for the visual page cost of diagrams, tables, and code blocks.
+  static String _buildPagePlan(int pages) {
+    // ── Visual element budgets (empirical A4 page costs at our font sizes) ──
+    // ASCII diagram (~30 lines, 10pt SourceCodePro): ~0.55 pages
+    // Markdown table (5 rows x 3 cols): ~0.45 pages
+    // Code block (~20 lines): ~0.40 pages
+    // Heading (H2 + underline): ~0.08 pages
+    // Intro/conclusion sections: ~1.0 page each
+    const double diagramCost   = 0.55;
+    const double tableCost     = 0.45;
+    const double codeCost      = 0.40;
+    const double headingCost   = 0.08;
+    const double fixedOverhead = 1.5; // cover/intro + conclusion
+    const int    wordsPerPage  = 360; // conservative for 12pt Arial body
+
+    // ── Decide visual element counts based on page budget ──────────────────
+    // Scale diagrams and tables proportionally. Never exceed budget.
+    final int maxDiag  = (pages <= 5) ? 1 : (pages <= 8) ? 2 : (pages <= 12) ? 3 : (pages <= 16) ? 4 : 5;
+    final int maxTbl   = (pages <= 5) ? 1 : (pages <= 8) ? 1 : (pages <= 12) ? 2 : 3;
+    final int maxCode  = (pages <= 5) ? 1 : (pages <= 10) ? 2 : 3;
+    // Number of H2 sections = pages - 2 (for intro+conclusion), min 2, max 10
+    final int sections = ((pages - 2).clamp(2, 10));
+
+    // ── Compute visual page consumption ─────────────────────────────────────
+    final double visualCost = (maxDiag * diagramCost)
+        + (maxTbl * tableCost)
+        + (maxCode * codeCost)
+        + (sections * headingCost)
+        + fixedOverhead;
+
+    // ── Remaining text budget ────────────────────────────────────────────────
+    final double textPages    = (pages - visualCost).clamp(1.0, pages.toDouble());
+    final int    totalWords   = (textPages * wordsPerPage).round();
+    final int    wordsPerSec  = (totalWords / sections).round();
+
+    return '''
+════════════════════════════════════════════════
+PAGE COUNT CONSTRAINT — EXTREMELY STRICT
+════════════════════════════════════════════════
+Target: EXACTLY $pages A4 pages. This is a hard limit.
+Stopping rule: When you have written your $sections-th body section + conclusion, STOP. Do not add more sections.
+
+WARNING: Diagrams, tables, and code blocks consume page space BEYOND word count.
+Failing to account for them will cause you to EXCEED the $pages-page limit.
+
+EXACT LAYOUT PLAN (follow this precisely):
+
+Page budget breakdown:
+  Fixed overhead (intro + conclusion): 1.5 pages
+  $maxDiag diagram(s) × 0.55 pages = ${(maxDiag * diagramCost).toStringAsFixed(2)} pages
+  $maxTbl table(s) × 0.45 pages = ${(maxTbl * tableCost).toStringAsFixed(2)} pages
+  $maxCode code block(s) × 0.40 pages = ${(maxCode * codeCost).toStringAsFixed(2)} pages
+  $sections H2 section headings × 0.08 pages = ${(sections * headingCost).toStringAsFixed(2)} pages
+  Text content budget: ${textPages.toStringAsFixed(1)} pages
+
+Text word budget:
+  Total words for all body text: $totalWords words
+  Words per section: ~$wordsPerSec words each ($sections sections)
+
+Element limits (DO NOT EXCEED):
+  - Maximum diagrams in entire response: $maxDiag
+  - Maximum tables in entire response: $maxTbl
+  - Maximum code blocks in entire response: $maxCode
+  - Exactly $sections numbered H2 body sections
+  - 1 introduction paragraph (~200 words)
+  - 1 conclusion paragraph (~150 words)
+
+Section template:
+  ## 1. [Section Name]
+  [~$wordsPerSec words of body text]
+  [0 or 1 diagram if budget allows]
+
+HARD STOP: After writing Section $sections + Conclusion, output NOTHING ELSE.
+Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag total.
+════════════════════════════════════════════════''';
+  }
+
+  /// Estimate max tokens — conservative to prevent bloat.
+  /// Uses 480 tokens/page (tighter than word-count-only estimate because
+  /// diagrams/tables add token cost without being pure text).
+  static int _tokensForPages(int pages) => (pages * 480).clamp(2500, 55000);
 
   /// Inject live integration capability prompts into the system string
   String injectCapabilities(String systemStr, String capabilities) {
@@ -730,16 +863,20 @@ NON-NEGOTIABLE RULES:
   }
 
   int _getMaxTokens(String input) {
+    // If user explicitly requests N pages, compute tokens from that
+    final userPages = _extractPageCount(input);
+    if (userPages != null) return _tokensForPages(userPages);
+
     final mode = detectIntent(input);
     switch (mode) {
-      case IntentMode.simple: return 2048;
-      case IntentMode.normal: return 8192;
-      case IntentMode.deep: return 16384;
-      case IntentMode.comparison: return 8192;
-      case IntentMode.agentic: return 16384;
-      case IntentMode.project: return 32768;
+      case IntentMode.simple:             return 2048;
+      case IntentMode.normal:             return 12000;  // assignment: 13-15 pages
+      case IntentMode.deep:               return 16000;  // comprehensive deep responses
+      case IntentMode.comparison:         return 10000;
+      case IntentMode.agentic:            return 16384;
+      case IntentMode.project:            return 50000;  // full app/website/10k+ code
       case IntentMode.inquisitiveProject: return 2048;
-      case IntentMode.deepDebug: return 65536; // Max possible — exhaustive debug
+      case IntentMode.deepDebug:          return 65536;  // exhaustive debug, 20k+ lines
     }
   }
 
@@ -1742,23 +1879,42 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
   }
 
   /// Perform a real-time web search via Ollama Cloud API
+  /// Perform a real-time web search via Ollama Cloud API
+  /// Returns a rich, AI-synthesis-ready context block with date stamp
   Future<String> webSearch(String query) async {
     try {
       _setStatus('Searching the web...');
       final results = await _ollamaService.webSearch(query);
-      if (results.isEmpty) return "No results found.";
-      
-      final StringBuffer sb = StringBuffer();
-      sb.writeln("WEB SEARCH RESULTS for: '$query'");
-      for (var r in results.take(3)) {
-         sb.writeln("• TITLE: ${r['title']}");
-         sb.writeln("  URL: ${r['url']}");
-         sb.writeln("  CONTENT: ${r['content']}");
+      final now = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+      final dateStr = '${now.day.toString().padLeft(2,'0')}/${now.month.toString().padLeft(2,'0')}/${now.year} '
+                      '${now.hour.toString().padLeft(2,'0')}:${now.minute.toString().padLeft(2,'0')} IST';
+
+      if (results.isEmpty) {
+        return '🔍 **Web Search:** "$query" — No results found at $dateStr.';
       }
+
+      final sb = StringBuffer();
+      sb.writeln('**Today is $dateStr.**');
+      sb.writeln();
+      // Present top 5 results with full content for AI to synthesize
+      int n = 1;
+      for (final r in results.take(5)) {
+        final title   = (r['title']   as String? ?? '').trim();
+        final url     = (r['url']     as String? ?? '').trim();
+        final content = (r['content'] as String? ?? '').trim();
+        if (title.isEmpty && content.isEmpty) continue;
+        sb.writeln('SOURCE $n: $title');
+        if (url.isNotEmpty) sb.writeln('URL: $url');
+        if (content.isNotEmpty) sb.writeln('CONTENT: $content');
+        sb.writeln();
+        n++;
+      }
+      sb.writeln('---');
+      sb.writeln('Based ONLY on the above real-time sources (as of $dateStr), answer the user query accurately. Do NOT invent numbers or dates. Cite sources.');
       return sb.toString();
     } catch (e) {
       debugPrint('[AIRouter] webSearch failed: $e');
-      return "⚠️ Web search failed: $e";
+      return '⚠️ Web search temporarily unavailable. Answer from your training data, but note it may not reflect today\'s latest info.';
     }
   }
 
