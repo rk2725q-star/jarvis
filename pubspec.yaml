@@ -72,9 +72,9 @@ dependencies:
   # Vibration
   vibration: ^3.1.8
   # URL launcher
-  url_launcher: ^6.3.0
+  url_launcher: ^6.3.2
   # Native sharing
-  share_plus: ^10.1.2
+  share_plus: ^12.0.2
   pdf: ^3.12.0
   flutter_local_notifications: ^21.0.0
   timezone: ^0.11.0

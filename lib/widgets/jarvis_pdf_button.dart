@@ -1,4 +1,5 @@
-﻿import 'dart:typed_data';
+// ignore_for_file: deprecated_member_use
+import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';

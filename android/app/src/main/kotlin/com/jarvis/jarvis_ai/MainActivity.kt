@@ -2,7 +2,9 @@ package com.jarvis.jarvis_ai
 
 import android.content.Context
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Environment
 import android.provider.Settings
 import android.text.TextUtils
 import io.flutter.embedding.android.FlutterActivity
@@ -12,6 +14,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val ACCESSIBILITY_CHANNEL = "jarvis.ai.os/accessibility"
     private val FILE_OPEN_CHANNEL = "jarvis.ai.os/file_open"
+    private val MEDIA_SCANNER_CHANNEL = "com.jarvis.jarvis_ai/media_scanner"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -176,6 +179,26 @@ class MainActivity : FlutterActivity() {
                     "getInitialFile" -> {
                         val path = resolveFilePath(intent)
                         result.success(path)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // ── Media Scanner Channel: notifies Android gallery / file manager ──
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_SCANNER_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "scanFile" -> {
+                        val path = call.argument<String>("path")
+                        if (path != null) {
+                            MediaScannerConnection.scanFile(
+                                applicationContext,
+                                arrayOf(path),
+                                null
+                            ) { _, _ -> result.success(true) }
+                        } else {
+                            result.error("INVALID", "No path provided", null)
+                        }
                     }
                     else -> result.notImplemented()
                 }
