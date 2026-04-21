@@ -1,4 +1,6 @@
+// ignore_for_file: unnecessary_brace_in_string_interps, prefer_interpolation_to_compose_strings, use_build_context_synchronously
 import 'dart:async';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -47,15 +49,42 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
   BrowserTab get _currentTab => _tabs[_currentTabIndex];
 
   // Whitelist: domains that must never be blocked
+  // Movie/streaming sites are allowed — only truly malicious content is blocked
   static const _safedomains = [
+    // Search & productivity
     'google.com', 'google.co.in', 'google.',
     'gstatic.com', 'googleapis.com', 'youtube.com',
-    'youtu.be', 'amazon.com', 'amazon.in',
-    'flipkart.com', 'docs.google.com', 'forms.google.com',
+    'youtu.be', 'docs.google.com', 'forms.google.com',
     'accounts.google.com', 'cloudflare.com',
+    // Shopping
+    'amazon.com', 'amazon.in', 'flipkart.com',
+    'myntra.com', 'meesho.com', 'snapdeal.com',
+    // Social
     'facebook.com', 'instagram.com', 'twitter.com',
-    'whatsapp.com', 'microsoft.com', 'apple.com',
-    'github.com', 'stackoverflow.com',
+    'whatsapp.com', 'telegram.org', 'reddit.com',
+    // Tech
+    'microsoft.com', 'apple.com', 'github.com',
+    'stackoverflow.com', 'wikipedia.org',
+    // Movie download sites — unrestricted access
+    'moviesda', 'isaidub', 'tamilrockers', 'kuttymovies',
+    'filmyzilla', 'bollyflix', 'vegamovies', 'skymovieshd',
+    'sdmoviespoint', '9xmovies', 'mp4moviez', 'downloadhub',
+    'movies4u', 'movierulz', 'jalshamoviez', 'cinemavilla',
+    'tamilyogi', 'tamilblasters', 'kuttymovies', 'cinevood',
+    'katmovie', 'ibomma', 'hdmovie2', 'dvdplay',
+    'filmyhit', 'worldfree4u', '1337x.to', 'rarbg',
+    'thepiratebay', 'yts.mx', 'eztv', 'limetorrents',
+    'torrentgalaxy', 'torlock', 'kickasstorrents',
+    // Music
+    'pagalworld', 'mr-jatt', 'djpunjab', 'songspk',
+    'wynk.in', 'gaana.com', 'jiosaavn.com',
+  ];
+
+  // Only block sites that are genuinely dangerous (malware, fraud, phishing)
+  // Movie piracy sites are NOT blocked — user has freedom of access
+  static const _dangerousDomains = [
+    'malware', 'phishing', 'ransomware',
+    'funinr.com', 'bet365fraud', 'scam-',
   ];
 
   bool _isAd(String url) {
@@ -63,14 +92,14 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     if (url.isEmpty) return false;
     final lowerUrl = url.toLowerCase();
 
-    // Always allow safe domains
+    // Always allow safe/movie domains
     if (_safedomains.any((d) => lowerUrl.contains(d))) return false;
 
-    // Check explicit ad-block domains list
+    // Block only pure ad-network/tracker domains
     if (BrowserAdBlockRules.adBlockDomains.any((d) => lowerUrl.contains(d))) return true;
 
-    // Only block clear betting/scam patterns
-    if (lowerUrl.contains('funinr.com') || lowerUrl.contains('casino')) return true;
+    // Block genuinely dangerous sites
+    if (_dangerousDomains.any((d) => lowerUrl.contains(d))) return true;
 
     return false;
   }
@@ -307,16 +336,19 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
         BrowserDownloadManager.show(context);
       },
 
-      // ── Long-press: image / link context menu ─────────────────────────────
+      // ── Long-press: image / link / text context menu ──────────────────────
       onLongPressHitTestResult: (controller, hitTestResult) async {
         final extra = hitTestResult.extra ?? '';
         final type = hitTestResult.type;
 
-        // Image or image-inside-anchor → offer save
+        // ── Image long-press ────────────────────────────────────────────────
         if (type == InAppWebViewHitTestResultType.IMAGE_TYPE ||
             type == InAppWebViewHitTestResultType.SRC_IMAGE_ANCHOR_TYPE) {
           if (!mounted) return;
           final imgUrl = extra;
+          // Also try to grab selected text for copy
+          final selectedText = (await controller.getSelectedText())?.trim() ?? '';
+          if (!mounted) return;
           showModalBottomSheet(
             context: context,
             backgroundColor: const Color(0xFF10102A),
@@ -327,38 +359,50 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Copy URL
                   ListTile(
-                    leading:
-                        const Icon(Icons.download, color: Colors.blueAccent),
+                    leading: const Icon(Icons.copy, color: Colors.amber),
+                    title: const Text('Copy Image URL',
+                        style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _copyToClipboard(imgUrl);
+                    },
+                  ),
+                  if (selectedText.isNotEmpty)
+                    ListTile(
+                      leading: const Icon(Icons.text_snippet, color: Colors.greenAccent),
+                      title: Text('Copy "${selectedText.length > 40 ? selectedText.substring(0, 40) + "…" : selectedText}"',
+                          style: const TextStyle(color: Colors.white)),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _copyToClipboard(selectedText);
+                      },
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.download, color: Colors.blueAccent),
                     title: const Text('Save Image',
                         style: TextStyle(color: Colors.white)),
                     subtitle: Text(
-                      imgUrl.length > 60
-                          ? '...${imgUrl.substring(imgUrl.length - 60)}'
+                      imgUrl.length > 55
+                          ? '…${imgUrl.substring(imgUrl.length - 55)}'
                           : imgUrl,
-                      style: const TextStyle(
-                          color: Colors.white38, fontSize: 11),
+                      style: const TextStyle(color: Colors.white38, fontSize: 11),
                       maxLines: 1,
                     ),
                     onTap: () {
                       Navigator.pop(ctx);
                       BrowserDownloadManager.addDownload(
-                        imgUrl,
-                        '',
-                        referer: _currentTab.url,
+                        imgUrl, '', referer: _currentTab.url,
                       );
                       BrowserDownloadManager.show(context);
                     },
                   ),
                   ListTile(
-                    leading:
-                        const Icon(Icons.open_in_browser, color: Colors.white54),
+                    leading: const Icon(Icons.open_in_browser, color: Colors.white54),
                     title: const Text('Open in New Tab',
                         style: TextStyle(color: Colors.white)),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _addNewTab(imgUrl, imgUrl);
-                    },
+                    onTap: () { Navigator.pop(ctx); _addNewTab(imgUrl, imgUrl); },
                   ),
                 ],
               ),
@@ -367,11 +411,12 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
           return;
         }
 
-        // SRC anchor (hyperlink) → offer open / download
+        // ── Link / anchor long-press ────────────────────────────────────────
         if ((type == InAppWebViewHitTestResultType.SRC_ANCHOR_TYPE ||
-                type ==
-                    InAppWebViewHitTestResultType.SRC_IMAGE_ANCHOR_TYPE) &&
+                type == InAppWebViewHitTestResultType.SRC_IMAGE_ANCHOR_TYPE) &&
             extra.isNotEmpty) {
+          if (!mounted) return;
+          final selectedText = (await controller.getSelectedText())?.trim() ?? '';
           if (!mounted) return;
           showModalBottomSheet(
             context: context,
@@ -384,34 +429,85 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
-                    leading:
-                        const Icon(Icons.download, color: Colors.blueAccent),
+                    leading: const Icon(Icons.copy, color: Colors.amber),
+                    title: const Text('Copy Link',
+                        style: TextStyle(color: Colors.white)),
+                    subtitle: Text(
+                      extra.length > 55 ? '…${extra.substring(extra.length - 55)}' : extra,
+                      style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      maxLines: 1,
+                    ),
+                    onTap: () { Navigator.pop(ctx); _copyToClipboard(extra); },
+                  ),
+                  if (selectedText.isNotEmpty)
+                    ListTile(
+                      leading: const Icon(Icons.text_snippet, color: Colors.greenAccent),
+                      title: Text('Copy "${selectedText.length > 40 ? selectedText.substring(0, 40) + "…" : selectedText}"',
+                          style: const TextStyle(color: Colors.white)),
+                      onTap: () { Navigator.pop(ctx); _copyToClipboard(selectedText); },
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.download, color: Colors.blueAccent),
                     title: const Text('Download Link',
                         style: TextStyle(color: Colors.white)),
                     onTap: () {
                       Navigator.pop(ctx);
                       BrowserDownloadManager.addDownload(
-                        extra,
-                        '',
-                        referer: _currentTab.url,
+                        extra, '', referer: _currentTab.url,
                       );
                       BrowserDownloadManager.show(context);
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.open_in_new,
-                        color: Colors.white54),
+                    leading: const Icon(Icons.open_in_new, color: Colors.white54),
                     title: const Text('Open in New Tab',
                         style: TextStyle(color: Colors.white)),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _addNewTab(extra, extra);
-                    },
+                    onTap: () { Navigator.pop(ctx); _addNewTab(extra, extra); },
                   ),
                 ],
               ),
             ),
           );
+          return;
+        }
+
+        // ── Plain text selection → show Copy menu ──────────────────────────
+        if (type == InAppWebViewHitTestResultType.UNKNOWN_TYPE ||
+            extra.isEmpty) {
+          final selectedText = (await controller.getSelectedText())?.trim() ?? '';
+          if (selectedText.isNotEmpty && mounted) {
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: const Color(0xFF10102A),
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              builder: (ctx) => SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.copy, color: Colors.amber),
+                      title: Text(
+                        'Copy: "${selectedText.length > 50 ? selectedText.substring(0, 50) : selectedText}…"',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      onTap: () { Navigator.pop(ctx); _copyToClipboard(selectedText); },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.search, color: Colors.blueAccent),
+                      title: Text('Search: "${selectedText.length > 30 ? '${selectedText.substring(0, 30)}…' : selectedText}"',
+                          style: const TextStyle(color: Colors.white)),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _addNewTab('https://www.google.com/search?q=${Uri.encodeComponent(selectedText)}', 'Search');
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
         }
       },
     );
@@ -765,7 +861,7 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
               // Chat History
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   reverse: false,
                   itemCount: _agentMessages.length,
                   itemBuilder: (ctx, i) {
@@ -773,9 +869,9 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                     return Align(
                       alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.92),
                         decoration: BoxDecoration(
                           color: msg.isUser ? _primary.withAlpha(38) : Colors.white.withAlpha(12),
                           borderRadius: BorderRadius.only(
@@ -786,10 +882,7 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                           ),
                           border: Border.all(color: msg.isUser ? _primary.withAlpha(76) : Colors.white12),
                         ),
-                        child: SelectableText(
-                          msg.text,
-                          style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
-                        ),
+                        child: _buildAgentMessageContent(msg.text, msg.isUser),
                       ),
                     );
                   },
@@ -892,19 +985,191 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     return 'https://www.google.com/search?q=${Uri.encodeComponent(input)}';
   }
 
-  /// Strip markdown/symbols from AI response text for clean display
+  /// Strip markdown from text while preserving content.
+  /// IMPORTANT: In Dart, replaceAll with regex does NOT support $1 backreferences.
+  /// Must use replaceAllMapped() for capture-group substitutions.
   String _cleanAgentText(String text) {
     return text
-        .replaceAll(RegExp(r'\*\*([^*]+)\*\*'), r'$1')   // bold
-        .replaceAll(RegExp(r'\*([^*]+)\*'), r'$1')        // italic
-        .replaceAll(RegExp(r'#+\s*'), '')                   // headings
-        .replaceAll(RegExp(r'`{1,3}[^`]*`{1,3}'), '')     // code
-        .replaceAll(RegExp(r'^[-*]\s+', multiLine: true), '• ')  // bullet
-        .replaceAll(RegExp(r'\\n'), '\n')                 // literal \n
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n')            // excess newlines
+        // Bold **text** → text
+        .replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m.group(1) ?? '')
+        // Italic *text* → text
+        .replaceAllMapped(RegExp(r'\*([^*]+)\*'), (m) => m.group(1) ?? '')
+        // Headings ## → remove hashes
+        .replaceAll(RegExp(r'#{1,6}\s*'), '')
+        // Inline code `code` → code (keep content)
+        .replaceAllMapped(RegExp(r'`{1,3}([^`]*)`{1,3}'), (m) => m.group(1) ?? '')
+        // Bullets - item → • item
+        .replaceAll(RegExp(r'^[-*]\s+', multiLine: true), '• ')
+        // Literal \n in strings → real newline
+        .replaceAll(r'\n', '\n')
+        // Collapse 3+ newlines → 2
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
         .trim();
   }
 
+  /// Detect if text contains a markdown table (has | separators)
+  bool _hasMarkdownTable(String text) {
+    return text.contains('|') &&
+        text.split('\n').any((l) => l.contains('|') && l.trim().startsWith('|'));
+  }
+
+  /// Render agent message — shows proper table for markdown tables,
+  /// selectable text otherwise
+  Widget _buildAgentMessageContent(String text, bool isUser) {
+    if (!isUser && _hasMarkdownTable(text)) {
+      return _renderMarkdownTable(text);
+    }
+    return SelectableText(
+      text,
+      style: TextStyle(
+        color: isUser ? Colors.white : Colors.white.withAlpha(230),
+        fontSize: 13,
+        height: 1.45,
+      ),
+    );
+  }
+
+  /// Parse and render a markdown table as a real Flutter table
+  Widget _renderMarkdownTable(String text) {
+    final lines = text.split('\n');
+    final tableLines = <String>[];
+    final beforeLines = <String>[];
+    final afterLines = <String>[];
+    bool inTable = false;
+    bool pastTable = false;
+    for (final line in lines) {
+      final isTableRow = line.trim().startsWith('|');
+      if (isTableRow && !pastTable) {
+        inTable = true;
+        // Skip separator lines (---|---)
+        if (!RegExp(r'^\|[-:\s|]+\|$').hasMatch(line.trim())) {
+          tableLines.add(line);
+        }
+      } else if (inTable && !isTableRow) {
+        pastTable = true;
+        inTable = false;
+        afterLines.add(line);
+      } else if (!inTable) {
+        beforeLines.add(line);
+      } else {
+        afterLines.add(line);
+      }
+    }
+
+    final cells = tableLines.map((row) {
+      return row.split('|')
+          .map((c) => c.trim())
+          .where((c) => c.isNotEmpty)
+          .toList();
+    }).toList();
+
+    if (cells.isEmpty) {
+      return SelectableText(text, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45));
+    }
+
+    final header = cells.first;
+    final rows = cells.skip(1).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (beforeLines.any((l) => l.trim().isNotEmpty))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: SelectableText(
+              beforeLines.join('\n').trim(),
+              style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45),
+            ),
+          ),
+        // Table
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Table(
+            defaultColumnWidth: const IntrinsicColumnWidth(),
+            border: TableBorder.all(color: Colors.white12, width: 0.5),
+            children: [
+              // Header row
+              TableRow(
+                decoration: BoxDecoration(color: Colors.white.withAlpha(20)),
+                children: header.map((h) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Text(h,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                )).toList(),
+              ),
+              // Data rows
+              ...rows.map((row) => TableRow(
+                children: List.generate(header.length, (ci) {
+                  final cell = ci < row.length ? row[ci] : '';
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    child: Text(cell,
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(200),
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                }),
+              )),
+            ],
+          ),
+        ),
+        if (afterLines.any((l) => l.trim().isNotEmpty))
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: SelectableText(
+              afterLines.join('\n').trim(),
+              style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Copy text to clipboard and show a brief snackbar
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Copied: ${text.length > 40 ? text.substring(0, 40) : text}…'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF1A1A3E),
+        ),
+      );
+    }
+  }
+
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // JARVIS Web Agent — Parallel Multi-Tab ReAct System
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Split a query into parallel subtasks when the user lists multiple goals.
+  /// e.g. "compare S24FE on flipkart and amazon and give me ratings"
+  /// → ["compare S24FE on flipkart", "compare S24FE on amazon"]
+  List<String> _parseSubtasks(String query) {
+    // AI will handle complex decomposition; here we do quick heuristic split
+    final patterns = [
+      RegExp(r'\band\s+(?:also\s+)?(?:on|in|from|check|compare|open|go to|visit|search)\b', caseSensitive: false),
+      RegExp(r'\n[-•\*]\s+'),
+    ];
+    for (final p in patterns) {
+      if (p.hasMatch(query)) {
+        final parts = query.split(p).map((s) => s.trim()).where((s) => s.length > 5).toList();
+        if (parts.length >= 2) return parts;
+      }
+    }
+    return [query];
+  }
+
+  // ── Entry point called from the UI send button ────────────────────────────
   Future<void> _runAgent() async {
     final command = _agentController.text.trim();
     if (command.isEmpty) return;
@@ -912,200 +1177,522 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     setState(() {
       _agentMessages.add(AgentMessage(command, isUser: true));
       _agentRunning = true;
-      _agentStatus = '🤖 JARVIS starting...';
+      _agentStatus = '🤖 JARVIS analyzing task...';
     });
     _agentController.clear();
+    final subtasks = _parseSubtasks(command);
 
+    try {
+      if (subtasks.length > 1) {
+        // ── PARALLEL multi-tab mode ──────────────────────────────────────
+        setState(() => _agentStatus = '⚡ Launching ${subtasks.length} parallel tasks...');
+
+        // Ensure enough tabs exist
+        while (_tabs.length < subtasks.length) {
+          _addNewTab('https://www.google.com', 'Working...');
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
+
+        // Show which tab is doing what
+        for (int i = 0; i < subtasks.length; i++) {
+          setState(() {
+            _tabs[i].title = 'Task ${i + 1}';
+            _agentMessages.add(AgentMessage(
+              '🗂 Tab ${i + 1}: ${subtasks[i]}',
+              isUser: false,
+            ));
+          });
+        }
+
+        // Run all agents concurrently
+        final futures = <Future<String>>[];
+        for (int i = 0; i < subtasks.length; i++) {
+          futures.add(_runAgentOnTab(_tabs[i], subtasks[i], taskIndex: i + 1));
+        }
+
+        final results = await Future.wait(futures);
+
+        if (mounted) {
+          setState(() {
+            _agentRunning = false;
+            _agentStatus = '';
+            final summary = results.asMap().entries
+                .map((e) => '📌 Task ${e.key + 1}: ${e.value}')
+                .join('\n\n');
+            _agentMessages.add(AgentMessage(
+              '✅ All ${subtasks.length} tasks completed!\n\n$summary',
+              isUser: false,
+            ));
+          });
+        }
+      } else {
+        // ── SINGLE task on current tab ───────────────────────────────────
+        await _runAgentOnTab(_currentTab, command);
+        if (mounted) {
+          setState(() {
+            _agentRunning = false;
+            _agentStatus = '';
+          });
+        }
+        // result message already added inside _runAgentOnTab
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _agentRunning = false;
+          _agentStatus = '';
+          _agentMessages.add(AgentMessage('⚠️ Agent error: $e', isUser: false));
+        });
+      }
+    }
+  }
+
+  // ── Core single-tab ReAct loop — OpenClaw-style snapshot+ref system ─────────
+  Future<String> _runAgentOnTab(
+    BrowserTab tab,
+    String command, {
+    int taskIndex = 0,
+  }) async {
     final router = context.read<AIRouter>();
-    // Keep only last 8 entries in history to avoid context explosion
     final List<Map<String, String>> history = [];
     int step = 0;
     int consecutiveErrors = 0;
+    final Set<String> visitedUrls = {};
+
+    // ── SOUL: build persistent context assembly (OpenClaw style) ──────────────
+    // Extracts the target site domain so JARVIS can fetch site-specific hints.
+    String siteKnowledge = '';
+    final siteMatch = RegExp(
+      r'(?:on|from|at|via|using|in|open)?\s*([a-zA-Z0-9-]+\.(?:com|in|org|net|io|co\.in)[^\s]*)',
+      caseSensitive: false,
+    ).firstMatch(command);
+    if (siteMatch != null) {
+      final site = siteMatch.group(1)!.trim();
+      final label = taskIndex > 0 ? '[Task $taskIndex] ' : '';
+      if (mounted) setState(() => _agentStatus = '${label}🔍 Learning $site...');
+      try {
+        final hint = await router.generateDirectResponse(
+          prompt: 'Task: "$command" on $site.\n'
+              'Give 4 bullet points MAX:\n'
+              '• Exact URL to navigate to first\n'
+              '• Search box: what to type and its label/placeholder\n'
+              '• Which button/link to click for results\n'
+              '• Where the download/buy/final action button appears\n'
+              'Be extremely concise. Real site knowledge only.',
+          systemOverride: 'You are a web automation expert. Output 4 bullets, 80 words max. No fluff.',
+        );
+        siteKnowledge = hint.trim();
+      } catch (_) {}
+    }
 
     try {
       while (true) {
         if (!mounted) break;
         step++;
+        final label = taskIndex > 0 ? '[T$taskIndex] ' : '';
 
-        // ── OBSERVE ──────────────────────────────────────────────────────
-        setState(() => _agentStatus = '👁 Step $step: Reading page...');
-        final pageDataRaw = await _currentTab.controller?.evaluateJavascript(source: r'''
-          (function(){
-            try {
-              const elems = document.querySelectorAll('a,button,input,select,textarea,[role="button"],[role="link"]');
-              let elemList = '';
-              for(let i=0; i<Math.min(elems.length,80); i++){
-                const el = elems[i];
-                const txt = (el.innerText||el.placeholder||el.value||el.name||el.getAttribute('aria-label')||el.title||'').trim().slice(0,100);
-                const tag = el.tagName + (el.type?'['+el.type+']':'');
-                const id = el.id?'#'+el.id:'';
-                if(txt||id) elemList += i+': '+tag+id+'="'+txt+'"\n';
-              }
-              return JSON.stringify({
-                url: window.location.href,
-                title: document.title,
-                text: (document.body?.innerText||'').substring(0,2000),
-                elements: elemList,
-                readyState: document.readyState
-              });
-            } catch(e){ return JSON.stringify({url:window.location.href, error: e.message}); }
-          })()
-        ''');
+        // ── OBSERVE — OpenClaw-style accessibility snapshot with numbered refs ──
+        if (mounted) setState(() => _agentStatus = '${label}👁 Step $step: Snapshot...');
 
-        final pageData = pageDataRaw?.toString() ?? '{}';
-        // Add observation, cap history at 8 entries
-        history.add({'role': 'observation', 'content': 'Step $step:\n$pageData'});
-        if (history.length > 8) history.removeAt(0);
+        final snapshotRaw = await tab.controller?.evaluateJavascript(source: r'''
+(function(){
+  try {
+    var url = window.location.href;
+    var title = document.title;
+    var readyState = document.readyState;
 
-        // ── REASON ──────────────────────────────────────────────────────
-        setState(() => _agentStatus = '🧠 Step $step: Thinking...');
+    // Build ARIA/accessibility snapshot with numbered refs — OpenClaw style
+    // Ref numbers let the AI say "click ref:5" instead of fragile selectors
+    var SEL = 'a[href],button:not([disabled]),input:not([type="hidden"]),select,textarea,[role="button"],[role="link"],[role="tab"],[role="menuitem"],label[for]';
+    var nodes = document.querySelectorAll(SEL);
+    var refs = [];
+    var dlLinks = [];
 
-        final historyText = history.map((h) => '[${h['role']!.toUpperCase()}]\n${h['content']}').join('\n\n');
+    for (var i = 0; i < Math.min(nodes.length, 80); i++) {
+      var el = nodes[i];
+      var tag = el.tagName.toLowerCase();
+      var type = el.type || '';
+      var role = el.getAttribute('role') || '';
+      var label = (
+        el.getAttribute('aria-label') ||
+        el.getAttribute('placeholder') ||
+        el.getAttribute('title') ||
+        el.innerText ||
+        el.value ||
+        el.getAttribute('alt') ||
+        el.getAttribute('name') ||
+        el.getAttribute('href') || ''
+      ).trim().replace(/\s+/g,' ').slice(0,70);
+      var href = (el.href || el.src || el.getAttribute('href') || '').slice(0,150);
+      var isInput = tag === 'input' || tag === 'textarea' || tag === 'select';
+      var entry = i + ': [' + (role||tag) + (type?('/'+type):'') + '] ' + JSON.stringify(label);
+      if (href && tag === 'a') entry += ' -> ' + href;
+      refs.push(entry);
 
+      // Capture direct file download links
+      if (href && /\.(mkv|mp4|avi|zip|rar|apk|torrent|mp3|flac|m4a|wav|opus|mov|webm|pdf|docx?)(\?|#|$)/i.test(href)) {
+        dlLinks.push({ref:i, label:label.slice(0,40), href:href});
+      }
+    }
+
+    // Scan all anchors for download-cue text even if not in refs
+    var allA = document.querySelectorAll('a');
+    for (var j = 0; j < allA.length && dlLinks.length < 20; j++) {
+      var a = allA[j];
+      var aHref = a.href || '';
+      var aText = (a.innerText || '').trim().toLowerCase();
+      if (aHref && /download|direct.?link|get.?file|direct.?download|play.?now|fast.?link|zippy|gdrive/i.test(aText)) {
+        dlLinks.push({ref:-1, label:aText.slice(0,40), href:aHref.slice(0,200)});
+      }
+    }
+
+    // Page text summary (first 800 chars)
+    var bodyText = (document.body ? document.body.innerText : '').replace(/\s+/g,' ').trim().slice(0,800);
+
+    // Detect forms
+    var forms = [];
+    document.querySelectorAll('form').forEach(function(f, fi) {
+      var inputs = [];
+      f.querySelectorAll('input,textarea,select').forEach(function(inp) {
+        inputs.push((inp.getAttribute('placeholder')||inp.name||inp.type||'?').slice(0,30));
+      });
+      forms.push('form' + fi + ': [' + inputs.join(', ') + ']');
+    });
+
+    return JSON.stringify({
+      url: url,
+      title: title,
+      readyState: readyState,
+      refs: refs,
+      dlLinks: dlLinks,
+      forms: forms,
+      text: bodyText
+    });
+  } catch(e) {
+    return JSON.stringify({url: window.location.href, error: e.message, readyState:'unknown'});
+  }
+})()
+''');
+
+        final snapshot = snapshotRaw?.toString() ?? '{}';
+
+        // Rolling history — keep last 12 entries
+        history.add({'role': 'obs', 'content': 'STEP $step\n$snapshot'});
+        if (history.length > 12) history.removeAt(0);
+
+        // ── Proactive download detection hint ─────────────────────────────
+        try {
+          final parsed = snapshot.contains('"dlLinks":[{') ||
+              (snapshot.contains('"dlLinks"') &&
+               snapshot.contains('"href"') &&
+               snapshot.contains('http'));
+          if (parsed && step > 1) {
+            history.add({
+              'role': 'JARVIS-hint',
+              'content': '🔗 Download links found in snapshot dlLinks. '
+                  'If the target file is there, use DOWNLOAD action NOW — do not browse further.',
+            });
+          }
+        } catch (_) {}
+
+        // ── REASON — OpenClaw-style context assembly ───────────────────────
+        if (mounted) setState(() => _agentStatus = '${label}🧠 Step $step: Reasoning...');
+
+        final historyText = history
+            .map((h) => '[${h["role"]!.toUpperCase()}]\n${h["content"]}')
+            .join('\n\n');
+
+        // SOUL prompt — persistent context like OpenClaw's SOUL.md + MEMORY.md
         final aiResponse = await router.generateDirectResponse(
-          prompt: '''TASK: "$command"
+          prompt: '''
+━━━━━━━━━━ JARVIS SOUL ━━━━━━━━━━
+You are JARVIS Web Agent — operate at 3x human speed, autonomous, never give up.
+You have full browser control via snapshot REFS (numbered interactive elements).
+You know how to handle: logins, CAPTCHAs, dynamic JS sites, forms, downloads.
 
-HISTORY (recent):
+━━━━━━━━━━ TASK MEMORY ━━━━━━━━━━
+GOAL: "$command"
+
+SITE KNOWLEDGE (pre-researched):
+${siteKnowledge.isNotEmpty ? siteKnowledge : "none — navigate instinctively"}
+
+━━━━━━━━━━ CONVERSATION LOOP ━━━━━━━━━━
 $historyText
 
-Decide the NEXT single action. Reply ONLY valid JSON, no markdown:
+━━━━━━━━━━ ACTION SCHEMA ━━━━━━━━━━
+Respond ONLY with raw JSON (no markdown, no explanation):
 {
-  "thought": "brief observation and plan",
-  "type": "ACTION|NAVIGATE|DONE|ANSWER|WAIT",
-  "js": "JS code string (only for ACTION)",
-  "navigate_url": "full URL (only for NAVIGATE)",
-  "answer": "plain text reply (only for DONE/ANSWER)"
+  "thought": "brief one-line plan",
+  "type": "NAVIGATE | CLICK | TYPE | SCROLL | DOWNLOAD | DONE | ANSWER | WAIT",
+  "ref": 12,
+  "value": "text to type (TYPE only)",
+  "navigate_url": "full URL (NAVIGATE only)",
+  "download_url": "direct file URL (DOWNLOAD only)",
+  "filename": "file.ext (DOWNLOAD only)",
+  "answer": "final result text (DONE/ANSWER only)"
 }
 
-RULES:
-- ACTION: run JavaScript on current page (click, type, scroll, extract)
-- NAVIGATE: go to a URL (use this to open new pages, follow links)
-- DONE: task fully complete - summarize what was achieved
-- ANSWER: user asked a question - answer it directly
-- WAIT: page still loading, wait for it
-- For form inputs: find the input, set .value="text", dispatch input+change events, then click submit
-- For clicks: use element.click() or find by text content
-- Keep trying different approaches if something fails
-- When you see a CAPTCHA or login wall, describe it in your answer''',
-          systemOverride: 'You are JARVIS Web Agent. Output ONLY raw JSON, no markdown, no explanation outside JSON.',
+━━━━━━━━━━ AGENT RULES ━━━━━━━━━━
+• NAVIGATE: jump directly to the exact URL — never use a search engine to find a URL you already know
+• CLICK: use ref number from snapshot (e.g. ref:7 means click 7th element in refs list)
+• TYPE: type value into input field at ref number — always CLICK the field ref first if not focused
+• SCROLL: scroll down to expose more content when needed
+• DOWNLOAD: use exact URL from dlLinks — triggers device download manager immediately
+• DONE: task complete — write a clean, human-readable summary with all results
+• WAIT: page still loading — wait for readyState=complete
+• SELF-CORRECT: if same action fails twice, try a completely different approach
+• FORMS: for Google/search: CLICK search box ref → TYPE query → CLICK search button ref
+• PIRACY SITES: search title → click movie card → find download section → DOWNLOAD
+• Never revisit a URL that was already visited: ${visitedUrls.join(", ")}
+• Complete ANY task — never stop unless DONE''',
+          systemOverride:
+              'You are JARVIS, an autonomous web agent. Output ONLY raw JSON. No markdown. No commentary.',
         );
 
-        // ── PARSE ────────────────────────────────────────────────────────
+        // ── PARSE ──────────────────────────────────────────────────────────
         String thought = '';
-        String actionType = 'DONE';
-        String jsCode = '';
+        String actionType = 'WAIT';
+        int ref = -1;
+        String value = '';
         String navigateUrl = '';
+        String downloadUrl = '';
+        String filename = '';
         String answer = '';
 
         try {
           String cleaned = aiResponse.trim();
-          // Strip markdown fences
+          // Strip any markdown fences
           if (cleaned.contains('```')) {
             final m = RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(cleaned);
             if (m != null) cleaned = m.group(1)!;
           }
-          final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(cleaned);
+          final jsonMatch = RegExp(r'\{[\s\S]*?\}').firstMatch(cleaned);
           if (jsonMatch != null) {
             final d = jsonMatch.group(0)!;
             thought      = RegExp(r'"thought"\s*:\s*"((?:[^"\\]|\\.)*)"').firstMatch(d)?.group(1) ?? '';
-            actionType   = (RegExp(r'"type"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ?? 'DONE').toUpperCase().trim();
-            jsCode       = RegExp(r'"js"\s*:\s*"((?:[^"\\]|\\.)*)"').firstMatch(d)?.group(1) ?? '';
+            actionType   = (RegExp(r'"type"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ?? 'WAIT').toUpperCase().trim();
+            final refStr = RegExp(r'"ref"\s*:\s*(\d+)').firstMatch(d)?.group(1);
+            ref          = refStr != null ? int.tryParse(refStr) ?? -1 : -1;
+            value        = RegExp(r'"value"\s*:\s*"((?:[^"\\]|\\.)*)"').firstMatch(d)?.group(1) ?? '';
             navigateUrl  = RegExp(r'"navigate_url"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ?? '';
+            downloadUrl  = RegExp(r'"download_url"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ?? '';
+            filename     = RegExp(r'"filename"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ?? '';
             answer       = RegExp(r'"answer"\s*:\s*"((?:[^"\\]|\\.)*)"').firstMatch(d)?.group(1) ?? '';
-            // Unescape JS string escapes
-            jsCode = jsCode.replaceAll(r'\"', '"').replaceAll(r'\n', '\n').replaceAll(r'\t', '\t').replaceAll(r'\\', '\\');
-            answer = answer.replaceAll(r'\n', '\n').replaceAll(r'\"', '"');
+            value        = value.replaceAll(r'\"', '"').replaceAll(r'\n', '\n');
+            answer       = answer.replaceAll(r'\n', '\n').replaceAll(r'\"', '"');
+            consecutiveErrors = 0;
           } else {
-            throw Exception('No JSON found');
+            throw Exception('No JSON in response');
           }
-          consecutiveErrors = 0;
         } catch (_) {
           consecutiveErrors++;
-          if (consecutiveErrors >= 4) {
-            setState(() {
-              _agentRunning = false;
-              _agentStatus = '';
-              _agentMessages.add(AgentMessage(
-                '⚠️ Could not parse AI response after $consecutiveErrors attempts. Task stopped.',
-                isUser: false,
-              ));
-            });
-            return;
-          }
-          history.add({'role': 'error', 'content': 'Parse failed, retry $consecutiveErrors'});
-          await Future.delayed(const Duration(milliseconds: 800));
-          continue;
+          history.add({'role': 'error', 'content': 'Parse fail #$consecutiveErrors — retrying'});
+          await _pollPageReady(tab, maxWait: 400);
+          continue; // never stop — self-correct
         }
 
-        history.add({'role': 'thought', 'content': thought});
+        history.add({'role': 'thought', 'content': '[$actionType ref:$ref] $thought'});
 
-        // ── ACT ──────────────────────────────────────────────────────────
+        // ── ACT ────────────────────────────────────────────────────────────
+
+        // DONE / ANSWER
         if (actionType == 'DONE' || actionType == 'ANSWER') {
           final raw = answer.isNotEmpty ? answer : thought;
           final clean = _cleanAgentText(raw);
-          setState(() {
-            _agentRunning = false;
-            _agentStatus = '';
-            _agentMessages.add(AgentMessage(
-              '✅ Done in $step step${step == 1 ? '' : 's'}!\n\n$clean',
-              isUser: false,
-            ));
-          });
-          return;
+          final prefix = taskIndex > 0 ? '[Task $taskIndex] ' : '';
+          final msg = '${prefix}✅ Done in $step step${step == 1 ? "" : "s"}!\n\n$clean';
+          if (mounted) setState(() => _agentMessages.add(AgentMessage(msg, isUser: false)));
+          return clean;
         }
 
+        // WAIT
         if (actionType == 'WAIT') {
-          setState(() => _agentStatus = '⏳ Step $step: Waiting for page...');
-          await Future.delayed(const Duration(seconds: 3));
-          history.add({'role': 'action', 'content': 'Waited 3 seconds'});
+          if (mounted) setState(() => _agentStatus = '${label}⏳ Step $step: Waiting for page...');
+          await _pollPageReady(tab, maxWait: 5000);
+          history.add({'role': 'action', 'content': 'Waited for page ready'});
           continue;
         }
 
+        // NAVIGATE
         if (actionType == 'NAVIGATE' && navigateUrl.isNotEmpty) {
-          setState(() => _agentStatus = '🌐 Step $step: Navigating...');
           final fullUrl = navigateUrl.startsWith('http') ? navigateUrl : 'https://$navigateUrl';
-          await _currentTab.controller?.loadUrl(
-            urlRequest: URLRequest(url: WebUri(fullUrl)),
-          );
-          if (mounted) setState(() => _agentStatus = '⏳ Loading...');
-          await Future.delayed(const Duration(seconds: 4));
-          history.add({'role': 'action', 'content': 'Navigated to $fullUrl'});
-          continue;
-        }
-
-        if (actionType == 'ACTION' && jsCode.isNotEmpty) {
-          setState(() => _agentStatus = '🚀 Step $step: Acting...');
-          final resultRaw = await _currentTab.controller?.evaluateJavascript(
-            source: '(function(){try{$jsCode;return "OK";}catch(e){return "ERROR: "+e.message;}})()',
-          );
-          final result = resultRaw?.toString() ?? 'OK';
-          history.add({'role': 'action', 'content': 'JS result: $result'});
-          if (result.startsWith('ERROR')) {
-            consecutiveErrors++;
-          } else {
-            consecutiveErrors = 0;
+          if (visitedUrls.contains(fullUrl)) {
+            // Don't revisit — push hint and continue reasoning
+            history.add({'role': 'JARVIS-hint', 'content': 'Already visited $fullUrl — try a different approach'});
+            continue;
           }
-          await Future.delayed(const Duration(milliseconds: 1200));
+          visitedUrls.add(fullUrl);
+          final shortUrl = fullUrl.length > 50 ? '${fullUrl.substring(0, 50)}…' : fullUrl;
+          if (mounted) setState(() => _agentStatus = '${label}🌐 Step $step: → $shortUrl');
+          await tab.controller?.loadUrl(urlRequest: URLRequest(url: WebUri(fullUrl)));
+          await _pollPageReady(tab, maxWait: 7000);
+          history.add({'role': 'action', 'content': 'Navigated → $fullUrl'});
           continue;
         }
 
-        // Unknown type — treat as done
-        setState(() {
-          _agentRunning = false;
-          _agentStatus = '';
-          _agentMessages.add(AgentMessage(
-            _cleanAgentText(answer.isNotEmpty ? answer : thought),
-            isUser: false,
-          ));
-        });
-        return;
+        // DOWNLOAD
+        if (actionType == 'DOWNLOAD' && downloadUrl.isNotEmpty) {
+          if (mounted) {
+            setState(() => _agentStatus = '${label}⬇ Step $step: Downloading...');
+            String cookiesString = '';
+            try {
+              final cookies = await CookieManager.instance().getCookies(url: WebUri(downloadUrl));
+              cookiesString = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+            } catch (_) {}
+            BrowserDownloadManager.addDownload(
+              downloadUrl,
+              filename.isNotEmpty ? filename : '',
+              cookies: cookiesString,
+              referer: tab.url.isNotEmpty ? tab.url : null,
+            );
+            BrowserDownloadManager.show(context);
+            final dn = filename.isNotEmpty ? filename : downloadUrl.split('/').last;
+            setState(() => _agentMessages.add(AgentMessage(
+              '${label}⬇ Downloading: $dn\n↳ Sent to Download Manager',
+              isUser: false,
+            )));
+          }
+          history.add({'role': 'action', 'content': 'DOWNLOAD triggered: $downloadUrl'});
+          await Future.delayed(const Duration(milliseconds: 200));
+          continue;
+        }
+
+        // CLICK — find element by ref number and click it
+        if (actionType == 'CLICK' && ref >= 0) {
+          if (mounted) setState(() => _agentStatus = '${label}👆 Step $step: Click ref:$ref...');
+
+          // Inject interceptor + click the ref element
+          await tab.controller?.evaluateJavascript(source: '''
+(function(){
+  if (!window.__jarvisPatched) {
+    window.__jarvisPatched = true;
+    document.addEventListener("click", function(e) {
+      var a = e.target.closest("a[href]");
+      if (!a) return;
+      var href = a.href || "";
+      if (/\\.(mkv|mp4|avi|zip|rar|apk|torrent|mp3|flac|m4a|wav|opus|mov|webm|pdf|docx?)(\\?|#|\$)/i.test(href)) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.__jarvisDlUrl = href;
+        window.__jarvisDlName = a.download || href.split("/").pop() || "";
+      }
+    }, true);
+  }
+})();
+''');
+          final clickResult = await tab.controller?.evaluateJavascript(source: '''
+(function(){
+  try {
+    var SEL = 'a[href],button:not([disabled]),input:not([type="hidden"]),select,textarea,[role="button"],[role="link"],[role="tab"],[role="menuitem"],label[for]';
+    var el = document.querySelectorAll(SEL)[${ref}];
+    if (!el) return "ERROR: ref ${ref} not found";
+    el.focus();
+    el.click();
+    return "CLICKED: " + (el.innerText||el.value||el.getAttribute("aria-label")||"?").trim().slice(0,40);
+  } catch(e) { return "ERROR: " + e.message; }
+})()
+''');
+
+          // Check for intercepted download
+          final intercepted = await tab.controller?.evaluateJavascript(
+              source: 'window.__jarvisDlUrl || ""');
+          final dlUrl = intercepted?.toString().replaceAll('"', '').trim() ?? '';
+          if (dlUrl.isNotEmpty) {
+            await tab.controller?.evaluateJavascript(
+                source: 'window.__jarvisDlUrl=null; window.__jarvisPatched=false;');
+            final dlNameRaw = await tab.controller?.evaluateJavascript(
+                source: 'window.__jarvisDlName || ""');
+            final dlName = dlNameRaw?.toString().replaceAll('"', '') ?? '';
+            if (mounted) {
+              String cookiesString = '';
+              try {
+                final cookies = await CookieManager.instance().getCookies(url: WebUri(dlUrl));
+                cookiesString = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+              } catch (_) {}
+              BrowserDownloadManager.addDownload(dlUrl, dlName,
+                  cookies: cookiesString, referer: tab.url);
+              BrowserDownloadManager.show(context);
+              setState(() => _agentMessages.add(AgentMessage(
+                  '${label}⬇ Download captured: ${dlName.isNotEmpty ? dlName : dlUrl.split("/").last}',
+                  isUser: false)));
+            }
+            history.add({'role': 'action', 'content': 'Download intercepted: $dlUrl'});
+            await Future.delayed(const Duration(milliseconds: 200));
+            continue;
+          }
+
+          final clickStr = clickResult?.toString() ?? 'OK';
+          history.add({'role': 'action', 'content': 'CLICK ref:$ref → $clickStr'});
+          if (clickStr.startsWith('ERROR')) { consecutiveErrors++; } else { consecutiveErrors = 0; }
+          await Future.delayed(const Duration(milliseconds: 200));
+          await _pollPageReady(tab, maxWait: 3000);
+          continue;
+        }
+
+        // TYPE — type text into an input field at ref
+        if (actionType == 'TYPE') {
+          if (mounted) setState(() => _agentStatus = '${label}⌨ Step $step: Type...');
+          final safeValue = value.replaceAll('"', r'\"').replaceAll('\n', r'\n');
+          final typeResult = await tab.controller?.evaluateJavascript(source: '''
+(function(){
+  try {
+    var SEL = 'a[href],button:not([disabled]),input:not([type="hidden"]),select,textarea,[role="button"],[role="link"],[role="tab"],[role="menuitem"],label[for]';
+    var el = document.querySelectorAll(SEL)[${ref >= 0 ? ref : 0}];
+    if (!el) {
+      el = document.querySelector('input[type="text"]:not([disabled]),input[type="search"]:not([disabled]),textarea:not([disabled])');
+    }
+    if (!el) return "ERROR: no input found";
+    el.focus();
+    var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value") && Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value").set;
+    if (setter) setter.call(el, "$safeValue"); else el.value = "$safeValue";
+    el.dispatchEvent(new Event("input",{bubbles:true}));
+    el.dispatchEvent(new Event("change",{bubbles:true}));
+    return "TYPED into " + (el.getAttribute("placeholder")||el.name||"input");
+  } catch(e) { return "ERROR: " + e.message; }
+})()
+''');
+          final typeStr = typeResult?.toString() ?? 'OK';
+          history.add({'role': 'action', 'content': 'TYPE "$value" ref:$ref → $typeStr'});
+          if (typeStr.startsWith('ERROR')) { consecutiveErrors++; } else { consecutiveErrors = 0; }
+          await Future.delayed(const Duration(milliseconds: 150));
+          continue;
+        }
+
+        // SCROLL — scroll down to reveal more content
+        if (actionType == 'SCROLL') {
+          if (mounted) setState(() => _agentStatus = '${label}📜 Step $step: Scrolling...');
+          await tab.controller?.evaluateJavascript(
+              source: 'window.scrollBy(0, window.innerHeight * 0.8)');
+          history.add({'role': 'action', 'content': 'Scrolled down'});
+          await Future.delayed(const Duration(milliseconds: 300));
+          continue;
+        }
+
+        // Unknown type — self-correct, never stop
+        consecutiveErrors++;
+        history.add({'role': 'error', 'content': 'Unknown type "$actionType" — retrying'});
+        await Future.delayed(const Duration(milliseconds: 200));
       }
     } catch (e) {
-      setState(() {
-        _agentRunning = false;
-        _agentStatus = '';
-        _agentMessages.add(AgentMessage('⚠️ Agent error: $e', isUser: false));
-      });
+      final msg = '⚠️ Agent error: $e';
+      if (mounted) setState(() => _agentMessages.add(AgentMessage(msg, isUser: false)));
+      return msg;
+    }
+    return 'Task completed.';
+  }
+
+  /// Smart page-ready poller — 200ms ticks (2x faster than before).
+  /// Returns as soon as readyState == "complete" or maxWait ms elapse.
+  Future<void> _pollPageReady(BrowserTab tab, {int maxWait = 5000}) async {
+    final deadline = DateTime.now().add(Duration(milliseconds: maxWait));
+    while (DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      try {
+        final r = await tab.controller?.evaluateJavascript(source: 'document.readyState');
+        if (r?.toString().contains('complete') == true) return;
+      } catch (_) {
+        return; // WebView disposed — exit safely
+      }
     }
   }
 
@@ -1301,3 +1888,5 @@ class _TopBarBtn extends StatelessWidget {
     );
   }
 }
+
+
