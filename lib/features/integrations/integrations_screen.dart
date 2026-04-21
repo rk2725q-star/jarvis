@@ -5,6 +5,7 @@ import '../../theme/jarvis_theme.dart';
 import 'integrations_model.dart';
 import 'integrations_provider.dart';
 import 'integration_browser_screen.dart';
+import '../youtube/youtube_screen.dart';
 
 class IntegrationsScreen extends StatefulWidget {
   const IntegrationsScreen({super.key});
@@ -284,6 +285,20 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   }
 
   void _openIntegration(AIIntegration integration) {
+    // ── YouTube → native clone app ─────────────────────────────────────────
+    if (integration.id == 'youtube') {
+      Navigator.of(context).push(PageRouteBuilder(
+        pageBuilder: (_, a1, a2) => const YouTubeScreen(),
+        transitionsBuilder: (_, anim, a2, child) => SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+              .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          child: child,
+        ),
+        transitionDuration: const Duration(milliseconds: 350),
+      ));
+      return;
+    }
+    // ── All others → Aria browser ─────────────────────────────────────────
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
