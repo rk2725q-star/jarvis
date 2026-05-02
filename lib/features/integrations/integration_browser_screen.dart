@@ -42,7 +42,6 @@ class IntegrationBrowserScreen extends StatefulWidget {
 
 class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     with SingleTickerProviderStateMixin {
-  
   final List<BrowserTab> _tabs = [];
   int _currentTabIndex = 0;
 
@@ -83,8 +82,12 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
   // Only block sites that are genuinely dangerous (malware, fraud, phishing)
   // Movie piracy sites are NOT blocked — user has freedom of access
   static const _dangerousDomains = [
-    'malware', 'phishing', 'ransomware',
-    'funinr.com', 'bet365fraud', 'scam-',
+    'malware',
+    'phishing',
+    'ransomware',
+    'funinr.com',
+    'bet365fraud',
+    'scam-',
   ];
 
   bool _isAd(String url) {
@@ -96,7 +99,9 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     if (_safedomains.any((d) => lowerUrl.contains(d))) return false;
 
     // Block only pure ad-network/tracker domains
-    if (BrowserAdBlockRules.adBlockDomains.any((d) => lowerUrl.contains(d))) return true;
+    if (BrowserAdBlockRules.adBlockDomains.any((d) => lowerUrl.contains(d))) {
+      return true;
+    }
 
     // Block genuinely dangerous sites
     if (_dangerousDomains.any((d) => lowerUrl.contains(d))) return true;
@@ -110,10 +115,13 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
   bool _agentRunning = false;
   String _agentStatus = '';
   final List<AgentMessage> _agentMessages = [
-    AgentMessage('Hello! I can analyze this page or automate tasks like clicking and filling forms. What would you like to do?', isUser: false),
+    AgentMessage(
+      'Hello! I can analyze this page or automate tasks like clicking and filling forms. What would you like to do?',
+      isUser: false,
+    ),
   ];
   late AnimationController _agentAnim;
-  
+
   // AdBlock tools
   final List<ContentBlocker> _contentBlockers = [];
   late final UserScript _youtubeAdScript;
@@ -132,10 +140,12 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
 
     // Setup ContentBlockers for Ad domains
     for (final domain in BrowserAdBlockRules.adBlockDomains) {
-      _contentBlockers.add(ContentBlocker(
-        trigger: ContentBlockerTrigger(urlFilter: '.*$domain.*'),
-        action: ContentBlockerAction(type: ContentBlockerActionType.BLOCK)
-      ));
+      _contentBlockers.add(
+        ContentBlocker(
+          trigger: ContentBlockerTrigger(urlFilter: '.*$domain.*'),
+          action: ContentBlockerAction(type: ContentBlockerActionType.BLOCK),
+        ),
+      );
     }
 
     _youtubeAdScript = UserScript(
@@ -212,11 +222,14 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
             ? _contentBlockers
             : [],
 
-        // ── UA: Android Chrome — maximizes site compatibility ─────────────
+        // ── PC Support / Desktop Mode ─────────────────────────────────────
+        preferredContentMode: UserPreferredContentMode.DESKTOP,
+
+        // ── UA: Windows Chrome — allows PC sites like MS Word, WhatsApp Web ──
         userAgent:
-            'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
             'AppleWebKit/537.36 (KHTML, like Gecko) '
-            'Chrome/124.0.6367.82 Mobile Safari/537.36',
+            'Chrome/124.0.0.0 Safari/537.36',
 
         // ── Long-press context menu for image save ────────────────────────
         disableContextMenu: false,
@@ -293,11 +306,30 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
 
         // Direct audio/video file links → download manager
         final dlExts = [
-          '.mp3', '.mp4', '.m4a', '.flac', '.aac', '.ogg', '.wav', '.opus',
-          '.mkv', '.avi', '.webm', '.mov',
-          '.zip', '.rar', '.7z', '.tar', '.gz',
-          '.apk', '.xapk',
-          '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+          '.mp3',
+          '.mp4',
+          '.m4a',
+          '.flac',
+          '.aac',
+          '.ogg',
+          '.wav',
+          '.opus',
+          '.mkv',
+          '.avi',
+          '.webm',
+          '.mov',
+          '.zip',
+          '.rar',
+          '.7z',
+          '.tar',
+          '.gz',
+          '.apk',
+          '.xapk',
+          '.pdf',
+          '.doc',
+          '.docx',
+          '.xls',
+          '.xlsx',
         ];
         final urlPath = (Uri.tryParse(url)?.path.toLowerCase()) ?? lower;
         if (dlExts.any((ext) => urlPath.endsWith(ext))) {
@@ -318,13 +350,12 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
       onDownloadStartRequest: (controller, request) async {
         String cookiesString = '';
         try {
-          final cookies =
-              await CookieManager.instance().getCookies(url: request.url);
-          cookiesString =
-              cookies.map((c) => '${c.name}=${c.value}').join('; ');
+          final cookies = await CookieManager.instance().getCookies(
+            url: request.url,
+          );
+          cookiesString = cookies.map((c) => '${c.name}=${c.value}').join('; ');
         } catch (_) {}
-        final referer =
-            _currentTab.url.isNotEmpty ? _currentTab.url : null;
+        final referer = _currentTab.url.isNotEmpty ? _currentTab.url : null;
         BrowserDownloadManager.addDownload(
           request.url.toString(),
           request.suggestedFilename ?? '',
@@ -347,7 +378,8 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
           if (!mounted) return;
           final imgUrl = extra;
           // Also try to grab selected text for copy
-          final selectedText = (await controller.getSelectedText())?.trim() ?? '';
+          final selectedText =
+              (await controller.getSelectedText())?.trim() ?? '';
           if (!mounted) return;
           showModalBottomSheet(
             context: context,
@@ -362,8 +394,10 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                   // Copy URL
                   ListTile(
                     leading: const Icon(Icons.copy, color: Colors.amber),
-                    title: const Text('Copy Image URL',
-                        style: TextStyle(color: Colors.white)),
+                    title: const Text(
+                      'Copy Image URL',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     onTap: () {
                       Navigator.pop(ctx);
                       _copyToClipboard(imgUrl);
@@ -371,38 +405,61 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                   ),
                   if (selectedText.isNotEmpty)
                     ListTile(
-                      leading: const Icon(Icons.text_snippet, color: Colors.greenAccent),
-                      title: Text('Copy "${selectedText.length > 40 ? selectedText.substring(0, 40) + "…" : selectedText}"',
-                          style: const TextStyle(color: Colors.white)),
+                      leading: const Icon(
+                        Icons.text_snippet,
+                        color: Colors.greenAccent,
+                      ),
+                      title: Text(
+                        'Copy "${selectedText.length > 40 ? selectedText.substring(0, 40) + "…" : selectedText}"',
+                        style: const TextStyle(color: Colors.white),
+                      ),
                       onTap: () {
                         Navigator.pop(ctx);
                         _copyToClipboard(selectedText);
                       },
                     ),
                   ListTile(
-                    leading: const Icon(Icons.download, color: Colors.blueAccent),
-                    title: const Text('Save Image',
-                        style: TextStyle(color: Colors.white)),
+                    leading: const Icon(
+                      Icons.download,
+                      color: Colors.blueAccent,
+                    ),
+                    title: const Text(
+                      'Save Image',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     subtitle: Text(
                       imgUrl.length > 55
                           ? '…${imgUrl.substring(imgUrl.length - 55)}'
                           : imgUrl,
-                      style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 11,
+                      ),
                       maxLines: 1,
                     ),
                     onTap: () {
                       Navigator.pop(ctx);
                       BrowserDownloadManager.addDownload(
-                        imgUrl, '', referer: _currentTab.url,
+                        imgUrl,
+                        '',
+                        referer: _currentTab.url,
                       );
                       BrowserDownloadManager.show(context);
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.open_in_browser, color: Colors.white54),
-                    title: const Text('Open in New Tab',
-                        style: TextStyle(color: Colors.white)),
-                    onTap: () { Navigator.pop(ctx); _addNewTab(imgUrl, imgUrl); },
+                    leading: const Icon(
+                      Icons.open_in_browser,
+                      color: Colors.white54,
+                    ),
+                    title: const Text(
+                      'Open in New Tab',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _addNewTab(imgUrl, imgUrl);
+                    },
                   ),
                 ],
               ),
@@ -416,7 +473,8 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                 type == InAppWebViewHitTestResultType.SRC_IMAGE_ANCHOR_TYPE) &&
             extra.isNotEmpty) {
           if (!mounted) return;
-          final selectedText = (await controller.getSelectedText())?.trim() ?? '';
+          final selectedText =
+              (await controller.getSelectedText())?.trim() ?? '';
           if (!mounted) return;
           showModalBottomSheet(
             context: context,
@@ -430,39 +488,72 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                 children: [
                   ListTile(
                     leading: const Icon(Icons.copy, color: Colors.amber),
-                    title: const Text('Copy Link',
-                        style: TextStyle(color: Colors.white)),
+                    title: const Text(
+                      'Copy Link',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     subtitle: Text(
-                      extra.length > 55 ? '…${extra.substring(extra.length - 55)}' : extra,
-                      style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      extra.length > 55
+                          ? '…${extra.substring(extra.length - 55)}'
+                          : extra,
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 11,
+                      ),
                       maxLines: 1,
                     ),
-                    onTap: () { Navigator.pop(ctx); _copyToClipboard(extra); },
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _copyToClipboard(extra);
+                    },
                   ),
                   if (selectedText.isNotEmpty)
                     ListTile(
-                      leading: const Icon(Icons.text_snippet, color: Colors.greenAccent),
-                      title: Text('Copy "${selectedText.length > 40 ? selectedText.substring(0, 40) + "…" : selectedText}"',
-                          style: const TextStyle(color: Colors.white)),
-                      onTap: () { Navigator.pop(ctx); _copyToClipboard(selectedText); },
+                      leading: const Icon(
+                        Icons.text_snippet,
+                        color: Colors.greenAccent,
+                      ),
+                      title: Text(
+                        'Copy "${selectedText.length > 40 ? selectedText.substring(0, 40) + "…" : selectedText}"',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _copyToClipboard(selectedText);
+                      },
                     ),
                   ListTile(
-                    leading: const Icon(Icons.download, color: Colors.blueAccent),
-                    title: const Text('Download Link',
-                        style: TextStyle(color: Colors.white)),
+                    leading: const Icon(
+                      Icons.download,
+                      color: Colors.blueAccent,
+                    ),
+                    title: const Text(
+                      'Download Link',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     onTap: () {
                       Navigator.pop(ctx);
                       BrowserDownloadManager.addDownload(
-                        extra, '', referer: _currentTab.url,
+                        extra,
+                        '',
+                        referer: _currentTab.url,
                       );
                       BrowserDownloadManager.show(context);
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.open_in_new, color: Colors.white54),
-                    title: const Text('Open in New Tab',
-                        style: TextStyle(color: Colors.white)),
-                    onTap: () { Navigator.pop(ctx); _addNewTab(extra, extra); },
+                    leading: const Icon(
+                      Icons.open_in_new,
+                      color: Colors.white54,
+                    ),
+                    title: const Text(
+                      'Open in New Tab',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _addNewTab(extra, extra);
+                    },
                   ),
                 ],
               ),
@@ -474,7 +565,8 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
         // ── Plain text selection → show Copy menu ──────────────────────────
         if (type == InAppWebViewHitTestResultType.UNKNOWN_TYPE ||
             extra.isEmpty) {
-          final selectedText = (await controller.getSelectedText())?.trim() ?? '';
+          final selectedText =
+              (await controller.getSelectedText())?.trim() ?? '';
           if (selectedText.isNotEmpty && mounted) {
             showModalBottomSheet(
               context: context,
@@ -492,15 +584,26 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                         'Copy: "${selectedText.length > 50 ? selectedText.substring(0, 50) : selectedText}…"',
                         style: const TextStyle(color: Colors.white),
                       ),
-                      onTap: () { Navigator.pop(ctx); _copyToClipboard(selectedText); },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.search, color: Colors.blueAccent),
-                      title: Text('Search: "${selectedText.length > 30 ? '${selectedText.substring(0, 30)}…' : selectedText}"',
-                          style: const TextStyle(color: Colors.white)),
                       onTap: () {
                         Navigator.pop(ctx);
-                        _addNewTab('https://www.google.com/search?q=${Uri.encodeComponent(selectedText)}', 'Search');
+                        _copyToClipboard(selectedText);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.search,
+                        color: Colors.blueAccent,
+                      ),
+                      title: Text(
+                        'Search: "${selectedText.length > 30 ? '${selectedText.substring(0, 30)}…' : selectedText}"',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _addNewTab(
+                          'https://www.google.com/search?q=${Uri.encodeComponent(selectedText)}',
+                          'Search',
+                        );
                       },
                     ),
                   ],
@@ -517,8 +620,9 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
   Future<void> _triggerDownload(String url, NavigationAction action) async {
     String cookiesString = '';
     try {
-      final cookies =
-          await CookieManager.instance().getCookies(url: WebUri(url));
+      final cookies = await CookieManager.instance().getCookies(
+        url: WebUri(url),
+      );
       cookiesString = cookies.map((c) => '${c.name}=${c.value}').join('; ');
     } catch (_) {}
     BrowserDownloadManager.addDownload(
@@ -542,7 +646,9 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_tabs.isEmpty) return const Scaffold(backgroundColor: Color(0xFF07070F));
+    if (_tabs.isEmpty) {
+      return const Scaffold(backgroundColor: Color(0xFF07070F));
+    }
     final bottomPad = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
@@ -587,9 +693,7 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
   Widget _buildTopBar() {
     final displayUrl = _currentTab.url.isEmpty
         ? widget.integration.url
-        : _currentTab.url
-            .replaceAll('https://', '')
-            .replaceAll('http://', '');
+        : _currentTab.url.replaceAll('https://', '').replaceAll('http://', '');
 
     return Container(
       height: 52,
@@ -602,10 +706,7 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            _primary.withAlpha(15),
-            const Color(0xFF0A0A18),
-          ],
+          colors: [_primary.withAlpha(15), const Color(0xFF0A0A18)],
         ),
       ),
       child: Row(
@@ -614,23 +715,24 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [
-                _primary.withAlpha(38),
-                _secondary.withAlpha(25),
-              ]),
+              gradient: LinearGradient(
+                colors: [_primary.withAlpha(38), _secondary.withAlpha(25)],
+              ),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: _primary.withAlpha(64)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(widget.integration.emoji,
-                    style: const TextStyle(fontSize: 13)),
+                Text(
+                  widget.integration.emoji,
+                  style: const TextStyle(fontSize: 13),
+                ),
                 const SizedBox(width: 4),
                 ShaderMask(
-                  shaderCallback: (b) =>
-                      LinearGradient(colors: [_primary, _secondary])
-                          .createShader(b),
+                  shaderCallback: (b) => LinearGradient(
+                    colors: [_primary, _secondary],
+                  ).createShader(b),
                   child: Text(
                     widget.integration.name,
                     style: const TextStyle(
@@ -656,13 +758,15 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                 decoration: BoxDecoration(
                   color: Colors.white.withAlpha(10),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                      color: Colors.white.withAlpha(20)),
+                  border: Border.all(color: Colors.white.withAlpha(20)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.lock_rounded,
-                        size: 10, color: _primary.withAlpha(178)),
+                    Icon(
+                      Icons.lock_rounded,
+                      size: 10,
+                      color: _primary.withAlpha(178),
+                    ),
                     const SizedBox(width: 5),
                     Expanded(
                       child: Text(
@@ -684,8 +788,9 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
 
           // Reload / Stop
           _TopBarBtn(
-            icon:
-                _currentTab.isLoading ? Icons.close_rounded : Icons.refresh_rounded,
+            icon: _currentTab.isLoading
+                ? Icons.close_rounded
+                : Icons.refresh_rounded,
             onTap: () {
               if (_currentTab.isLoading) {
                 _currentTab.controller?.stopLoading();
@@ -705,10 +810,11 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF10102A),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Navigate to URL',
-            style: TextStyle(color: Colors.white, fontSize: 15)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Navigate to URL',
+          style: TextStyle(color: Colors.white, fontSize: 15),
+        ),
         content: TextField(
           controller: c,
           autofocus: true,
@@ -716,8 +822,7 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white.withAlpha(12),
-            border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             hintText: 'https://',
             hintStyle: const TextStyle(color: Colors.white30),
           ),
@@ -725,14 +830,31 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
             Navigator.of(ctx).pop();
             final url = _resolveUrl(input.trim());
             _currentTab.controller?.loadUrl(
-                urlRequest: URLRequest(url: WebUri(url)));
+              urlRequest: URLRequest(url: WebUri(url)),
+            );
           },
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel',
-                  style: TextStyle(color: Colors.white38))),
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white38),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              final url = _resolveUrl(c.text.trim());
+              _currentTab.controller?.loadUrl(
+                urlRequest: URLRequest(url: WebUri(url)),
+              );
+            },
+            child: const Text(
+              'Open',
+              style: TextStyle(color: Colors.blueAccent),
+            ),
+          ),
         ],
       ),
     );
@@ -744,63 +866,98 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
       context: context,
       backgroundColor: const Color(0xFF10102A),
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) {
-        return StatefulBuilder(builder: (ctx, setSheetState) {
-          return SizedBox(
-            height: MediaQuery.of(context).size.height * 0.7,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Tabs (${_tabs.length})', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle, color: Colors.blueAccent),
-                        onPressed: () {
-                          _addNewTab('https://google.com', 'New Tab');
-                          Navigator.pop(ctx);
-                        },
-                      )
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _tabs.length,
-                    itemBuilder: (ctx, index) {
-                      final tab = _tabs[index];
-                      final isSelected = index == _currentTabIndex;
-                      return ListTile(
-                        selected: isSelected,
-                        selectedTileColor: Colors.white.withAlpha(20),
-                        title: Text(tab.title.isNotEmpty ? tab.title : tab.url, style: TextStyle(color: isSelected ? Colors.blueAccent : Colors.white)),
-                        subtitle: Text(tab.url, style: const TextStyle(color: Colors.white30, fontSize: 11), maxLines: 1),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white54),
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return SizedBox(
+              height: MediaQuery.of(context).size.height * 0.7,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Tabs (${_tabs.length})',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.add_circle,
+                            color: Colors.blueAccent,
+                          ),
                           onPressed: () {
-                            if (_tabs.length == 1) return; // don't close last tab
-                            setState(() {
-                              _tabs.removeAt(index);
-                              if (_currentTabIndex >= _tabs.length) _currentTabIndex = _tabs.length - 1;
-                            });
-                            setSheetState((){});
+                            _addNewTab('https://google.com', 'New Tab');
+                            Navigator.pop(ctx);
                           },
                         ),
-                        onTap: () {
-                          setState(() => _currentTabIndex = index);
-                          Navigator.pop(ctx);
-                        },
-                      );
-                    },
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        });
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _tabs.length,
+                      itemBuilder: (ctx, index) {
+                        final tab = _tabs[index];
+                        final isSelected = index == _currentTabIndex;
+                        return ListTile(
+                          selected: isSelected,
+                          selectedTileColor: Colors.white.withAlpha(20),
+                          title: Text(
+                            tab.title.isNotEmpty ? tab.title : tab.url,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.blueAccent
+                                  : Colors.white,
+                            ),
+                          ),
+                          subtitle: Text(
+                            tab.url,
+                            style: const TextStyle(
+                              color: Colors.white30,
+                              fontSize: 11,
+                            ),
+                            maxLines: 1,
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(
+                              Icons.close,
+                              color: Colors.white54,
+                            ),
+                            onPressed: () {
+                              if (_tabs.length == 1) {
+                                return; // don't close last tab
+                              }
+                              setState(() {
+                                _tabs.removeAt(index);
+                                if (_currentTabIndex >= _tabs.length) {
+                                  _currentTabIndex = _tabs.length - 1;
+                                }
+                              });
+                              setSheetState(() {});
+                            },
+                          ),
+                          onTap: () {
+                            setState(() => _currentTabIndex = index);
+                            Navigator.pop(ctx);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -846,41 +1003,70 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                 child: Row(
                   children: [
                     ShaderMask(
-                      shaderCallback: (b) => LinearGradient(colors: [_primary, _secondary]).createShader(b),
-                      child: const Text('⚡ JARVIS Web Agent', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                      shaderCallback: (b) => LinearGradient(
+                        colors: [_primary, _secondary],
+                      ).createShader(b),
+                      child: const Text(
+                        '⚡ JARVIS Web Agent',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
                     const Spacer(),
                     GestureDetector(
                       onTap: () => setState(() => _agentPanelOpen = false),
-                      child: const Icon(Icons.close, color: Colors.white30, size: 18),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white30,
+                        size: 18,
+                      ),
                     ),
                   ],
                 ),
               ),
-              
+
               // Chat History
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   reverse: false,
                   itemCount: _agentMessages.length,
                   itemBuilder: (ctx, i) {
                     final msg = _agentMessages[i];
                     return Align(
-                      alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: msg.isUser
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.92),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.92,
+                        ),
                         decoration: BoxDecoration(
-                          color: msg.isUser ? _primary.withAlpha(38) : Colors.white.withAlpha(12),
+                          color: msg.isUser
+                              ? _primary.withAlpha(38)
+                              : Colors.white.withAlpha(12),
                           borderRadius: BorderRadius.only(
                             topLeft: const Radius.circular(16),
                             topRight: const Radius.circular(16),
                             bottomLeft: Radius.circular(msg.isUser ? 16 : 4),
                             bottomRight: Radius.circular(msg.isUser ? 4 : 16),
                           ),
-                          border: Border.all(color: msg.isUser ? _primary.withAlpha(76) : Colors.white12),
+                          border: Border.all(
+                            color: msg.isUser
+                                ? _primary.withAlpha(76)
+                                : Colors.white12,
+                          ),
                         ),
                         child: _buildAgentMessageContent(msg.text, msg.isUser),
                       ),
@@ -899,7 +1085,10 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                         SizedBox(
                           width: 12,
                           height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 1.5, valueColor: AlwaysStoppedAnimation(_primary)),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            valueColor: AlwaysStoppedAnimation(_primary),
+                          ),
                         ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -929,12 +1118,21 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                         ),
                         child: TextField(
                           controller: _agentController,
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             hintText: 'Tell JARVIS what to do here...',
-                            hintStyle: TextStyle(color: Colors.white30, fontSize: 13),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            hintStyle: TextStyle(
+                              color: Colors.white30,
+                              fontSize: 13,
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
                           ),
                           onSubmitted: (_) => _runAgent(),
                         ),
@@ -949,17 +1147,32 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
                         height: 44,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(colors: [_primary, _secondary]),
+                          gradient: LinearGradient(
+                            colors: [_primary, _secondary],
+                          ),
                           boxShadow: [
-                            BoxShadow(color: _primary.withAlpha(102), blurRadius: 12, offset: const Offset(0, 4)),
+                            BoxShadow(
+                              color: _primary.withAlpha(102),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
                           ],
                         ),
                         child: _agentRunning
                             ? const Padding(
                                 padding: EdgeInsets.all(12),
-                                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation(
+                                    Colors.white,
+                                  ),
+                                ),
                               )
-                            : const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
+                            : const Icon(
+                                Icons.bolt_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                       ),
                     ),
                   ],
@@ -976,7 +1189,9 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
   String _resolveUrl(String input) {
     if (input.isEmpty) return 'https://www.google.com';
     // Already a full URL
-    if (input.startsWith('http://') || input.startsWith('https://')) return input;
+    if (input.startsWith('http://') || input.startsWith('https://')) {
+      return input;
+    }
     // Looks like a domain: contains a dot and no spaces
     final hasDot = input.contains('.');
     final hasSpace = input.contains(' ');
@@ -997,7 +1212,10 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
         // Headings ## → remove hashes
         .replaceAll(RegExp(r'#{1,6}\s*'), '')
         // Inline code `code` → code (keep content)
-        .replaceAllMapped(RegExp(r'`{1,3}([^`]*)`{1,3}'), (m) => m.group(1) ?? '')
+        .replaceAllMapped(
+          RegExp(r'`{1,3}([^`]*)`{1,3}'),
+          (m) => m.group(1) ?? '',
+        )
         // Bullets - item → • item
         .replaceAll(RegExp(r'^[-*]\s+', multiLine: true), '• ')
         // Literal \n in strings → real newline
@@ -1010,7 +1228,9 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
   /// Detect if text contains a markdown table (has | separators)
   bool _hasMarkdownTable(String text) {
     return text.contains('|') &&
-        text.split('\n').any((l) => l.contains('|') && l.trim().startsWith('|'));
+        text
+            .split('\n')
+            .any((l) => l.contains('|') && l.trim().startsWith('|'));
   }
 
   /// Render agent message — shows proper table for markdown tables,
@@ -1057,14 +1277,18 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     }
 
     final cells = tableLines.map((row) {
-      return row.split('|')
+      return row
+          .split('|')
           .map((c) => c.trim())
           .where((c) => c.isNotEmpty)
           .toList();
     }).toList();
 
     if (cells.isEmpty) {
-      return SelectableText(text, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45));
+      return SelectableText(
+        text,
+        style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45),
+      );
     }
 
     final header = cells.first;
@@ -1078,7 +1302,11 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
             padding: const EdgeInsets.only(bottom: 8),
             child: SelectableText(
               beforeLines.join('\n').trim(),
-              style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                height: 1.45,
+              ),
             ),
           ),
         // Table
@@ -1091,32 +1319,46 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
               // Header row
               TableRow(
                 decoration: BoxDecoration(color: Colors.white.withAlpha(20)),
-                children: header.map((h) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  child: Text(h,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                )).toList(),
+                children: header
+                    .map(
+                      (h) => Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        child: Text(
+                          h,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
               // Data rows
-              ...rows.map((row) => TableRow(
-                children: List.generate(header.length, (ci) {
-                  final cell = ci < row.length ? row[ci] : '';
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    child: Text(cell,
-                      style: TextStyle(
-                        color: Colors.white.withAlpha(200),
-                        fontSize: 12,
+              ...rows.map(
+                (row) => TableRow(
+                  children: List.generate(header.length, (ci) {
+                    final cell = ci < row.length ? row[ci] : '';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
                       ),
-                    ),
-                  );
-                }),
-              )),
+                      child: Text(
+                        cell,
+                        style: TextStyle(
+                          color: Colors.white.withAlpha(200),
+                          fontSize: 12,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
             ],
           ),
         ),
@@ -1125,7 +1367,11 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
             padding: const EdgeInsets.only(top: 8),
             child: SelectableText(
               afterLines.join('\n').trim(),
-              style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                height: 1.45,
+              ),
             ),
           ),
       ],
@@ -1138,14 +1384,15 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Copied: ${text.length > 40 ? text.substring(0, 40) : text}…'),
+          content: Text(
+            'Copied: ${text.length > 40 ? text.substring(0, 40) : text}…',
+          ),
           duration: const Duration(seconds: 2),
           backgroundColor: const Color(0xFF1A1A3E),
         ),
       );
     }
   }
-
 
   // ─────────────────────────────────────────────────────────────────────────
   // JARVIS Web Agent — Parallel Multi-Tab ReAct System
@@ -1157,12 +1404,19 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
   List<String> _parseSubtasks(String query) {
     // AI will handle complex decomposition; here we do quick heuristic split
     final patterns = [
-      RegExp(r'\band\s+(?:also\s+)?(?:on|in|from|check|compare|open|go to|visit|search)\b', caseSensitive: false),
+      RegExp(
+        r'\band\s+(?:also\s+)?(?:on|in|from|check|compare|open|go to|visit|search)\b',
+        caseSensitive: false,
+      ),
       RegExp(r'\n[-•\*]\s+'),
     ];
     for (final p in patterns) {
       if (p.hasMatch(query)) {
-        final parts = query.split(p).map((s) => s.trim()).where((s) => s.length > 5).toList();
+        final parts = query
+            .split(p)
+            .map((s) => s.trim())
+            .where((s) => s.length > 5)
+            .toList();
         if (parts.length >= 2) return parts;
       }
     }
@@ -1185,7 +1439,10 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     try {
       if (subtasks.length > 1) {
         // ── PARALLEL multi-tab mode ──────────────────────────────────────
-        setState(() => _agentStatus = '⚡ Launching ${subtasks.length} parallel tasks...');
+        setState(
+          () =>
+              _agentStatus = '⚡ Launching ${subtasks.length} parallel tasks...',
+        );
 
         // Ensure enough tabs exist
         while (_tabs.length < subtasks.length) {
@@ -1197,10 +1454,9 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
         for (int i = 0; i < subtasks.length; i++) {
           setState(() {
             _tabs[i].title = 'Task ${i + 1}';
-            _agentMessages.add(AgentMessage(
-              '🗂 Tab ${i + 1}: ${subtasks[i]}',
-              isUser: false,
-            ));
+            _agentMessages.add(
+              AgentMessage('🗂 Tab ${i + 1}: ${subtasks[i]}', isUser: false),
+            );
           });
         }
 
@@ -1216,13 +1472,17 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
           setState(() {
             _agentRunning = false;
             _agentStatus = '';
-            final summary = results.asMap().entries
+            final summary = results
+                .asMap()
+                .entries
                 .map((e) => '📌 Task ${e.key + 1}: ${e.value}')
                 .join('\n\n');
-            _agentMessages.add(AgentMessage(
-              '✅ All ${subtasks.length} tasks completed!\n\n$summary',
-              isUser: false,
-            ));
+            _agentMessages.add(
+              AgentMessage(
+                '✅ All ${subtasks.length} tasks completed!\n\n$summary',
+                isUser: false,
+              ),
+            );
           });
         }
       } else {
@@ -1260,30 +1520,8 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     final Set<String> visitedUrls = {};
 
     // ── SOUL: build persistent context assembly (OpenClaw style) ──────────────
-    // Extracts the target site domain so JARVIS can fetch site-specific hints.
-    String siteKnowledge = '';
-    final siteMatch = RegExp(
-      r'(?:on|from|at|via|using|in|open)?\s*([a-zA-Z0-9-]+\.(?:com|in|org|net|io|co\.in)[^\s]*)',
-      caseSensitive: false,
-    ).firstMatch(command);
-    if (siteMatch != null) {
-      final site = siteMatch.group(1)!.trim();
-      final label = taskIndex > 0 ? '[Task $taskIndex] ' : '';
-      if (mounted) setState(() => _agentStatus = '${label}🔍 Learning $site...');
-      try {
-        final hint = await router.generateDirectResponse(
-          prompt: 'Task: "$command" on $site.\n'
-              'Give 4 bullet points MAX:\n'
-              '• Exact URL to navigate to first\n'
-              '• Search box: what to type and its label/placeholder\n'
-              '• Which button/link to click for results\n'
-              '• Where the download/buy/final action button appears\n'
-              'Be extremely concise. Real site knowledge only.',
-          systemOverride: 'You are a web automation expert. Output 4 bullets, 80 words max. No fluff.',
-        );
-        siteKnowledge = hint.trim();
-      } catch (_) {}
-    }
+    String siteKnowledge =
+        ''; // Disabled pre-fetch to dramatically improve speed
 
     try {
       while (true) {
@@ -1292,9 +1530,12 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
         final label = taskIndex > 0 ? '[T$taskIndex] ' : '';
 
         // ── OBSERVE — OpenClaw-style accessibility snapshot with numbered refs ──
-        if (mounted) setState(() => _agentStatus = '${label}👁 Step $step: Snapshot...');
+        if (mounted) {
+          setState(() => _agentStatus = '${label}👁 Step $step: Snapshot...');
+        }
 
-        final snapshotRaw = await tab.controller?.evaluateJavascript(source: r'''
+        final snapshotRaw = await tab.controller?.evaluateJavascript(
+          source: r'''
 (function(){
   try {
     var url = window.location.href;
@@ -1372,7 +1613,8 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     return JSON.stringify({url: window.location.href, error: e.message, readyState:'unknown'});
   }
 })()
-''');
+''',
+        );
 
         final snapshot = snapshotRaw?.toString() ?? '{}';
 
@@ -1382,21 +1624,25 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
 
         // ── Proactive download detection hint ─────────────────────────────
         try {
-          final parsed = snapshot.contains('"dlLinks":[{') ||
+          final parsed =
+              snapshot.contains('"dlLinks":[{') ||
               (snapshot.contains('"dlLinks"') &&
-               snapshot.contains('"href"') &&
-               snapshot.contains('http'));
+                  snapshot.contains('"href"') &&
+                  snapshot.contains('http'));
           if (parsed && step > 1) {
             history.add({
               'role': 'JARVIS-hint',
-              'content': '🔗 Download links found in snapshot dlLinks. '
-                  'If the target file is there, use DOWNLOAD action NOW — do not browse further.',
+              'content':
+                  '🔗 Download links found in snapshot dlLinks. '
+                  'Carefully verify if this is the final file or an intermediate page before using DOWNLOAD action.',
             });
           }
         } catch (_) {}
 
         // ── REASON — OpenClaw-style context assembly ───────────────────────
-        if (mounted) setState(() => _agentStatus = '${label}🧠 Step $step: Reasoning...');
+        if (mounted) {
+          setState(() => _agentStatus = '${label}🧠 Step $step: Reasoning...');
+        }
 
         final historyText = history
             .map((h) => '[${h["role"]!.toUpperCase()}]\n${h["content"]}')
@@ -1404,7 +1650,8 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
 
         // SOUL prompt — persistent context like OpenClaw's SOUL.md + MEMORY.md
         final aiResponse = await router.generateDirectResponse(
-          prompt: '''
+          prompt:
+              '''
 ━━━━━━━━━━ JARVIS SOUL ━━━━━━━━━━
 You are JARVIS Web Agent — operate at 3x human speed, autonomous, never give up.
 You have full browser control via snapshot REFS (numbered interactive elements).
@@ -1463,35 +1710,69 @@ Respond ONLY with raw JSON (no markdown, no explanation):
           String cleaned = aiResponse.trim();
           // Strip any markdown fences
           if (cleaned.contains('```')) {
-            final m = RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(cleaned);
+            final m = RegExp(
+              r'```(?:json)?\s*([\s\S]*?)```',
+            ).firstMatch(cleaned);
             if (m != null) cleaned = m.group(1)!;
           }
           final jsonMatch = RegExp(r'\{[\s\S]*?\}').firstMatch(cleaned);
           if (jsonMatch != null) {
             final d = jsonMatch.group(0)!;
-            thought      = RegExp(r'"thought"\s*:\s*"((?:[^"\\]|\\.)*)"').firstMatch(d)?.group(1) ?? '';
-            actionType   = (RegExp(r'"type"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ?? 'WAIT').toUpperCase().trim();
+            thought =
+                RegExp(
+                  r'"thought"\s*:\s*"((?:[^"\\]|\\.)*)"',
+                ).firstMatch(d)?.group(1) ??
+                '';
+            actionType =
+                (RegExp(r'"type"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ??
+                        'WAIT')
+                    .toUpperCase()
+                    .trim();
             final refStr = RegExp(r'"ref"\s*:\s*(\d+)').firstMatch(d)?.group(1);
-            ref          = refStr != null ? int.tryParse(refStr) ?? -1 : -1;
-            value        = RegExp(r'"value"\s*:\s*"((?:[^"\\]|\\.)*)"').firstMatch(d)?.group(1) ?? '';
-            navigateUrl  = RegExp(r'"navigate_url"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ?? '';
-            downloadUrl  = RegExp(r'"download_url"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ?? '';
-            filename     = RegExp(r'"filename"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ?? '';
-            answer       = RegExp(r'"answer"\s*:\s*"((?:[^"\\]|\\.)*)"').firstMatch(d)?.group(1) ?? '';
-            value        = value.replaceAll(r'\"', '"').replaceAll(r'\n', '\n');
-            answer       = answer.replaceAll(r'\n', '\n').replaceAll(r'\"', '"');
+            ref = refStr != null ? int.tryParse(refStr) ?? -1 : -1;
+            value =
+                RegExp(
+                  r'"value"\s*:\s*"((?:[^"\\]|\\.)*)"',
+                ).firstMatch(d)?.group(1) ??
+                '';
+            navigateUrl =
+                RegExp(
+                  r'"navigate_url"\s*:\s*"([^"]*)"',
+                ).firstMatch(d)?.group(1) ??
+                '';
+            downloadUrl =
+                RegExp(
+                  r'"download_url"\s*:\s*"([^"]*)"',
+                ).firstMatch(d)?.group(1) ??
+                '';
+            filename =
+                RegExp(r'"filename"\s*:\s*"([^"]*)"').firstMatch(d)?.group(1) ??
+                '';
+            answer =
+                RegExp(
+                  r'"answer"\s*:\s*"((?:[^"\\]|\\.)*)"',
+                ).firstMatch(d)?.group(1) ??
+                '';
+            value = value.replaceAll(r'\"', '"').replaceAll(r'\n', '\n');
+            answer = answer.replaceAll(r'\n', '\n').replaceAll(r'\"', '"');
             consecutiveErrors = 0;
           } else {
             throw Exception('No JSON in response');
           }
         } catch (_) {
           consecutiveErrors++;
-          history.add({'role': 'error', 'content': 'Parse fail #$consecutiveErrors — retrying'});
+          history.add({
+            'role': 'error',
+            'content': 'Parse fail #$consecutiveErrors — retrying',
+          });
           await _pollPageReady(tab, maxWait: 400);
           continue; // never stop — self-correct
         }
 
-        history.add({'role': 'thought', 'content': '[$actionType ref:$ref] $thought'});
+        history.add({
+          'role': 'thought',
+          'content': '[$actionType ref:$ref] $thought',
+        });
 
         // ── ACT ────────────────────────────────────────────────────────────
 
@@ -1500,14 +1781,23 @@ Respond ONLY with raw JSON (no markdown, no explanation):
           final raw = answer.isNotEmpty ? answer : thought;
           final clean = _cleanAgentText(raw);
           final prefix = taskIndex > 0 ? '[Task $taskIndex] ' : '';
-          final msg = '${prefix}✅ Done in $step step${step == 1 ? "" : "s"}!\n\n$clean';
-          if (mounted) setState(() => _agentMessages.add(AgentMessage(msg, isUser: false)));
+          final msg =
+              '${prefix}✅ Done in $step step${step == 1 ? "" : "s"}!\n\n$clean';
+          if (mounted) {
+            setState(
+              () => _agentMessages.add(AgentMessage(msg, isUser: false)),
+            );
+          }
           return clean;
         }
 
         // WAIT
         if (actionType == 'WAIT') {
-          if (mounted) setState(() => _agentStatus = '${label}⏳ Step $step: Waiting for page...');
+          if (mounted) {
+            setState(
+              () => _agentStatus = '${label}⏳ Step $step: Waiting for page...',
+            );
+          }
           await _pollPageReady(tab, maxWait: 5000);
           history.add({'role': 'action', 'content': 'Waited for page ready'});
           continue;
@@ -1515,16 +1805,27 @@ Respond ONLY with raw JSON (no markdown, no explanation):
 
         // NAVIGATE
         if (actionType == 'NAVIGATE' && navigateUrl.isNotEmpty) {
-          final fullUrl = navigateUrl.startsWith('http') ? navigateUrl : 'https://$navigateUrl';
+          final fullUrl = navigateUrl.startsWith('http')
+              ? navigateUrl
+              : 'https://$navigateUrl';
           if (visitedUrls.contains(fullUrl)) {
             // Don't revisit — push hint and continue reasoning
-            history.add({'role': 'JARVIS-hint', 'content': 'Already visited $fullUrl — try a different approach'});
+            history.add({
+              'role': 'JARVIS-hint',
+              'content': 'Already visited $fullUrl — try a different approach',
+            });
             continue;
           }
           visitedUrls.add(fullUrl);
-          final shortUrl = fullUrl.length > 50 ? '${fullUrl.substring(0, 50)}…' : fullUrl;
-          if (mounted) setState(() => _agentStatus = '${label}🌐 Step $step: → $shortUrl');
-          await tab.controller?.loadUrl(urlRequest: URLRequest(url: WebUri(fullUrl)));
+          final shortUrl = fullUrl.length > 50
+              ? '${fullUrl.substring(0, 50)}…'
+              : fullUrl;
+          if (mounted) {
+            setState(() => _agentStatus = '${label}🌐 Step $step: → $shortUrl');
+          }
+          await tab.controller?.loadUrl(
+            urlRequest: URLRequest(url: WebUri(fullUrl)),
+          );
           await _pollPageReady(tab, maxWait: 7000);
           history.add({'role': 'action', 'content': 'Navigated → $fullUrl'});
           continue;
@@ -1533,11 +1834,17 @@ Respond ONLY with raw JSON (no markdown, no explanation):
         // DOWNLOAD
         if (actionType == 'DOWNLOAD' && downloadUrl.isNotEmpty) {
           if (mounted) {
-            setState(() => _agentStatus = '${label}⬇ Step $step: Downloading...');
+            setState(
+              () => _agentStatus = '${label}⬇ Step $step: Downloading...',
+            );
             String cookiesString = '';
             try {
-              final cookies = await CookieManager.instance().getCookies(url: WebUri(downloadUrl));
-              cookiesString = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+              final cookies = await CookieManager.instance().getCookies(
+                url: WebUri(downloadUrl),
+              );
+              cookiesString = cookies
+                  .map((c) => '${c.name}=${c.value}')
+                  .join('; ');
             } catch (_) {}
             BrowserDownloadManager.addDownload(
               downloadUrl,
@@ -1546,23 +1853,37 @@ Respond ONLY with raw JSON (no markdown, no explanation):
               referer: tab.url.isNotEmpty ? tab.url : null,
             );
             BrowserDownloadManager.show(context);
-            final dn = filename.isNotEmpty ? filename : downloadUrl.split('/').last;
-            setState(() => _agentMessages.add(AgentMessage(
-              '${label}⬇ Downloading: $dn\n↳ Sent to Download Manager',
-              isUser: false,
-            )));
+            final dn = filename.isNotEmpty
+                ? filename
+                : downloadUrl.split('/').last;
+            setState(
+              () => _agentMessages.add(
+                AgentMessage(
+                  '${label}⬇ Downloading: $dn\n↳ Sent to Download Manager',
+                  isUser: false,
+                ),
+              ),
+            );
           }
-          history.add({'role': 'action', 'content': 'DOWNLOAD triggered: $downloadUrl'});
+          history.add({
+            'role': 'action',
+            'content': 'DOWNLOAD triggered: $downloadUrl',
+          });
           await Future.delayed(const Duration(milliseconds: 200));
           continue;
         }
 
         // CLICK — find element by ref number and click it
         if (actionType == 'CLICK' && ref >= 0) {
-          if (mounted) setState(() => _agentStatus = '${label}👆 Step $step: Click ref:$ref...');
+          if (mounted) {
+            setState(
+              () => _agentStatus = '${label}👆 Step $step: Click ref:$ref...',
+            );
+          }
 
           // Inject interceptor + click the ref element
-          await tab.controller?.evaluateJavascript(source: '''
+          await tab.controller?.evaluateJavascript(
+            source: '''
 (function(){
   if (!window.__jarvisPatched) {
     window.__jarvisPatched = true;
@@ -1579,8 +1900,11 @@ Respond ONLY with raw JSON (no markdown, no explanation):
     }, true);
   }
 })();
-''');
-          final clickResult = await tab.controller?.evaluateJavascript(source: '''
+''',
+          );
+          final clickResult = await tab.controller?.evaluateJavascript(
+            source:
+                '''
 (function(){
   try {
     var SEL = 'a[href],button:not([disabled]),input:not([type="hidden"]),select,textarea,[role="button"],[role="link"],[role="tab"],[role="menuitem"],label[for]';
@@ -1591,39 +1915,68 @@ Respond ONLY with raw JSON (no markdown, no explanation):
     return "CLICKED: " + (el.innerText||el.value||el.getAttribute("aria-label")||"?").trim().slice(0,40);
   } catch(e) { return "ERROR: " + e.message; }
 })()
-''');
+''',
+          );
 
           // Check for intercepted download
           final intercepted = await tab.controller?.evaluateJavascript(
-              source: 'window.__jarvisDlUrl || ""');
-          final dlUrl = intercepted?.toString().replaceAll('"', '').trim() ?? '';
+            source: 'window.__jarvisDlUrl || ""',
+          );
+          final dlUrl =
+              intercepted?.toString().replaceAll('"', '').trim() ?? '';
           if (dlUrl.isNotEmpty) {
             await tab.controller?.evaluateJavascript(
-                source: 'window.__jarvisDlUrl=null; window.__jarvisPatched=false;');
+              source:
+                  'window.__jarvisDlUrl=null; window.__jarvisPatched=false;',
+            );
             final dlNameRaw = await tab.controller?.evaluateJavascript(
-                source: 'window.__jarvisDlName || ""');
+              source: 'window.__jarvisDlName || ""',
+            );
             final dlName = dlNameRaw?.toString().replaceAll('"', '') ?? '';
             if (mounted) {
               String cookiesString = '';
               try {
-                final cookies = await CookieManager.instance().getCookies(url: WebUri(dlUrl));
-                cookiesString = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+                final cookies = await CookieManager.instance().getCookies(
+                  url: WebUri(dlUrl),
+                );
+                cookiesString = cookies
+                    .map((c) => '${c.name}=${c.value}')
+                    .join('; ');
               } catch (_) {}
-              BrowserDownloadManager.addDownload(dlUrl, dlName,
-                  cookies: cookiesString, referer: tab.url);
+              BrowserDownloadManager.addDownload(
+                dlUrl,
+                dlName,
+                cookies: cookiesString,
+                referer: tab.url,
+              );
               BrowserDownloadManager.show(context);
-              setState(() => _agentMessages.add(AgentMessage(
-                  '${label}⬇ Download captured: ${dlName.isNotEmpty ? dlName : dlUrl.split("/").last}',
-                  isUser: false)));
+              setState(
+                () => _agentMessages.add(
+                  AgentMessage(
+                    '${label}⬇ Download captured: ${dlName.isNotEmpty ? dlName : dlUrl.split("/").last}',
+                    isUser: false,
+                  ),
+                ),
+              );
             }
-            history.add({'role': 'action', 'content': 'Download intercepted: $dlUrl'});
+            history.add({
+              'role': 'action',
+              'content': 'Download intercepted: $dlUrl',
+            });
             await Future.delayed(const Duration(milliseconds: 200));
             continue;
           }
 
           final clickStr = clickResult?.toString() ?? 'OK';
-          history.add({'role': 'action', 'content': 'CLICK ref:$ref → $clickStr'});
-          if (clickStr.startsWith('ERROR')) { consecutiveErrors++; } else { consecutiveErrors = 0; }
+          history.add({
+            'role': 'action',
+            'content': 'CLICK ref:$ref → $clickStr',
+          });
+          if (clickStr.startsWith('ERROR')) {
+            consecutiveErrors++;
+          } else {
+            consecutiveErrors = 0;
+          }
           await Future.delayed(const Duration(milliseconds: 200));
           await _pollPageReady(tab, maxWait: 3000);
           continue;
@@ -1631,9 +1984,15 @@ Respond ONLY with raw JSON (no markdown, no explanation):
 
         // TYPE — type text into an input field at ref
         if (actionType == 'TYPE') {
-          if (mounted) setState(() => _agentStatus = '${label}⌨ Step $step: Type...');
-          final safeValue = value.replaceAll('"', r'\"').replaceAll('\n', r'\n');
-          final typeResult = await tab.controller?.evaluateJavascript(source: '''
+          if (mounted) {
+            setState(() => _agentStatus = '${label}⌨ Step $step: Type...');
+          }
+          final safeValue = value
+              .replaceAll('"', r'\"')
+              .replaceAll('\n', r'\n');
+          final typeResult = await tab.controller?.evaluateJavascript(
+            source:
+                '''
 (function(){
   try {
     var SEL = 'a[href],button:not([disabled]),input:not([type="hidden"]),select,textarea,[role="button"],[role="link"],[role="tab"],[role="menuitem"],label[for]';
@@ -1650,19 +2009,32 @@ Respond ONLY with raw JSON (no markdown, no explanation):
     return "TYPED into " + (el.getAttribute("placeholder")||el.name||"input");
   } catch(e) { return "ERROR: " + e.message; }
 })()
-''');
+''',
+          );
           final typeStr = typeResult?.toString() ?? 'OK';
-          history.add({'role': 'action', 'content': 'TYPE "$value" ref:$ref → $typeStr'});
-          if (typeStr.startsWith('ERROR')) { consecutiveErrors++; } else { consecutiveErrors = 0; }
+          history.add({
+            'role': 'action',
+            'content': 'TYPE "$value" ref:$ref → $typeStr',
+          });
+          if (typeStr.startsWith('ERROR')) {
+            consecutiveErrors++;
+          } else {
+            consecutiveErrors = 0;
+          }
           await Future.delayed(const Duration(milliseconds: 150));
           continue;
         }
 
         // SCROLL — scroll down to reveal more content
         if (actionType == 'SCROLL') {
-          if (mounted) setState(() => _agentStatus = '${label}📜 Step $step: Scrolling...');
+          if (mounted) {
+            setState(
+              () => _agentStatus = '${label}📜 Step $step: Scrolling...',
+            );
+          }
           await tab.controller?.evaluateJavascript(
-              source: 'window.scrollBy(0, window.innerHeight * 0.8)');
+            source: 'window.scrollBy(0, window.innerHeight * 0.8)',
+          );
           history.add({'role': 'action', 'content': 'Scrolled down'});
           await Future.delayed(const Duration(milliseconds: 300));
           continue;
@@ -1670,12 +2042,17 @@ Respond ONLY with raw JSON (no markdown, no explanation):
 
         // Unknown type — self-correct, never stop
         consecutiveErrors++;
-        history.add({'role': 'error', 'content': 'Unknown type "$actionType" — retrying'});
+        history.add({
+          'role': 'error',
+          'content': 'Unknown type "$actionType" — retrying',
+        });
         await Future.delayed(const Duration(milliseconds: 200));
       }
     } catch (e) {
       final msg = '⚠️ Agent error: $e';
-      if (mounted) setState(() => _agentMessages.add(AgentMessage(msg, isUser: false)));
+      if (mounted) {
+        setState(() => _agentMessages.add(AgentMessage(msg, isUser: false)));
+      }
       return msg;
     }
     return 'Task completed.';
@@ -1688,15 +2065,15 @@ Respond ONLY with raw JSON (no markdown, no explanation):
     while (DateTime.now().isBefore(deadline)) {
       await Future.delayed(const Duration(milliseconds: 200));
       try {
-        final r = await tab.controller?.evaluateJavascript(source: 'document.readyState');
+        final r = await tab.controller?.evaluateJavascript(
+          source: 'document.readyState',
+        );
         if (r?.toString().contains('complete') == true) return;
       } catch (_) {
         return; // WebView disposed — exit safely
       }
     }
   }
-
-
 
   // ─── Bottom JARVIS toolbar ──────────────────────────────────────────────────
 
@@ -1710,9 +2087,7 @@ Respond ONLY with raw JSON (no markdown, no explanation):
       ),
       decoration: const BoxDecoration(
         color: Color(0xFF0A0A18),
-        border: Border(
-          top: BorderSide(color: Color(0xFF1A1A2E), width: 0.8),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFF1A1A2E), width: 0.8)),
       ),
       child: Row(
         children: [
@@ -1726,11 +2101,7 @@ Respond ONLY with raw JSON (no markdown, no explanation):
             enabled: _currentTab.canGoForward,
             onTap: () => _currentTab.controller?.goForward(),
           ),
-          _NavBtn(
-            icon: Icons.filter_none,
-            enabled: true,
-            onTap: _showTabsMenu,
-          ),
+          _NavBtn(icon: Icons.filter_none, enabled: true, onTap: _showTabsMenu),
 
           const Spacer(),
 
@@ -1739,22 +2110,15 @@ Respond ONLY with raw JSON (no markdown, no explanation):
             onTap: () => setState(() => _agentPanelOpen = !_agentPanelOpen),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: _agentPanelOpen
                       ? [_primary, _secondary]
-                      : [
-                          _primary.withAlpha(46),
-                          _secondary.withAlpha(30),
-                        ],
+                      : [_primary.withAlpha(46), _secondary.withAlpha(30)],
                 ),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: _primary.withAlpha(127),
-                  width: 0.8,
-                ),
+                border: Border.all(color: _primary.withAlpha(127), width: 0.8),
                 boxShadow: _agentPanelOpen
                     ? [
                         BoxShadow(
@@ -1779,10 +2143,11 @@ Respond ONLY with raw JSON (no markdown, no explanation):
                           : const Color(0xFF22C55E),
                       boxShadow: [
                         BoxShadow(
-                          color: (_agentPanelOpen
-                                  ? Colors.white
-                                  : const Color(0xFF22C55E))
-                              .withAlpha(178),
+                          color:
+                              (_agentPanelOpen
+                                      ? Colors.white
+                                      : const Color(0xFF22C55E))
+                                  .withAlpha(178),
                           blurRadius: 5,
                         ),
                       ],
@@ -1888,5 +2253,3 @@ class _TopBarBtn extends StatelessWidget {
     );
   }
 }
-
-

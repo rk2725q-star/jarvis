@@ -404,6 +404,14 @@ For time estimate: give Optimistic, Realistic, and Pessimistic ranges.
 Always be warm, non-judgmental, and encouraging.
 ''',
 
+  'jarvisplayer': '''
+[JARVIS PLAYER CAPABILITY UNLOCKED]
+You can now play local video files in a native hardware-accelerated player.
+When user asks to play a specific video file:
+- Offer to open the JARVIS Player
+- The UI handles the media kit integration directly
+''',
+
 };
 
 class IntegrationsProvider extends ChangeNotifier {

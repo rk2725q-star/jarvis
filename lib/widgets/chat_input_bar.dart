@@ -8,6 +8,8 @@ import '../features/vibecode/vibecode_screen.dart';
 import '../features/integrations/integrations_screen.dart';
 import '../features/integrations/integrations_provider.dart';
 import '../features/integrations/integrations_model.dart';
+import '../services/netless_service.dart';
+import '../core/router/ai_router.dart';
 
 class ChatInputBar extends StatefulWidget {
   final Function(String) onSubmit;
@@ -23,7 +25,8 @@ class ChatInputBar extends StatefulWidget {
   State<ChatInputBar> createState() => _ChatInputBarState();
 }
 
-class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderStateMixin {
+class _ChatInputBarState extends State<ChatInputBar>
+    with SingleTickerProviderStateMixin {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -34,6 +37,9 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
   // @ mention picker state
   bool _showAtPicker = false;
   String _atQuery = '';
+
+  // — Netless / Infinity model selector —
+  String _selectedMode = 'infinity'; // 'netless' | 'infinity'
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -106,6 +112,186 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
         localeId: 'en_US',
       );
     }
+  }
+
+  // ── Model Picker Popup (Netless / Infinity) ───────────────────────────
+  void _showModelPicker(BuildContext context, ChatProvider chatProvider) {
+    final RenderBox button = context.findRenderObject()! as RenderBox;
+    final RenderBox overlay =
+        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(
+          button.size.bottomRight(Offset.zero),
+          ancestor: overlay,
+        ),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    showMenu<String>(
+      context: context,
+      position: position.shift(const Offset(-80, -130)),
+      color: const Color(0xFF1A1A2E),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: JarvisColors.accentPrimary.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      elevation: 24,
+      items: [
+        // ── Header label ──
+        PopupMenuItem<String>(
+          enabled: false,
+          height: 36,
+          child: Text(
+            'SELECT MODE',
+            style: TextStyle(
+              color: JarvisColors.textMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.4,
+            ),
+          ),
+        ),
+        // ── Netless ──
+        PopupMenuItem<String>(
+          value: 'netless',
+          height: 64,
+          child: _ModelOption(
+            icon: Icons.wifi_off_rounded,
+            iconColor: const Color(0xFF00E676),
+            title: 'Netless',
+            subtitle: 'Offline · Gemma 4 E2B-it',
+            isSelected: _selectedMode == 'netless',
+            badge: 'OFFLINE',
+            badgeColor: const Color(0xFF00E676),
+          ),
+        ),
+        // ── Infinity ──
+        PopupMenuItem<String>(
+          value: 'infinity',
+          height: 64,
+          child: _ModelOption(
+            icon: Icons.all_inclusive_rounded,
+            iconColor: JarvisColors.accentPrimary,
+            title: 'Infinity',
+            subtitle: 'All cloud providers',
+            isSelected: _selectedMode == 'infinity',
+            badge: 'ONLINE',
+            badgeColor: JarvisColors.accentPrimary,
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == null) return;
+      if (!mounted) return;
+      setState(() => _selectedMode = value);
+
+      if (value == 'netless') {
+        // Switch router to netless provider
+        chatProvider.router.setLastSelectedProvider(AIProvider.netless);
+        final netless = NetlessService();
+        if (!netless.isLoaded && !netless.isLoading && !netless.isDownloading) {
+          // Schedule dialog after current frame to avoid BuildContext async-gap lint
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showNetlessDownloadDialog(this.context, netless);
+          });
+        }
+      } else {
+        // Switch back to auto-select (clear netless preference)
+        chatProvider.router.setLastSelectedProvider(null);
+      }
+    });
+  }
+
+  void _showNetlessDownloadDialog(
+    BuildContext context,
+    NetlessService netless,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                color: Color(0xFF00E676),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Download Netless',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Netless runs Google Gemma 4 E2B-it entirely on your device — no internet needed.',
+              style: TextStyle(color: Color(0xFFB0B0C8), fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _InfoRow(icon: Icons.storage_rounded, text: 'Size: ~1.5 GB'),
+                  SizedBox(height: 6),
+                  _InfoRow(icon: Icons.memory_rounded, text: 'Model: Gemma 4 E2B-it'),
+                  SizedBox(height: 6),
+                  _InfoRow(icon: Icons.wifi_off_rounded, text: 'Works 100% offline'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later', style: TextStyle(color: Color(0xFF7070A0))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00E676),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              netless.downloadAndLoad();
+            },
+            child: const Text('Download', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showActionMenu(ChatProvider provider) {
@@ -210,17 +396,20 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                     const IntegrationsScreen(),
                 transitionsBuilder:
                     (context, animation, secondaryAnimation, child) {
-                  return SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 1),
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                    )),
-                    child: child,
-                  );
-                },
+                      return SlideTransition(
+                        position:
+                            Tween<Offset>(
+                              begin: const Offset(0, 1),
+                              end: Offset.zero,
+                            ).animate(
+                              CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOutCubic,
+                              ),
+                            ),
+                        child: child,
+                      );
+                    },
                 transitionDuration: const Duration(milliseconds: 400),
               ),
             );
@@ -344,9 +533,21 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                   _controller.text = "@arena Generate an image of: ";
                   _focusNode.requestFocus();
                 },
-                leading: const Icon(Icons.image_rounded, color: Colors.purpleAccent),
-                title: const Text("Image Generator", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                subtitle: const Text("Powered autonomously by Arena.ai", style: TextStyle(color: JarvisColors.textMuted, fontSize: 12)),
+                leading: const Icon(
+                  Icons.image_rounded,
+                  color: Colors.purpleAccent,
+                ),
+                title: const Text(
+                  "Image Generator",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: const Text(
+                  "Powered autonomously by Arena.ai",
+                  style: TextStyle(color: JarvisColors.textMuted, fontSize: 12),
+                ),
               ),
               const Divider(height: 1, color: JarvisColors.border),
               ListTile(
@@ -355,9 +556,21 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                   _controller.text = "@arena Generate a video of: ";
                   _focusNode.requestFocus();
                 },
-                leading: const Icon(Icons.movie_creation_rounded, color: Colors.blueAccent),
-                title: const Text("Video Generator", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                subtitle: const Text("Powered autonomously by Arena.ai", style: TextStyle(color: JarvisColors.textMuted, fontSize: 12)),
+                leading: const Icon(
+                  Icons.movie_creation_rounded,
+                  color: Colors.blueAccent,
+                ),
+                title: const Text(
+                  "Video Generator",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: const Text(
+                  "Powered autonomously by Arena.ai",
+                  style: TextStyle(color: JarvisColors.textMuted, fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -396,7 +609,8 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
     _controller.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(
-          offset: atIdx + integration.id.length + 2),
+        offset: atIdx + integration.id.length + 2,
+      ),
     );
     setState(() => _showAtPicker = false);
     _focusNode.requestFocus();
@@ -405,14 +619,15 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
   Widget _buildAtPicker(IntegrationsProvider intProv) {
     final connected = intProv.connectedIntegrations;
     final all = kAIIntegrations;
-    final filtered = [
-      ...connected,
-      ...all.where((a) => !connected.any((c) => c.id == a.id)),
-    ].where((i) =>
-            _atQuery.isEmpty ||
-            i.id.contains(_atQuery) ||
-            i.name.toLowerCase().contains(_atQuery))
-        .toList();
+    final filtered =
+        [...connected, ...all.where((a) => !connected.any((c) => c.id == a.id))]
+            .where(
+              (i) =>
+                  _atQuery.isEmpty ||
+                  i.id.contains(_atQuery) ||
+                  i.name.toLowerCase().contains(_atQuery),
+            )
+            .toList();
 
     if (filtered.isEmpty) return const SizedBox.shrink();
 
@@ -423,7 +638,8 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
         color: const Color(0xFF0F0F1E),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: JarvisColors.accentPrimary.withValues(alpha: 0.25)),
+          color: JarvisColors.accentPrimary.withValues(alpha: 0.25),
+        ),
         boxShadow: [
           BoxShadow(
             color: JarvisColors.accentPrimary.withValues(alpha: 0.12),
@@ -476,12 +692,16 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 4),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 8),
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                          color: color.withValues(alpha: 0.2), width: 0.7),
+                        color: color.withValues(alpha: 0.2),
+                        width: 0.7,
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -512,14 +732,19 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                         if (isConnected)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF22C55E)
-                                  .withValues(alpha: 0.15),
+                              color: const Color(
+                                0xFF22C55E,
+                              ).withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                  color: const Color(0xFF22C55E)
-                                      .withValues(alpha: 0.4)),
+                                color: const Color(
+                                  0xFF22C55E,
+                                ).withValues(alpha: 0.4),
+                              ),
                             ),
                             child: const Text(
                               'Connected',
@@ -566,7 +791,10 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
             if (chatProvider.isAnalyzing)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 16,
+                ),
                 color: JarvisColors.accentPrimary.withValues(alpha: 0.1),
                 child: Row(
                   children: [
@@ -575,7 +803,9 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                       height: 14,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(JarvisColors.accentPrimary),
+                        valueColor: AlwaysStoppedAnimation(
+                          JarvisColors.accentPrimary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -595,7 +825,10 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
             if (chatProvider.attachedFilePaths.isNotEmpty)
               Container(
                 height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: chatProvider.attachedFilePaths.length,
@@ -604,7 +837,10 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                     final fileName = path.split(Platform.pathSeparator).last;
                     return Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: JarvisColors.surfaceElevated,
                         borderRadius: BorderRadius.circular(12),
@@ -612,13 +848,27 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.description_rounded, size: 14, color: JarvisColors.textMuted),
+                          const Icon(
+                            Icons.description_rounded,
+                            size: 14,
+                            color: JarvisColors.textMuted,
+                          ),
                           const SizedBox(width: 6),
-                          Text(fileName, style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 11)),
+                          Text(
+                            fileName,
+                            style: const TextStyle(
+                              color: JarvisColors.textSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
                           const SizedBox(width: 4),
                           GestureDetector(
                             onTap: () => chatProvider.unattachFile(path),
-                            child: const Icon(Icons.close_rounded, size: 14, color: JarvisColors.error),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 14,
+                              color: JarvisColors.error,
+                            ),
                           ),
                         ],
                       ),
@@ -631,7 +881,9 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
             Container(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
               decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: JarvisColors.border, width: 0.5)),
+                border: Border(
+                  top: BorderSide(color: JarvisColors.border, width: 0.5),
+                ),
               ),
               child: SafeArea(
                 top: false,
@@ -651,20 +903,38 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                     boxShadow: _focusNode.hasFocus
                         ? [
                             BoxShadow(
-                              color: JarvisColors.accentPrimary.withValues(alpha: 0.12),
+                              color: JarvisColors.accentPrimary.withValues(
+                                alpha: 0.12,
+                              ),
                               blurRadius: 20,
                               spreadRadius: 2,
-                            )
+                            ),
                           ]
                         : [],
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      // + button inside bar
+                      // + button inside bar — premium accent circle
                       _InBarButton(
                         onTap: () => _showActionMenu(chatProvider),
-                        child: const Icon(Icons.add_rounded, color: JarvisColors.textSecondary, size: 22),
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: JarvisColors.accentPrimary.withValues(alpha: 0.13),
+                            border: Border.all(
+                              color: JarvisColors.accentPrimary.withValues(alpha: 0.35),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            color: JarvisColors.accentPrimary,
+                            size: 18,
+                          ),
+                        ),
                       ),
 
                       // Text field - takes remaining space
@@ -672,8 +942,8 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                         child: TextField(
                           controller: _controller,
                           focusNode: _focusNode,
-                          maxLines: 5,
-                          minLines: 1,
+                          maxLines: 8,
+                          minLines: 3,
                           style: const TextStyle(
                             color: JarvisColors.textPrimary,
                             fontSize: 15,
@@ -682,81 +952,189 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                           cursorColor: JarvisColors.accentPrimary,
                           decoration: const InputDecoration(
                             hintText: 'Ask JARVIS...',
-                            hintStyle: TextStyle(color: JarvisColors.textMuted, fontSize: 14),
+                            hintStyle: TextStyle(
+                              color: JarvisColors.textMuted,
+                              fontSize: 14,
+                            ),
                             border: InputBorder.none,
                             focusedBorder: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             filled: false,
                             fillColor: Colors.transparent,
-                            contentPadding: EdgeInsets.symmetric(vertical: 12),
+                            contentPadding: EdgeInsets.symmetric(vertical: 14),
                             isDense: true,
                           ),
                           onSubmitted: (_) => _send(),
                         ),
                       ),
 
-                      // Mic button inside bar
-                      if (_speechAvailable)
-                        _InBarButton(
-                          onTap: _toggleListening,
-                          child: AnimatedBuilder(
-                            animation: _pulseAnimation,
-                            builder: (_, child) {
-                              return Transform.scale(
-                                scale: _isListening ? _pulseAnimation.value : 1.0,
-                                child: Icon(
-                                  _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                                  color: _isListening
-                                      ? JarvisColors.accentPrimary
-                                      : JarvisColors.textMuted,
-                                  size: 22,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-
-                      // Send button inside bar (gradient pill when active)
+                      // ── Model picker + Mic + Send ──────────────────────────
                       Padding(
-                        padding: const EdgeInsets.only(right: 5, bottom: 5),
-                        child: GestureDetector(
-                          onTap: widget.isGenerating ? null : _send,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: (!widget.isGenerating && _hasText)
-                                  ? JarvisColors.primaryGradient
-                                  : null,
-                              color: (!widget.isGenerating && _hasText)
-                                  ? null
-                                  : JarvisColors.surfaceElevated,
-                              boxShadow: (!widget.isGenerating && _hasText)
-                                  ? [
-                                      BoxShadow(
-                                        color: JarvisColors.accentPrimary.withValues(alpha: 0.4),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 3),
-                                      )
-                                    ]
-                                  : null,
-                            ),
-                            child: widget.isGenerating
-                                ? const Padding(
-                                    padding: EdgeInsets.all(10),
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation(JarvisColors.accentPrimary),
+                        padding: const EdgeInsets.only(bottom: 6, right: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+
+                            // ── Model picker button (\u221e / wifi-off) ─────────────
+                            if (_speechAvailable)
+                              Builder(
+                                builder: (btnCtx) => GestureDetector(
+                                  onTap: () => _showModelPicker(btnCtx, chatProvider),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 220),
+                                    width: 34,
+                                    height: 34,
+                                    margin: const EdgeInsets.only(right: 6),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: _selectedMode == 'netless'
+                                          ? const Color(0xFF00E676).withValues(alpha: 0.15)
+                                          : JarvisColors.accentPrimary.withValues(alpha: 0.13),
+                                      border: Border.all(
+                                        color: _selectedMode == 'netless'
+                                            ? const Color(0xFF00E676).withValues(alpha: 0.5)
+                                            : JarvisColors.accentPrimary.withValues(alpha: 0.35),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: _selectedMode == 'netless'
+                                              ? const Color(0xFF00E676).withValues(alpha: 0.18)
+                                              : JarvisColors.accentPrimary.withValues(alpha: 0.10),
+                                          blurRadius: 10,
+                                          spreadRadius: 0,
+                                        ),
+                                      ],
                                     ),
-                                  )
-                                : Icon(
-                                    Icons.arrow_upward_rounded,
-                                    color: _hasText ? Colors.white : JarvisColors.textMuted,
-                                    size: 20,
+                                    child: Center(
+                                      child: Icon(
+                                        _selectedMode == 'netless'
+                                            ? Icons.wifi_off_rounded
+                                            : Icons.all_inclusive_rounded,
+                                        color: _selectedMode == 'netless'
+                                            ? const Color(0xFF00E676)
+                                            : JarvisColors.accentPrimary,
+                                        size: 16,
+                                      ),
+                                    ),
                                   ),
-                          ),
+                                ),
+                              ),
+
+                            // ── Mic button ────────────────────────────────────
+                            if (_speechAvailable)
+                              AnimatedBuilder(
+                                animation: _pulseAnimation,
+                                builder: (ctx, child) => GestureDetector(
+                                  onTap: _toggleListening,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    width: 36,
+                                    height: 36,
+                                    margin: const EdgeInsets.only(right: 8),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: _isListening
+                                          ? RadialGradient(colors: [
+                                              JarvisColors.accentPrimary.withValues(alpha: 0.35),
+                                              JarvisColors.accentPrimary.withValues(alpha: 0.08),
+                                            ])
+                                          : null,
+                                      color: _isListening
+                                          ? null
+                                          : JarvisColors.surfaceElevated,
+                                      border: Border.all(
+                                        color: _isListening
+                                            ? JarvisColors.accentPrimary.withValues(alpha: 0.55 * _pulseAnimation.value)
+                                            : JarvisColors.border.withValues(alpha: 0.4),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: _isListening
+                                          ? [
+                                              BoxShadow(
+                                                color: JarvisColors.accentPrimary.withValues(
+                                                  alpha: 0.30 * _pulseAnimation.value,
+                                                ),
+                                                blurRadius: 14,
+                                                spreadRadius: 2,
+                                              ),
+                                            ]
+                                          : [],
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        _isListening
+                                            ? Icons.mic_rounded
+                                            : Icons.mic_none_rounded,
+                                        color: _isListening
+                                            ? JarvisColors.accentPrimary
+                                            : JarvisColors.textMuted,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // ── Send button ───────────────────────────────────
+                            GestureDetector(
+                              onTap: widget.isGenerating ? null : _send,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: (!widget.isGenerating && _hasText)
+                                      ? const LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Color(0xFF7B5FFF),
+                                            Color(0xFF9B88FF),
+                                          ],
+                                        )
+                                      : null,
+                                  color: (!widget.isGenerating && _hasText)
+                                      ? null
+                                      : JarvisColors.surfaceElevated,
+                                  border: Border.all(
+                                    color: (!widget.isGenerating && _hasText)
+                                        ? Colors.transparent
+                                        : JarvisColors.border.withValues(alpha: 0.4),
+                                    width: 1,
+                                  ),
+                                  boxShadow: (!widget.isGenerating && _hasText)
+                                      ? [
+                                          BoxShadow(
+                                            color: const Color(0xFF7B5FFF).withValues(alpha: 0.55),
+                                            blurRadius: 16,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: widget.isGenerating
+                                    ? Padding(
+                                        padding: const EdgeInsets.all(9),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation(
+                                            JarvisColors.accentPrimary,
+                                          ),
+                                        ),
+                                      )
+                                    : Icon(
+                                        Icons.arrow_upward_rounded,
+                                        color: _hasText
+                                            ? Colors.white
+                                            : JarvisColors.textMuted,
+                                        size: 19,
+                                      ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -770,6 +1148,7 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
     );
   }
 }
+
 
 // ── Small button inside the input bar ────────────────────────────────────────
 class _InBarButton extends StatelessWidget {
@@ -832,23 +1211,143 @@ class _ActionTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: const TextStyle(
-                            color: JarvisColors.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600)),
-                    Text(subtitle,
-                        style: const TextStyle(
-                            color: JarvisColors.textMuted, fontSize: 12)),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: JarvisColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: JarvisColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: JarvisColors.textMuted, size: 20),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: JarvisColors.textMuted,
+                size: 20,
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Model Option Item (for Netless/Infinity picker) ───────────────────────────
+class _ModelOption extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final bool isSelected;
+  final String badge;
+  final Color badgeColor;
+
+  const _ModelOption({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.isSelected,
+    required this.badge,
+    required this.badgeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Icon circle
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: iconColor.withValues(alpha: 0.12),
+            border: Border.all(
+              color: iconColor.withValues(alpha: isSelected ? 0.6 : 0.25),
+              width: 1.2,
+            ),
+          ),
+          child: Icon(icon, color: iconColor, size: 18),
+        ),
+        const SizedBox(width: 12),
+        // Labels
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFFCCCCE8),
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF7070A0),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: badgeColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: badgeColor.withValues(alpha: 0.4), width: 0.8),
+          ),
+          child: Text(
+            badge,
+            style: TextStyle(
+              color: badgeColor,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        // Selected checkmark
+        if (isSelected) ...[
+          const SizedBox(width: 6),
+          Icon(Icons.check_circle_rounded, color: iconColor, size: 16),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Info row for download dialog ──────────────────────────────────────────────
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: const Color(0xFF7B5FFF), size: 14),
+        const SizedBox(width: 8),
+        Text(text, style: const TextStyle(color: Color(0xFFB0B0C8), fontSize: 13)),
+      ],
     );
   }
 }

@@ -6,6 +6,8 @@ import 'package:jarvis_ai/core/security/secure_storage_service.dart';
 import 'package:jarvis_ai/core/api/nvidia_client.dart';
 import 'package:jarvis_ai/core/memory/memory_service.dart';
 import 'package:jarvis_ai/features/chat/chat_provider.dart';
+import 'package:jarvis_ai/services/netless_service.dart';
+import 'package:jarvis_ai/features/netless/netless_management_screen.dart';
 import 'memory_manager_screen.dart';
 import 'provider_settings_tile.dart';
 import 'ai_providers_screen.dart';
@@ -92,6 +94,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+
+                  // ── Netless (Offline AI) ────────────────────────────────
+                  _SectionHeader(title: 'Netless — Offline AI', icon: Icons.wifi_off_rounded),
+                  const SizedBox(height: 12),
+                  ChangeNotifierProvider.value(
+                    value: NetlessService(),
+                    child: Consumer<NetlessService>(
+                      builder: (context, svc, _) {
+                        final isReady = svc.isAvailable;
+                        final hasFile = svc.modelPath != null;
+                        final color = isReady ? const Color(0xFF00E676) : const Color(0xFF7B5FFF);
+                        return GestureDetector(
+                          onTap: () => Navigator.push(context,
+                            MaterialPageRoute(builder: (_) => const NetlessManagementScreen())),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [color.withValues(alpha: 0.12), color.withValues(alpha: 0.04)],
+                                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: color.withValues(alpha: 0.35)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44, height: 44,
+                                  decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                                  child: Icon(
+                                    isReady ? Icons.hub_rounded : svc.isDownloading ? Icons.download_rounded : Icons.wifi_off_rounded,
+                                    color: color, size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        isReady ? 'Netless Active' : hasFile ? 'Gemma Downloaded — Tap to Load' : 'Gemma 4 E2B-it (Offline)',
+                                        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        svc.isDownloading ? '${(svc.downloadProgress * 100).toInt()}% — ${svc.status}' : svc.status,
+                                        style: const TextStyle(color: JarvisColors.textMuted, fontSize: 11),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: color.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Text(
+                                    isReady ? 'READY' : 'MANAGE',
+                                    style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 28),
 
                   // Provider API key settings
                   _SectionHeader(title: 'API Keys', icon: Icons.vpn_key_rounded),

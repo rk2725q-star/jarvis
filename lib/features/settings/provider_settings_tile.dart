@@ -96,12 +96,13 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
     }
 
     // SPECIAL HANDLING: If this is an Ollama provider, sync the specialized OllamaProvider
-    if (widget.provider == AIProvider.ollamaCloud || widget.provider == AIProvider.ollama) {
+    if (widget.provider == AIProvider.ollamaCloud ||
+        widget.provider == AIProvider.ollama) {
       final op = context.read<OllamaProvider>();
       await op.saveSettings(
-        apiKey:  (widget.provider == AIProvider.ollamaCloud) ? key : null,
+        apiKey: (widget.provider == AIProvider.ollamaCloud) ? key : null,
         baseUrl: (widget.provider == AIProvider.ollamaCloud) ? url : null,
-        localUrl: (widget.provider == AIProvider.ollama)     ? url : null,
+        localUrl: (widget.provider == AIProvider.ollama) ? url : null,
       );
     }
 
@@ -139,7 +140,9 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       decoration: BoxDecoration(
-        color: _expanded ? JarvisColors.surfaceHighlight : JarvisColors.surfaceElevated,
+        color: _expanded
+            ? JarvisColors.surfaceHighlight
+            : JarvisColors.surfaceElevated,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: _expanded
@@ -194,8 +197,8 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                                 shape: BoxShape.circle,
                                 color: isEnabled
                                     ? (widget.noApiKey || _hasKey)
-                                        ? JarvisColors.success
-                                        : JarvisColors.warning
+                                          ? JarvisColors.success
+                                          : JarvisColors.warning
                                     : JarvisColors.textMuted,
                               ),
                             ),
@@ -203,14 +206,14 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                             Text(
                               isEnabled
                                   ? (widget.noApiKey || _hasKey)
-                                      ? 'Active'
-                                      : 'No API Key'
+                                        ? 'Active'
+                                        : 'No API Key'
                                   : 'Disabled',
                               style: TextStyle(
                                 color: isEnabled
                                     ? (widget.noApiKey || _hasKey)
-                                        ? JarvisColors.success
-                                        : JarvisColors.warning
+                                          ? JarvisColors.success
+                                          : JarvisColors.warning
                                     : JarvisColors.textMuted,
                                 fontSize: 11,
                               ),
@@ -234,7 +237,9 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                     ),
                   ),
                   Icon(
-                    _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                    _expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
                     color: JarvisColors.textMuted,
                     size: 20,
                   ),
@@ -272,22 +277,34 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                       ),
                       decoration: InputDecoration(
                         hintText: widget.urlHint ?? 'http://...',
-                        hintStyle: const TextStyle(color: JarvisColors.textMuted, fontSize: 13),
+                        hintStyle: const TextStyle(
+                          color: JarvisColors.textMuted,
+                          fontSize: 13,
+                        ),
                         filled: true,
                         fillColor: JarvisColors.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: JarvisColors.border),
+                          borderSide: const BorderSide(
+                            color: JarvisColors.border,
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: JarvisColors.border),
+                          borderSide: const BorderSide(
+                            color: JarvisColors.border,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: widget.iconColor.withValues(alpha: 0.6)),
+                          borderSide: BorderSide(
+                            color: widget.iconColor.withValues(alpha: 0.6),
+                          ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                       ),
                     ),
                   ],
@@ -314,40 +331,61 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                       ),
                       decoration: InputDecoration(
                         hintText: widget.apiKeyHint ?? 'Enter API key...',
-                        hintStyle: const TextStyle(color: JarvisColors.textMuted, fontSize: 13),
+                        hintStyle: const TextStyle(
+                          color: JarvisColors.textMuted,
+                          fontSize: 13,
+                        ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscureKey ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                            _obscureKey
+                                ? Icons.visibility_rounded
+                                : Icons.visibility_off_rounded,
                             color: JarvisColors.textMuted,
                             size: 18,
                           ),
-                          onPressed: () => setState(() => _obscureKey = !_obscureKey),
+                          onPressed: () =>
+                              setState(() => _obscureKey = !_obscureKey),
                         ),
                         filled: true,
                         fillColor: JarvisColors.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: JarvisColors.border),
+                          borderSide: const BorderSide(
+                            color: JarvisColors.border,
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: JarvisColors.border),
+                          borderSide: const BorderSide(
+                            color: JarvisColors.border,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: widget.iconColor.withValues(alpha: 0.6)),
+                          borderSide: BorderSide(
+                            color: widget.iconColor.withValues(alpha: 0.6),
+                          ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                       ),
                     ),
                   ],
 
                   // Ollama Specific Mode Toggle
-                  if (widget.provider == AIProvider.ollamaCloud || widget.provider == AIProvider.ollama) ...[
+                  if (widget.provider == AIProvider.ollamaCloud ||
+                      widget.provider == AIProvider.ollama) ...[
                     const SizedBox(height: 18),
                     const Text(
                       'OLLAMA MODE',
-                      style: TextStyle(color: JarvisColors.textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+                      style: TextStyle(
+                        color: JarvisColors.textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Consumer<OllamaProvider>(
@@ -377,14 +415,21 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                       child: ElevatedButton.icon(
                         onPressed: _saveKey,
                         icon: const Icon(Icons.save_rounded, size: 18),
-                        label: const Text('Save Settings', style: TextStyle(fontWeight: FontWeight.w600)),
+                        label: const Text(
+                          'Save Settings',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: widget.iconColor.withValues(alpha: 0.2),
+                          backgroundColor: widget.iconColor.withValues(
+                            alpha: 0.2,
+                          ),
                           foregroundColor: widget.iconColor,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: widget.iconColor.withValues(alpha: 0.4)),
+                            side: BorderSide(
+                              color: widget.iconColor.withValues(alpha: 0.4),
+                            ),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
@@ -393,7 +438,8 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                   ],
 
                   // Test Connection for Ollama
-                  if (widget.provider == AIProvider.ollamaCloud || widget.provider == AIProvider.ollama) ...[
+                  if (widget.provider == AIProvider.ollamaCloud ||
+                      widget.provider == AIProvider.ollama) ...[
                     const SizedBox(height: 12),
                     Consumer<OllamaProvider>(
                       builder: (context, op, _) => Column(
@@ -402,15 +448,34 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                             width: double.infinity,
                             child: OutlinedButton.icon(
                               onPressed: op.testing ? null : op.testConnection,
-                              icon: op.testing 
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                : const Icon(Icons.bolt, size: 16),
-                              label: Text(op.testing ? 'Testing...' : 'Test Connection'),
+                              icon: op.testing
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.bolt, size: 16),
+                              label: Text(
+                                op.testing ? 'Testing...' : 'Test Connection',
+                              ),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: op.testResult?['success'] == true ? Colors.green : widget.iconColor,
-                                side: BorderSide(color: op.testResult?['success'] == true ? Colors.green.withValues(alpha: 0.5) : widget.iconColor.withValues(alpha: 0.5)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                foregroundColor:
+                                    op.testResult?['success'] == true
+                                    ? Colors.green
+                                    : widget.iconColor,
+                                side: BorderSide(
+                                  color: op.testResult?['success'] == true
+                                      ? Colors.green.withValues(alpha: 0.5)
+                                      : widget.iconColor.withValues(alpha: 0.5),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                               ),
                             ),
                           ),
@@ -419,14 +484,21 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: op.testResult!['success'] ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                                color: op.testResult!['success']
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.red.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                op.testResult!['success'] 
-                                  ? '✅ ${op.testResult!['latency_ms']}ms' 
-                                  : '❌ ${op.testResult!['error']}',
-                                style: TextStyle(fontSize: 11, color: op.testResult!['success'] ? Colors.green : Colors.red),
+                                op.testResult!['success']
+                                    ? '✅ ${op.testResult!['latency_ms']}ms'
+                                    : '❌ ${op.testResult!['error']}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: op.testResult!['success']
+                                      ? Colors.green
+                                      : Colors.red,
+                                ),
                               ),
                             ),
                           ],
@@ -455,12 +527,28 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                               ? const SizedBox(
                                   width: 12,
                                   height: 12,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: JarvisColors.accentPrimary),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: JarvisColors.accentPrimary,
+                                  ),
                                 )
-                              : const Icon(Icons.refresh_rounded, size: 14, color: JarvisColors.accentPrimary),
-                          label: const Text('Fetch', style: TextStyle(color: JarvisColors.accentPrimary, fontSize: 12)),
+                              : const Icon(
+                                  Icons.refresh_rounded,
+                                  size: 14,
+                                  color: JarvisColors.accentPrimary,
+                                ),
+                          label: const Text(
+                            'Fetch',
+                            style: TextStyle(
+                              color: JarvisColors.accentPrimary,
+                              fontSize: 12,
+                            ),
+                          ),
                           style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                           ),
                         ),
                     ],
@@ -475,29 +563,38 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                       decoration: BoxDecoration(
                         color: JarvisColors.surface,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: JarvisColors.border, width: 0.5),
+                        border: Border.all(
+                          color: JarvisColors.border,
+                          width: 0.5,
+                        ),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           isExpanded: true,
                           dropdownColor: JarvisColors.surfaceElevated,
-                          value: _selectedModel != null && _models.contains(_selectedModel!)
+                          value:
+                              _selectedModel != null &&
+                                  _models.contains(_selectedModel!)
                               ? _selectedModel
                               : _models.first,
-                          icon: Icon(Icons.arrow_drop_down_rounded, color: widget.iconColor),
-                          selectedItemBuilder: (context) => _models.map((model) {
-                            return Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                model,
-                                style: TextStyle(
-                                  color: widget.iconColor,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                          icon: Icon(
+                            Icons.arrow_drop_down_rounded,
+                            color: widget.iconColor,
+                          ),
+                          selectedItemBuilder: (context) =>
+                              _models.map((model) {
+                                return Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    model,
+                                    style: TextStyle(
+                                      color: widget.iconColor,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
                           items: _models.map((model) {
                             return DropdownMenuItem(
                               value: model,
@@ -513,7 +610,10 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                           onChanged: (value) {
                             if (value != null) {
                               setState(() => _selectedModel = value);
-                              widget.router.setSelectedModel(widget.provider, value);
+                              widget.router.updateSelectedModel(
+                                widget.provider,
+                                value,
+                              );
                             }
                           },
                         ),
@@ -527,8 +627,8 @@ class _ProviderSettingsTileState extends State<ProviderSettingsTile> {
                         widget.noApiKey
                             ? 'Models auto-detected at runtime'
                             : _hasKey
-                                ? 'Tap "Fetch" to load available models'
-                                : 'Enter API key to fetch models',
+                            ? 'Tap "Fetch" to load available models'
+                            : 'Enter API key to fetch models',
                         style: const TextStyle(
                           color: JarvisColors.textMuted,
                           fontSize: 12,
@@ -550,7 +650,11 @@ class _ModeChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _ModeChip({required this.label, required this.selected, required this.onTap});
+  const _ModeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -560,7 +664,9 @@ class _ModeChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? JarvisColors.accentPrimary.withValues(alpha: 0.2) : JarvisColors.surface,
+          color: selected
+              ? JarvisColors.accentPrimary.withValues(alpha: 0.2)
+              : JarvisColors.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected ? JarvisColors.accentPrimary : JarvisColors.border,
@@ -569,7 +675,9 @@ class _ModeChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? JarvisColors.accentPrimary : JarvisColors.textMuted,
+            color: selected
+                ? JarvisColors.accentPrimary
+                : JarvisColors.textMuted,
             fontSize: 12,
             fontWeight: selected ? FontWeight.bold : FontWeight.normal,
           ),

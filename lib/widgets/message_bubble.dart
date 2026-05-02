@@ -83,6 +83,10 @@ class _InlineIntegrationBrowserState extends State<_InlineIntegrationBrowser> {
 
     final launchUrl = integration.buildTaskUrl(widget.query);
 
+    if (launchUrl.startsWith('internal://')) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       width: double.infinity,
       height: MediaQuery.of(context).size.height * 0.68,

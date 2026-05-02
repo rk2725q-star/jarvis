@@ -7,14 +7,34 @@ import 'package:jarvis_ai/core/api/openrouter_client.dart';
 import 'package:jarvis_ai/core/api/local_model_client.dart';
 import 'package:jarvis_ai/services/ollama_cloud_service.dart';
 import 'package:jarvis_ai/services/google_docs_service.dart';
+import 'package:jarvis_ai/services/netless_service.dart';
 import 'package:jarvis_ai/core/memory/memory_service.dart';
 import 'package:jarvis_ai/core/security/secure_storage_service.dart';
 import 'package:jarvis_ai/core/api/anthropic_client.dart';
 import 'package:jarvis_ai/core/file_processor/file_processor.dart';
 
-enum AIProvider { llamaCpp, gemini, ollama, ollamaCloud, nvidia, openRouter, zeera, anthropic }
+enum AIProvider {
+  llamaCpp,
+  gemini,
+  ollama,
+  ollamaCloud,
+  nvidia,
+  openRouter,
+  zeera,
+  anthropic,
+  netless, // ⭐ Offline Gemma 4 E2B-it — works without internet
+}
 
-enum IntentMode { simple, normal, deep, comparison, agentic, project, inquisitiveProject, deepDebug }
+enum IntentMode {
+  simple,
+  normal,
+  deep,
+  comparison,
+  agentic,
+  project,
+  inquisitiveProject,
+  deepDebug,
+}
 
 class ProviderStatus {
   final AIProvider provider;
@@ -47,6 +67,8 @@ class ProviderStatus {
         return 'Zeera (Dual-Model)';
       case AIProvider.anthropic:
         return 'Anthropic';
+      case AIProvider.netless:
+        return 'Netless (Offline)';
     }
   }
 }
@@ -66,17 +88,18 @@ class AIRouter extends ChangeNotifier {
     required FileProcessor fileProcessor,
     required OllamaCloudService ollamaService,
     required GoogleDocsService googleDocs,
-  })  : _secureStorage = secureStorage,
-        _memory = memory,
-        _fileProcessor = fileProcessor,
-        _ollamaService = ollamaService,
-        _googleDocs = googleDocs;
+  }) : _secureStorage = secureStorage,
+       _memory = memory,
+       _fileProcessor = fileProcessor,
+       _ollamaService = ollamaService,
+       _googleDocs = googleDocs;
 
   MemoryService get memory => _memory;
   GoogleDocsService? get googleDocs => _googleDocs;
 
   AIProvider? _activeProvider;
   String? _activeModel;
+  AIProvider? _lastSelectedProvider;
   bool _isGenerating = false;
   String _statusMessage = 'Ready';
 
@@ -90,11 +113,12 @@ class AIRouter extends ChangeNotifier {
     AIProvider.openRouter: true,
     AIProvider.zeera: false,
     AIProvider.anthropic: true,
+    AIProvider.netless: true,
   };
 
   // Selected models per provider
   final Map<AIProvider, String?> _selectedModels = {};
-  
+
   // Zeera Specific Configuration
   bool _zeeraEnabled = false;
   int _zeeraRounds = 1;
@@ -155,9 +179,15 @@ class AIRouter extends ChangeNotifier {
     await prefs.setInt('zeera_rounds', _zeeraRounds);
     await prefs.setString('zeera_provider_a', _zeeraProviderA.name);
     await prefs.setString('zeera_provider_b', _zeeraProviderB.name);
-    if (_zeeraModelA != null) await prefs.setString('zeera_model_a', _zeeraModelA!);
-    if (_zeeraModelB != null) await prefs.setString('zeera_model_b', _zeeraModelB!);
-    if (_zeeraSynthesisModel != null) await prefs.setString('zeera_synthesis_model', _zeeraSynthesisModel!);
+    if (_zeeraModelA != null) {
+      await prefs.setString('zeera_model_a', _zeeraModelA!);
+    }
+    if (_zeeraModelB != null) {
+      await prefs.setString('zeera_model_b', _zeeraModelB!);
+    }
+    if (_zeeraSynthesisModel != null) {
+      await prefs.setString('zeera_synthesis_model', _zeeraSynthesisModel!);
+    }
   }
 
   Future<void> _loadZeeraConfig() async {
@@ -166,23 +196,43 @@ class AIRouter extends ChangeNotifier {
     _zeeraRounds = prefs.getInt('zeera_rounds') ?? 1;
     final pa = prefs.getString('zeera_provider_a');
     final pb = prefs.getString('zeera_provider_b');
-    if (pa != null) _zeeraProviderA = AIProvider.values.firstWhere((e) => e.name == pa, orElse: () => AIProvider.nvidia);
-    if (pb != null) _zeeraProviderB = AIProvider.values.firstWhere((e) => e.name == pb, orElse: () => AIProvider.ollamaCloud);
+    if (pa != null) {
+      _zeeraProviderA = AIProvider.values.firstWhere(
+        (e) => e.name == pa,
+        orElse: () => AIProvider.nvidia,
+      );
+    }
+    if (pb != null) {
+      _zeeraProviderB = AIProvider.values.firstWhere(
+        (e) => e.name == pb,
+        orElse: () => AIProvider.ollamaCloud,
+      );
+    }
     _zeeraModelA = prefs.getString('zeera_model_a');
     _zeeraModelB = prefs.getString('zeera_model_b');
     _zeeraSynthesisModel = prefs.getString('zeera_synthesis_model');
   }
 
   // Ordered fallback chain: Gemini -> Ollama Cloud -> Ollama -> NVIDIA -> llama.cpp
-  List<AIProvider> get _fallbackChain => [
-        AIProvider.gemini,
-        AIProvider.ollamaCloud,
-        AIProvider.ollama,
-        AIProvider.openRouter,
-        AIProvider.anthropic,
-        AIProvider.nvidia,
-        AIProvider.llamaCpp,
-      ].where((p) => _providerEnabled[p] == true).toList();
+  List<AIProvider> get _fallbackChain {
+    final baseChain = [
+      AIProvider.gemini,
+      AIProvider.ollamaCloud,
+      AIProvider.ollama,
+      AIProvider.openRouter,
+      AIProvider.anthropic,
+      AIProvider.nvidia,
+      AIProvider.llamaCpp,
+    ];
+
+    if (_lastSelectedProvider != null &&
+        baseChain.contains(_lastSelectedProvider)) {
+      baseChain.remove(_lastSelectedProvider!);
+      baseChain.insert(0, _lastSelectedProvider!);
+    }
+
+    return baseChain.where((p) => _providerEnabled[p] == true).toList();
+  }
 
   AIProvider? get activeProvider => _activeProvider;
   String? get activeModel => _activeModel;
@@ -193,14 +243,24 @@ class AIRouter extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     for (final p in AIProvider.values) {
       _providerEnabled[p] = prefs.getBool('provider_${p.name}_enabled') ?? true;
-      _selectedModels[p]  = prefs.getString('provider_${p.name}_model');
+      _selectedModels[p] = prefs.getString('provider_${p.name}_model');
     }
+
+    final lastProvName = prefs.getString('last_selected_provider');
+    if (lastProvName != null) {
+      try {
+        _lastSelectedProvider = AIProvider.values.firstWhere(
+          (p) => p.name == lastProvName,
+        );
+      } catch (_) {}
+    }
+
     await _loadZeeraConfig();
     notifyListeners();
 
     // Proactively load keys from environment if missing in storage
     await _initEnvironmentKeys();
-    
+
     // Proactively load models for NVIDIA
     await _initGoogleDocs();
     final key = await _secureStorage.getApiKey('nvidia');
@@ -234,7 +294,9 @@ class AIRouter extends ChangeNotifier {
     // Auto-detect keys logic here if needed, but avoid hardcoded invalid keys
     final antKey = await _secureStorage.getApiKey('anthropic');
     if (antKey == null || antKey.isEmpty) {
-       debugPrint('[AIRouter] Anthropic key missing - user must provide in settings');
+      debugPrint(
+        '[AIRouter] Anthropic key missing - user must provide in settings',
+      );
     }
   }
 
@@ -245,15 +307,34 @@ class AIRouter extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setSelectedModel(AIProvider provider, String model) async {
+  Future<void> updateSelectedModel(AIProvider provider, String model) async {
     _selectedModels[provider] = model;
+    _lastSelectedProvider = provider;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('provider_${provider.name}_model', model);
+    await prefs.setString('last_selected_provider', provider.name);
     notifyListeners();
   }
 
-  bool isProviderEnabled(AIProvider provider) => _providerEnabled[provider] ?? false;
+  bool isProviderEnabled(AIProvider provider) =>
+      _providerEnabled[provider] ?? false;
   String? getSelectedModel(AIProvider provider) => _selectedModels[provider];
+
+  /// Switch the preferred provider (used by Netless/Infinity toggle).
+  /// Pass null to clear the preference and return to auto-fallback chain.
+  void setLastSelectedProvider(AIProvider? provider) {
+    _lastSelectedProvider = provider;
+    if (provider != null) {
+      SharedPreferences.getInstance().then(
+        (p) => p.setString('last_selected_provider', provider.name),
+      );
+    } else {
+      SharedPreferences.getInstance().then(
+        (p) => p.remove('last_selected_provider'),
+      );
+    }
+    notifyListeners();
+  }
 
   void _setStatus(String msg) {
     _statusMessage = msg;
@@ -423,20 +504,21 @@ When user sends large code for review/debugging:
   Step 5: Security scan (hardcoded secrets, injection risks)
 ''';
 
-
   /// Initialize Google Docs if credentials exist
   Future<void> _initGoogleDocs() async {
     String? json = await _secureStorage.getApiKey('google_service_account');
-    
+
     // Fallback to environment define if not in storage or assets
     if (json == null || json.isEmpty) {
       json = const String.fromEnvironment('GOOGLE_SERVICE_ACCOUNT');
     }
-    
+
     // Fallback to assets if still not found
     if (json.isEmpty) {
       try {
-        json = await rootBundle.loadString('assets/config/google_service_account.json');
+        json = await rootBundle.loadString(
+          'assets/config/google_service_account.json',
+        );
       } catch (_) {
         debugPrint('[AIRouter] Google Service Account asset not found.');
       }
@@ -487,17 +569,24 @@ When user sends large code for review/debugging:
   /// Generates an exhaustive academic report (16-22 pages)
   Future<String> createAcademicReport(String topic, String title) async {
     if (!_googleDocs.isAuthenticated) return "⚠️ Google Docs not connected.";
-    
+
     try {
       _setStatus('Starting deep research & report generation...');
-      
+
       // Initialize sub-agent with appropriate AI clients
       final geminiKey = await _secureStorage.getApiKey('gemini');
-      final ollamaUrl = await _secureStorage.getBaseUrl('ollamaLocal') ?? 'http://127.0.0.1:11434';
-      
+      final ollamaUrl =
+          await _secureStorage.getBaseUrl('ollamaLocal') ??
+          'http://127.0.0.1:11434';
+
       final agent = JarvisDocAgent(
         service: _googleDocs,
-        gemini: geminiKey != null ? GeminiApiClient(apiKey: geminiKey, model: _selectedModels[AIProvider.gemini] ?? 'gemini-1.5-pro') : null,
+        gemini: geminiKey != null
+            ? GeminiApiClient(
+                apiKey: geminiKey,
+                model: _selectedModels[AIProvider.gemini] ?? 'gemini-1.5-pro',
+              )
+            : null,
         ollama: LocalModelClient(baseUrl: ollamaUrl),
         ollamaCloud: _ollamaService,
       );
@@ -536,11 +625,24 @@ When user sends large code for review/debugging:
     // so these agentic keywords are only for OS-level automation, NOT for
     // opening web integrations autonomously.
     const agenticKeywords = [
-      'whatsapp', 'send message', 'make a call', 'launch app',
-      'turn on', 'turn off', 'toggle wifi', 'toggle bluetooth',
-      'take a screenshot', 'take a photo', 'record video',
-      'brightness', 'volume', 'ringtone', 'alarm',
-      'docx', 'google doc', 'save to doc',
+      'whatsapp',
+      'send message',
+      'make a call',
+      'launch app',
+      'turn on',
+      'turn off',
+      'toggle wifi',
+      'toggle bluetooth',
+      'take a screenshot',
+      'take a photo',
+      'record video',
+      'brightness',
+      'volume',
+      'ringtone',
+      'alarm',
+      'docx',
+      'google doc',
+      'save to doc',
     ];
 
     if (agenticKeywords.any((kw) => queryText.contains(kw))) {
@@ -554,25 +656,38 @@ When user sends large code for review/debugging:
     //   1. Debug keywords in the query
     //   2. Large code blocks (``` markers with many newlines)
     //   3. Explicit "step by step", "all bugs", "deeply analyze" in query
-    final bool hasDebugKeywords = 
-        queryText.contains('debug') || queryText.contains('bug') || queryText.contains('fix') ||
-        queryText.contains('error') || queryText.contains('issue') || queryText.contains('crash') ||
-        queryText.contains('exception') || queryText.contains('audit') ||
-        queryText.contains('review code') || queryText.contains('find bug') ||
-        queryText.contains('analyze') || queryText.contains('lines');
+    final bool hasDebugKeywords =
+        queryText.contains('debug') ||
+        queryText.contains('bug') ||
+        queryText.contains('fix') ||
+        queryText.contains('error') ||
+        queryText.contains('issue') ||
+        queryText.contains('crash') ||
+        queryText.contains('exception') ||
+        queryText.contains('audit') ||
+        queryText.contains('review code') ||
+        queryText.contains('find bug') ||
+        queryText.contains('analyze') ||
+        queryText.contains('lines');
 
     // Count lines in the FULL input (including pasted code)
     final int totalLines = input.split('\n').length;
-    final bool hasLargeCodeBlock = input.contains('```') ||
-        totalLines > 100 ||   // 100+ line paste
-        input.length > 8000;  // ~2000 tokens of raw content
+    final bool hasLargeCodeBlock =
+        input.contains('```') ||
+        totalLines > 100 || // 100+ line paste
+        input.length > 8000; // ~2000 tokens of raw content
 
-    final bool hasDeepDebugIntent = 
-        queryText.contains('all bug') || queryText.contains('step by step') ||
-        queryText.contains('deeply') || queryText.contains('completely') || 
-        queryText.contains('every bug') || queryText.contains('all errors') ||
-        queryText.contains('full debug') || queryText.contains('10k') ||
-        queryText.contains('5k') || queryText.contains('deeply analyse') ||
+    final bool hasDeepDebugIntent =
+        queryText.contains('all bug') ||
+        queryText.contains('step by step') ||
+        queryText.contains('deeply') ||
+        queryText.contains('completely') ||
+        queryText.contains('every bug') ||
+        queryText.contains('all errors') ||
+        queryText.contains('full debug') ||
+        queryText.contains('10k') ||
+        queryText.contains('5k') ||
+        queryText.contains('deeply analyse') ||
         queryText.contains('deeply analyze');
 
     if (hasDebugKeywords && (hasLargeCodeBlock || hasDeepDebugIntent)) {
@@ -583,30 +698,45 @@ When user sends large code for review/debugging:
       return IntentMode.deepDebug;
     }
 
-    if (queryText.contains('vs') || queryText.contains('compare') || queryText.contains('difference')) {
+    if (queryText.contains('vs') ||
+        queryText.contains('compare') ||
+        queryText.contains('difference')) {
       return IntentMode.comparison;
     }
-    if (queryText.contains('explain') || queryText.contains('why') || queryText.contains('how') || queryText.length > 50) {
+    if (queryText.contains('explain') ||
+        queryText.contains('why') ||
+        queryText.contains('how') ||
+        queryText.length > 50) {
       return IntentMode.deep;
     }
-    if (queryText.contains('build') || queryText.contains('create') || queryText.contains('implement') || queryText.contains('website') || queryText.contains('vibecode')) {
-      // INQUISITIVE CHECK: If the request is too simple (e.g., "build a chatbot"), 
+    if (queryText.contains('build') ||
+        queryText.contains('create') ||
+        queryText.contains('implement') ||
+        queryText.contains('website') ||
+        queryText.contains('vibecode')) {
+      // INQUISITIVE CHECK: If the request is too simple (e.g., "build a chatbot"),
       // return a specialized "NeedInfo" mode to trigger questioning.
-      if (queryText.split(' ').length < 10) return IntentMode.inquisitiveProject;
+      if (queryText.split(' ').length < 10) {
+        return IntentMode.inquisitiveProject;
+      }
       return IntentMode.project;
     }
     return IntentMode.normal;
   }
 
   /// Build the adaptive prompt components (system vs user) based on detected intent
-  ({String system, String user}) _buildAdaptivePrompt(String userInput, {bool isVoiceMode = false}) {
+  ({String system, String user}) _buildAdaptivePrompt(
+    String userInput, {
+    bool isVoiceMode = false,
+  }) {
     final mode = detectIntent(userInput);
     final memCtx = _memory.buildContextString();
-    
+
     String instructions;
     switch (mode) {
       case IntentMode.agentic:
-        instructions = "Provide a physical multi-step automation plan for the Android OS. Be surgical and goal-oriented.";
+        instructions =
+            "Provide a physical multi-step automation plan for the Android OS. Be surgical and goal-oriented.";
         break;
       case IntentMode.simple:
         instructions = "Reply naturally and very briefly. No formatting.";
@@ -616,36 +746,57 @@ When user sends large code for review/debugging:
         break;
       case IntentMode.deep:
         final StringBuffer sb = StringBuffer();
-        sb.writeln('Generate an EXHAUSTIVE, COMPREHENSIVE, PROFESSIONAL-GRADE response.');
-        sb.writeln('TARGET: 13-15 A4 pages of rich content. Cover the topic with full depth.');
+        sb.writeln(
+          'Generate an EXHAUSTIVE, COMPREHENSIVE, PROFESSIONAL-GRADE response.',
+        );
+        sb.writeln(
+          'TARGET: 13-15 A4 pages of rich content. Cover the topic with full depth.',
+        );
         sb.writeln('');
         sb.writeln('STRUCTURE REQUIREMENTS:');
         sb.writeln('1. Start with a clear introduction / overview section');
         sb.writeln('2. Use numbered H2 headings for each major topic/subtopic');
         sb.writeln('3. For each major section include:');
         sb.writeln('   - Detailed explanation (3-5 paragraphs minimum)');
-        sb.writeln('   - At least one ASCII diagram showing architecture/flow/concept');
+        sb.writeln(
+          '   - At least one ASCII diagram showing architecture/flow/concept',
+        );
         sb.writeln('   - Real-world examples with specific data/numbers');
         sb.writeln('   - Step-by-step breakdown where applicable');
-        sb.writeln('4. Include at minimum 2 comparison tables across the response');
-        sb.writeln('5. Add code examples (in triple-backtick blocks) where relevant');
+        sb.writeln(
+          '4. Include at minimum 2 comparison tables across the response',
+        );
+        sb.writeln(
+          '5. Add code examples (in triple-backtick blocks) where relevant',
+        );
         sb.writeln('6. End with a conclusion / summary section');
         sb.writeln('');
         sb.writeln('DIAGRAM RULES (use ASCII style only):');
-        sb.writeln('- Use +--+ and | for boxes, -- for connections, v/^ for arrows');
-        sb.writeln('- No emoji inside diagrams. Use plain ASCII characters only.');
+        sb.writeln(
+          '- Use +--+ and | for boxes, -- for connections, v/^ for arrows',
+        );
+        sb.writeln(
+          '- No emoji inside diagrams. Use plain ASCII characters only.',
+        );
         sb.writeln('- Every major concept should have a visual diagram');
         sb.writeln('');
         sb.writeln('DEPTH RULES:');
         sb.writeln('- Do NOT summarize. Explain every claim fully.');
         sb.writeln('- Include technical specifications, formulas, algorithms');
-        sb.writeln('- Use real-world case studies from India/Tamil Nadu when relevant');
-        sb.writeln('- NO TOKEN LIMIT. Write until the content is COMPLETE and COMPREHENSIVE.');
-        sb.writeln('- Minimum 4000 words. Target 6000-8000 words for full coverage.');
+        sb.writeln(
+          '- Use real-world case studies from India/Tamil Nadu when relevant',
+        );
+        sb.writeln(
+          '- NO TOKEN LIMIT. Write until the content is COMPLETE and COMPREHENSIVE.',
+        );
+        sb.writeln(
+          '- Minimum 4000 words. Target 6000-8000 words for full coverage.',
+        );
         instructions = sb.toString();
         break;
       case IntentMode.comparison:
-        instructions = "Compare clearly using advanced metrics. Use a Markdown table for presentation.";
+        instructions =
+            "Compare clearly using advanced metrics. Use a Markdown table for presentation.";
         break;
       case IntentMode.project:
         instructions = '''You are in Senior Full-Stack Developer Mode.
@@ -656,11 +807,13 @@ When user sends large code for review/debugging:
 - After all code, provide a short "How to Run" section.''';
         break;
       case IntentMode.inquisitiveProject:
-        instructions = "The user wants to build a project but has been vague. You MUST ask for: 1. Frontend preference, 2. Backend/Language, 3. Database choice, 4. Any required third-party integrations (Payment, Auth, etc.).";
+        instructions =
+            "The user wants to build a project but has been vague. You MUST ask for: 1. Frontend preference, 2. Backend/Language, 3. Database choice, 4. Any required third-party integrations (Payment, Auth, etc.).";
         break;
       case IntentMode.deepDebug:
         final lineCount = userInput.split('\n').length;
-        instructions = '''
+        instructions =
+            '''
 You are JARVIS in DEEP DEBUG MODE — the most elite, thorough code auditor in existence.
 You are analyzing approximately $lineCount lines of code. Your mission: find EVERY SINGLE BUG.
 
@@ -722,11 +875,13 @@ NON-NEGOTIABLE RULES:
     }
 
     // Inject current precise real-world time in Tamil Nadu (IST)
-    final nowIst = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+    final nowIst = DateTime.now().toUtc().add(
+      const Duration(hours: 5, minutes: 30),
+    );
     final hour = nowIst.hour;
     final period = hour < 12 ? 'AM' : 'PM';
     final hour12 = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-    
+
     String timeOfDay;
     if (hour >= 5 && hour < 12) {
       timeOfDay = "MORNING";
@@ -736,7 +891,8 @@ NON-NEGOTIABLE RULES:
       timeOfDay = "NIGHT"; // Starts exactly at 6:00 PM (18:00)
     }
 
-    final timeContext = "[SYSTEM TIME] Currently it is $timeOfDay. The precise Tamil Nadu (IST) date and time is: ${nowIst.year}-${nowIst.month.toString().padLeft(2, '0')}-${nowIst.day.toString().padLeft(2, '0')} ${hour12.toString().padLeft(2, '0')}:${nowIst.minute.toString().padLeft(2, '0')} $period (ISO: ${nowIst.year}-${nowIst.month.toString().padLeft(2, '0')}-${nowIst.day.toString().padLeft(2, '0')} ${nowIst.hour.toString().padLeft(2, '0')}:${nowIst.minute.toString().padLeft(2, '0')})";
+    final timeContext =
+        "[SYSTEM TIME] Currently it is $timeOfDay. The precise Tamil Nadu (IST) date and time is: ${nowIst.year}-${nowIst.month.toString().padLeft(2, '0')}-${nowIst.day.toString().padLeft(2, '0')} ${hour12.toString().padLeft(2, '0')}:${nowIst.minute.toString().padLeft(2, '0')} $period (ISO: ${nowIst.year}-${nowIst.month.toString().padLeft(2, '0')}-${nowIst.day.toString().padLeft(2, '0')} ${nowIst.hour.toString().padLeft(2, '0')}:${nowIst.minute.toString().padLeft(2, '0')})";
 
     String voiceConstraint = isVoiceMode
         ? "\n[CRITICAL VOICE MODE RULE] You are speaking out loud through a Text-To-Speech engine. You MUST format your response in plain, natural conversational text ONLY. DO NOT use markdown. Most importantly, DO NOT use Tanglish or mix languages. Speak in the language the user is speaking in, or the language they explicitly request. If speaking Tamil, use PURE TAMIL script, not English characters (Tanglish)."
@@ -750,7 +906,8 @@ NON-NEGOTIABLE RULES:
       instructions = '$instructions\n\n${_buildPagePlan(userPages)}';
     }
 
-    final systemStr = "$baseSystemPrompt$voiceConstraint\n\n$timeContext\n\n[CONTEXT]\n$memCtx\n\n[INSTRUCTION]\n$instructions";
+    final systemStr =
+        "$baseSystemPrompt$voiceConstraint\n\n$timeContext\n\n[CONTEXT]\n$memCtx\n\n[INSTRUCTION]\n$instructions";
     return (system: systemStr, user: userInput);
   }
 
@@ -760,7 +917,10 @@ NON-NEGOTIABLE RULES:
     final patterns = [
       RegExp(r'\bwithin\s+(\d{1,2})\s*pages?\b', caseSensitive: false),
       RegExp(r'\b(\d{1,2})\s*-\s*page\b', caseSensitive: false),
-      RegExp(r'\b(\d{1,2})\s*pages?\s*(only|max|minimum|pdf|report|document|response|plan|limit|strictly)?\b', caseSensitive: false),
+      RegExp(
+        r'\b(\d{1,2})\s*pages?\s*(only|max|minimum|pdf|report|document|response|plan|limit|strictly)?\b',
+        caseSensitive: false,
+      ),
     ];
     for (final re in patterns) {
       final m = re.firstMatch(input);
@@ -782,32 +942,51 @@ NON-NEGOTIABLE RULES:
     // Code block (~20 lines): ~0.40 pages
     // Heading (H2 + underline): ~0.08 pages
     // Intro/conclusion sections: ~1.0 page each
-    const double diagramCost   = 0.55;
-    const double tableCost     = 0.45;
-    const double codeCost      = 0.40;
-    const double headingCost   = 0.08;
+    const double diagramCost = 0.55;
+    const double tableCost = 0.45;
+    const double codeCost = 0.40;
+    const double headingCost = 0.08;
     const double fixedOverhead = 1.5; // cover/intro + conclusion
-    const int    wordsPerPage  = 360; // conservative for 12pt Arial body
+    const int wordsPerPage = 360; // conservative for 12pt Arial body
 
     // ── Decide visual element counts based on page budget ──────────────────
     // Scale diagrams and tables proportionally. Never exceed budget.
-    final int maxDiag  = (pages <= 5) ? 1 : (pages <= 8) ? 2 : (pages <= 12) ? 3 : (pages <= 16) ? 4 : 5;
-    final int maxTbl   = (pages <= 5) ? 1 : (pages <= 8) ? 1 : (pages <= 12) ? 2 : 3;
-    final int maxCode  = (pages <= 5) ? 1 : (pages <= 10) ? 2 : 3;
+    final int maxDiag = (pages <= 5)
+        ? 1
+        : (pages <= 8)
+        ? 2
+        : (pages <= 12)
+        ? 3
+        : (pages <= 16)
+        ? 4
+        : 5;
+    final int maxTbl = (pages <= 5)
+        ? 1
+        : (pages <= 8)
+        ? 1
+        : (pages <= 12)
+        ? 2
+        : 3;
+    final int maxCode = (pages <= 5)
+        ? 1
+        : (pages <= 10)
+        ? 2
+        : 3;
     // Number of H2 sections = pages - 2 (for intro+conclusion), min 2, max 10
     final int sections = ((pages - 2).clamp(2, 10));
 
     // ── Compute visual page consumption ─────────────────────────────────────
-    final double visualCost = (maxDiag * diagramCost)
-        + (maxTbl * tableCost)
-        + (maxCode * codeCost)
-        + (sections * headingCost)
-        + fixedOverhead;
+    final double visualCost =
+        (maxDiag * diagramCost) +
+        (maxTbl * tableCost) +
+        (maxCode * codeCost) +
+        (sections * headingCost) +
+        fixedOverhead;
 
     // ── Remaining text budget ────────────────────────────────────────────────
-    final double textPages    = (pages - visualCost).clamp(1.0, pages.toDouble());
-    final int    totalWords   = (textPages * wordsPerPage).round();
-    final int    wordsPerSec  = (totalWords / sections).round();
+    final double textPages = (pages - visualCost).clamp(1.0, pages.toDouble());
+    final int totalWords = (textPages * wordsPerPage).round();
+    final int wordsPerSec = (totalWords / sections).round();
 
     return '''
 ════════════════════════════════════════════════
@@ -869,74 +1048,121 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
 
     final mode = detectIntent(input);
     switch (mode) {
-      case IntentMode.simple:             return 2048;
-      case IntentMode.normal:             return 12000;  // assignment: 13-15 pages
-      case IntentMode.deep:               return 16000;  // comprehensive deep responses
-      case IntentMode.comparison:         return 10000;
-      case IntentMode.agentic:            return 16384;
-      case IntentMode.project:            return 50000;  // full app/website/10k+ code
-      case IntentMode.inquisitiveProject: return 2048;
-      case IntentMode.deepDebug:          return 65536;  // exhaustive debug, 20k+ lines
+      case IntentMode.simple:
+        return 2048;
+      case IntentMode.normal:
+        return 12000; // assignment: 13-15 pages
+      case IntentMode.deep:
+        return 16000; // comprehensive deep responses
+      case IntentMode.comparison:
+        return 10000;
+      case IntentMode.agentic:
+        return 16384;
+      case IntentMode.project:
+        return 50000; // full app/website/10k+ code
+      case IntentMode.inquisitiveProject:
+        return 2048;
+      case IntentMode.deepDebug:
+        return 65536; // exhaustive debug, 20k+ lines
     }
   }
 
   /// Smart streaming generator with automatic fallback
-  Stream<String> generateStream(String prompt, {String? systemPrompt, String? imageBase64, int? maxTokens, bool isVoiceMode = false, String integrationCapabilities = ''}) async* {
+  Stream<String> generateStream(
+    String prompt, {
+    String? systemPrompt,
+    String? imageBase64,
+    int? maxTokens,
+    bool isVoiceMode = false,
+    String integrationCapabilities = '',
+  }) async* {
     _activeProvider = null;
-    
+
     // Check if Zeera logic should trigger
     // Check if Zeera logic should trigger
     if (_zeeraEnabled || _selectedModels[AIProvider.zeera] != null) {
       if (_zeeraEnabled) {
-         yield* _generateZeeraStream(prompt, systemPrompt: systemPrompt);
-         return;
+        yield* _generateZeeraStream(prompt, systemPrompt: systemPrompt);
+        return;
       }
+    }
+
+    // ── Netless (offline) fast-path ──────────────────────────────────────────
+    // If user selected Netless, route ONLY to on-device Gemma — no fallback.
+    if (_lastSelectedProvider == AIProvider.netless) {
+      final netless = NetlessService();
+      if (!netless.isAvailable) {
+        _isGenerating = false;
+        yield '🔴 **Netless model not loaded.**\n\n'
+            'Go to **Settings → Netless** to download the Gemma 4 E2B-it model (~1.5 GB).\n'
+            'Once downloaded, JARVIS runs 100% offline without any internet!';
+        return;
+      }
+      _isGenerating = true;
+      _setStatus('Netless — running offline Gemma 4 E2B-it…');
+      _activeProvider = AIProvider.netless;
+      _activeModel = 'Gemma 4 E2B-it';
+      notifyListeners();
+      await for (final token in netless.generateStream(
+        prompt,
+        systemPrompt: systemPrompt,
+      )) {
+        yield token;
+      }
+      _isGenerating = false;
+      _setStatus('Done via Netless (offline)');
+      notifyListeners();
+      return;
     }
 
     final mode = detectIntent(prompt);
     if (mode == IntentMode.inquisitiveProject) {
       _isGenerating = false;
       yield "I'm ready to build this project for you! To ensure a **100% complete, ready-to-deploy** result using the **Zeera Meta-Intelligence Layer**, please specify:\n\n"
-            "1. **Frontend:** (e.g., React, Next.js, Flutter, HTML/CSS)\n"
-            "2. **Backend:** (e.g., Node.js, Python/Flask, Go, Bun)\n"
-            "3. **Database:** (e.g., PostgreSQL, MongoDB, Supabase, Firebase)\n"
-            "4. **Specific Features:** (e.g., Stripe, Google Maps, Auth.js)\n\n"
-            "Once you provide these details, I will generate the **entire** codebase in a single response.";
+          "1. **Frontend:** (e.g., React, Next.js, Flutter, HTML/CSS)\n"
+          "2. **Backend:** (e.g., Node.js, Python/Flask, Go, Bun)\n"
+          "3. **Database:** (e.g., PostgreSQL, MongoDB, Supabase, Firebase)\n"
+          "4. **Specific Features:** (e.g., Stripe, Google Maps, Auth.js)\n\n"
+          "Once you provide these details, I will generate the **entire** codebase in a single response.";
       return;
     }
 
     _isGenerating = true;
     _setStatus('Thinking...');
 
-    // DETECT LANGUAGE PREFERENCE CHANGE: If the user says "talk in tamil" etc. 
+    // DETECT LANGUAGE PREFERENCE CHANGE: If the user says "talk in tamil" etc.
     // we save it to high importance memory immediately to ensure the next prompt has it!
     final normalized = prompt.toLowerCase();
-    if (normalized.contains('talk in tamil') || normalized.contains('தமிழ் பேச') || normalized.contains('provide response in tamil')) {
-       _memory.addMemory(
-         content: "USER PREFERENCE: Talk in PURE TAMIL characters from now on. DO NOT switch back to English until explicitly told.",
-         importance: 1.0,
-         category: 'language'
-       );
-    } else if (normalized.contains('talk in english') || normalized.contains('speak in english')) {
-       _memory.addMemory(
-         content: "USER PREFERENCE: Switch back to English for all future responses.",
-         importance: 1.0,
-         category: 'language'
-       );
+    if (normalized.contains('talk in tamil') ||
+        normalized.contains('தமிழ் பேச') ||
+        normalized.contains('provide response in tamil')) {
+      _memory.addMemory(
+        content:
+            "USER PREFERENCE: Talk in PURE TAMIL characters from now on. DO NOT switch back to English until explicitly told.",
+        importance: 1.0,
+        category: 'language',
+      );
+    } else if (normalized.contains('talk in english') ||
+        normalized.contains('speak in english')) {
+      _memory.addMemory(
+        content:
+            "USER PREFERENCE: Switch back to English for all future responses.",
+        importance: 1.0,
+        category: 'language',
+      );
     }
 
-    final maxTokensVal = maxTokens ?? (isVoiceMode ? 512 : _getMaxTokens(prompt));
-    
+    final maxTokensVal =
+        maxTokens ?? (isVoiceMode ? 512 : _getMaxTokens(prompt));
+
     // Build separated prompts
     var promptPair = _buildAdaptivePrompt(prompt, isVoiceMode: isVoiceMode);
     if (systemPrompt != null) {
       promptPair = (system: '$baseSystemPrompt\n$systemPrompt', user: prompt);
     }
-        
+
     // For voice mode, prioritize absolute speed: Nvidia ONLY.
-    final chain = isVoiceMode 
-        ? [AIProvider.nvidia]
-        : _fallbackChain;
+    final chain = isVoiceMode ? [AIProvider.nvidia] : _fallbackChain;
 
     if (chain.isEmpty) {
       _isGenerating = false;
@@ -945,7 +1171,6 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       return;
     }
 
-
     String currentUserPrompt = promptPair.user;
     final totalBuffer = StringBuffer();
     final List<String> errorLog = [];
@@ -953,22 +1178,28 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     for (int i = 0; i < chain.length; i++) {
       final provider = chain[i];
       final currentBuffer = StringBuffer();
-      
+
       try {
         final statusPrefix = i == 0 ? 'Connecting to' : 'Continuous Fallback:';
         _setStatus('$statusPrefix ${_providerName(provider)}...');
 
         // If we are continuing a partially failed generation
         if (totalBuffer.isNotEmpty) {
-           currentUserPrompt = "${promptPair.user}\n\n[CONTINUATION CONTEXT]\nAssistant has already generated: \"${totalBuffer.toString()}\"\n\nCONTINUE the response exactly where it left off. Do NOT repeat or restart.";
+          currentUserPrompt =
+              "${promptPair.user}\n\n[CONTINUATION CONTEXT]\nAssistant has already generated: \"${totalBuffer.toString()}\"\n\nCONTINUE the response exactly where it left off. Do NOT repeat or restart.";
         }
 
-        final stream = await _tryStreamProvider(provider, currentUserPrompt, systemPrompt: promptPair.system, maxTokens: maxTokensVal);
+        final stream = await _tryStreamProvider(
+          provider,
+          currentUserPrompt,
+          systemPrompt: promptPair.system,
+          maxTokens: maxTokensVal,
+        );
         if (stream == null) {
           errorLog.add('${_providerName(provider)}: Null or Unavailable');
           if (i == chain.length - 1 && totalBuffer.isEmpty) {
-             final errDetails = errorLog.join(" | ");
-             throw Exception('All providers unavailable.\nDetails: $errDetails');
+            final errDetails = errorLog.join(" | ");
+            throw Exception('All providers unavailable.\nDetails: $errDetails');
           }
           continue;
         }
@@ -986,71 +1217,81 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
             hasStarted = true;
             _setStatus('Streaming from ${_providerName(provider)}');
           }
-          
+
           partialBuffer += chunk;
-          
+
           if (!inThinkBlock && partialBuffer.contains('<think>')) {
-             inThinkBlock = true;
-             final beforeThink = partialBuffer.split('<think>').first;
-             if (beforeThink.isNotEmpty) {
-               yield beforeThink;
-               totalBuffer.write(beforeThink);
-               currentBuffer.write(beforeThink);
-             }
-             partialBuffer = partialBuffer.substring(partialBuffer.indexOf('<think>'));
+            inThinkBlock = true;
+            final beforeThink = partialBuffer.split('<think>').first;
+            if (beforeThink.isNotEmpty) {
+              yield beforeThink;
+              totalBuffer.write(beforeThink);
+              currentBuffer.write(beforeThink);
+            }
+            partialBuffer = partialBuffer.substring(
+              partialBuffer.indexOf('<think>'),
+            );
           }
-          
+
           if (inThinkBlock && partialBuffer.contains('</think>')) {
-             inThinkBlock = false;
-             partialBuffer = partialBuffer.substring(partialBuffer.indexOf('</think>') + 8);
-             if (partialBuffer.startsWith('\n')) partialBuffer = partialBuffer.substring(1);
+            inThinkBlock = false;
+            partialBuffer = partialBuffer.substring(
+              partialBuffer.indexOf('</think>') + 8,
+            );
+            if (partialBuffer.startsWith('\n')) {
+              partialBuffer = partialBuffer.substring(1);
+            }
           }
-          
+
           if (!inThinkBlock) {
-             int possibleTagIdx = partialBuffer.lastIndexOf('<');
-             if (possibleTagIdx != -1 && possibleTagIdx >= partialBuffer.length - 7) {
-                final safeToYield = partialBuffer.substring(0, possibleTagIdx);
-                if (safeToYield.isNotEmpty) {
-                   yield safeToYield;
-                   totalBuffer.write(safeToYield);
-                   currentBuffer.write(safeToYield);
-                }
-                partialBuffer = partialBuffer.substring(possibleTagIdx);
-             } else {
-                if (partialBuffer.isNotEmpty) {
-                   yield partialBuffer;
-                   totalBuffer.write(partialBuffer);
-                   currentBuffer.write(partialBuffer);
-                   partialBuffer = "";
-                }
-             }
+            int possibleTagIdx = partialBuffer.lastIndexOf('<');
+            if (possibleTagIdx != -1 &&
+                possibleTagIdx >= partialBuffer.length - 7) {
+              final safeToYield = partialBuffer.substring(0, possibleTagIdx);
+              if (safeToYield.isNotEmpty) {
+                yield safeToYield;
+                totalBuffer.write(safeToYield);
+                currentBuffer.write(safeToYield);
+              }
+              partialBuffer = partialBuffer.substring(possibleTagIdx);
+            } else {
+              if (partialBuffer.isNotEmpty) {
+                yield partialBuffer;
+                totalBuffer.write(partialBuffer);
+                currentBuffer.write(partialBuffer);
+                partialBuffer = "";
+              }
+            }
           }
         }
 
         if (!inThinkBlock && partialBuffer.isNotEmpty) {
-           yield partialBuffer;
-           totalBuffer.write(partialBuffer);
-           currentBuffer.write(partialBuffer);
+          yield partialBuffer;
+          totalBuffer.write(partialBuffer);
+          currentBuffer.write(partialBuffer);
         }
-
 
         _isGenerating = false;
         _setStatus('Done via ${_providerName(provider)}');
-        
+
         // Auto-save significant responses to memory
-        if (totalBuffer.length > 50 && detectIntent(prompt) != IntentMode.simple) {
-           _memory.addMemory(
-             content: "User Preference: When user asked '$prompt', JARVIS responded with info about '${totalBuffer.toString().substring(0, 80)}...'",
-             importance: 0.6,
-           );
+        if (totalBuffer.length > 50 &&
+            detectIntent(prompt) != IntentMode.simple) {
+          _memory.addMemory(
+            content:
+                "User Preference: When user asked '$prompt', JARVIS responded with info about '${totalBuffer.toString().substring(0, 80)}...'",
+            importance: 0.6,
+          );
         }
-        
+
         notifyListeners();
         return;
       } catch (e) {
-        debugPrint('[AIRouter] Error with provider ${_providerName(provider)}: $e');
+        debugPrint(
+          '[AIRouter] Error with provider ${_providerName(provider)}: $e',
+        );
         errorLog.add('${_providerName(provider)} failed: $e');
-        
+
         if (i == chain.length - 1 && totalBuffer.isEmpty) {
           _isGenerating = false;
           _setStatus('All providers failed');
@@ -1066,29 +1307,46 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
 
   /// Non-streaming generator for internal orchestration (e.g. agent loop, file analysis)
   /// Supports optional imageBase64 for vision-based action decisions
-  Future<String> generate(String userInput, {String? systemPrompt, String? imageBase64}) async {
+  Future<String> generate(
+    String userInput, {
+    String? systemPrompt,
+    String? imageBase64,
+  }) async {
     final maxTokens = imageBase64 != null ? 128 : _getMaxTokens(userInput);
-    
+
     var promptPair = _buildAdaptivePrompt(userInput, isVoiceMode: false);
     if (systemPrompt != null) {
       // If we have an image, don't pollute with the heavy baseSystemPrompt which tells it to "chat".
       // We want it to be a pure vision translator.
-      final base = imageBase64 != null ? "You are JARVIS Vision Engine." : baseSystemPrompt;
+      final base = imageBase64 != null
+          ? "You are JARVIS Vision Engine."
+          : baseSystemPrompt;
       promptPair = (system: '$base\n$systemPrompt', user: userInput);
     }
-    
+
     final chain = _fallbackChain;
 
     for (final provider in chain) {
       try {
         debugPrint('[AIRouter] Attempting Vision Analysis via $provider...');
-        final result = await _tryProvider(provider, promptPair.user, systemPrompt: promptPair.system, maxTokens: maxTokens, imageBase64: imageBase64);
-        
+        final result = await _tryProvider(
+          provider,
+          promptPair.user,
+          systemPrompt: promptPair.system,
+          maxTokens: maxTokens,
+          imageBase64: imageBase64,
+        );
+
         // If the model literally says it can't "see", treat it as a failure and try the next one
         if (result != null) {
           final lowResult = result.toLowerCase();
-          if (imageBase64 != null && (lowResult.contains("can't see") || lowResult.contains("cannot see") || lowResult.contains("have not seen"))) {
-            debugPrint('[AIRouter] $provider claims it cannot see, falling back...');
+          if (imageBase64 != null &&
+              (lowResult.contains("can't see") ||
+                  lowResult.contains("cannot see") ||
+                  lowResult.contains("have not seen"))) {
+            debugPrint(
+              '[AIRouter] $provider claims it cannot see, falling back...',
+            );
             continue;
           }
           return result;
@@ -1099,7 +1357,9 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         continue;
       }
     }
-    throw Exception('All providers failed to interpret the image. Check your Vision Model settings.');
+    throw Exception(
+      'All providers failed to interpret the image. Check your Vision Model settings.',
+    );
   }
 
   /// Professional file analysis pipeline: extract -> chunk -> analyze -> merge
@@ -1107,27 +1367,29 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     try {
       _setStatus('Extracting file content...');
       final text = await _fileProcessor.extractText(filePath);
-      
+
       _setStatus('Splitting into chunks...');
       final chunks = _fileProcessor.chunkText(text, size: 2000);
-      
+
       String finalAnalysis = "";
       int current = 1;
-      
+
       for (var chunk in chunks) {
         _setStatus('Analyzing chunk $current/${chunks.length}...');
         final res = await generate(
           "Analyze this file segment and summarize key points:\n\n$chunk",
-          systemPrompt: "You are a professional file analyzer. Extract actionable insights."
+          systemPrompt:
+              "You are a professional file analyzer. Extract actionable insights.",
         );
         finalAnalysis += "\n---\n### Segment $current Analysis\n$res\n";
         current++;
       }
-      
+
       _setStatus('Consolidating results...');
       return await generate(
         "Consolidate these segmented analyses into a professional final report:\n\n$finalAnalysis",
-        systemPrompt: "Create a final executive summary of the file content based on the provided segments."
+        systemPrompt:
+            "Create a final executive summary of the file content based on the provided segments.",
       );
     } catch (e) {
       _setStatus('File analysis failed');
@@ -1144,38 +1406,42 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     AIProvider? providerOverride,
   }) async {
     final systemPrompt = systemOverride ?? _buildAdaptivePrompt(prompt).system;
-    
+
     // Use high tokens for coding/project tasks
     final maxTokens = _getMaxTokens(prompt);
 
     // If provider is overridden, try it first
     final List<AIProvider> providers = [];
     if (providerOverride != null) providers.add(providerOverride);
-    
+
     // Fallback/Default chain: Gemini -> OpenRouter -> NVIDIA -> Ollama Cloud -> Ollama Local
-    providers.addAll([
-      AIProvider.gemini,
-      AIProvider.openRouter,
-      AIProvider.nvidia,
-      AIProvider.ollamaCloud,
-      AIProvider.ollama,
-      AIProvider.llamaCpp,
-    ].where((p) => !providers.contains(p)));
+    providers.addAll(
+      [
+        AIProvider.gemini,
+        AIProvider.openRouter,
+        AIProvider.nvidia,
+        AIProvider.ollamaCloud,
+        AIProvider.ollama,
+        AIProvider.llamaCpp,
+      ].where((p) => !providers.contains(p)),
+    );
 
     for (var provider in providers) {
       if (isProviderEnabled(provider)) {
         try {
           _setStatus('Consulting ${provider.name}...');
           final response = await _tryProvider(
-            provider, 
-            prompt, 
-            systemPrompt: systemPrompt, 
+            provider,
+            prompt,
+            systemPrompt: systemPrompt,
             imageBase64: imageBase64,
             maxTokens: maxTokens, // CRITICAL: Pass the tokens!
           );
           if (response != null && response.trim().isNotEmpty) return response;
         } catch (e) {
-          debugPrint('[AIRouter] Direct response from ${provider.name} failed: $e');
+          debugPrint(
+            '[AIRouter] Direct response from ${provider.name} failed: $e',
+          );
         }
       }
     }
@@ -1183,7 +1449,13 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     return "⚠️ All enabled AI providers failed to generate a response for your project.";
   }
 
-  Future<String?> _tryProvider(AIProvider provider, String prompt, {String? systemPrompt, int? maxTokens, String? imageBase64}) async {
+  Future<String?> _tryProvider(
+    AIProvider provider,
+    String prompt, {
+    String? systemPrompt,
+    int? maxTokens,
+    String? imageBase64,
+  }) async {
     switch (provider) {
       case AIProvider.zeera:
         // Synthesis engine doesn't use standard _tryProvider for its recursive loop
@@ -1191,11 +1463,17 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       case AIProvider.llamaCpp:
         // Local model doesn't support vision; skip if image needed
         if (imageBase64 != null) return null;
-        final url = await _secureStorage.getBaseUrl('llamaCpp') ?? 'http://127.0.0.1:8080';
+        final url =
+            await _secureStorage.getBaseUrl('llamaCpp') ??
+            'http://127.0.0.1:8080';
         final key = await _secureStorage.getApiKey('llamaCpp');
         final client = LocalModelClient(baseUrl: url, apiKey: key);
-        final fullText = systemPrompt != null ? '$systemPrompt\nUser: $prompt' : prompt;
-        return (await client.isAvailable()) ? await client.generateStream(fullText).join() : null;
+        final fullText = systemPrompt != null
+            ? '$systemPrompt\nUser: $prompt'
+            : prompt;
+        return (await client.isAvailable())
+            ? await client.generateStream(fullText).join()
+            : null;
       case AIProvider.gemini:
         final key = await _secureStorage.getApiKey('gemini');
         if (key == null || key.isEmpty) return null;
@@ -1203,7 +1481,10 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         if (model == null) {
           final models = await GeminiApiClient(apiKey: key).fetchModels();
           // For vision tasks prefer flash (supports images)
-          model = _pickBestModel(models, hint: imageBase64 != null ? 'flash' : 'flash');
+          model = _pickBestModel(
+            models,
+            hint: imageBase64 != null ? 'flash' : 'flash',
+          );
         }
         if (model.isEmpty) return null;
         return await GeminiApiClient(apiKey: key, model: model).generate(
@@ -1214,17 +1495,25 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         );
       case AIProvider.ollama:
         try {
-          final localUrl = await _secureStorage.getBaseUrl('ollamaLocal') ?? 'http://127.0.0.1:11434';
+          final localUrl =
+              await _secureStorage.getBaseUrl('ollamaLocal') ??
+              'http://127.0.0.1:11434';
           _ollamaService.setLocalUrl(localUrl);
-          
+
           final messages = [
-            if (systemPrompt != null) OllamaChatMessage(role: 'system', content: systemPrompt),
+            if (systemPrompt != null)
+              OllamaChatMessage(role: 'system', content: systemPrompt),
             OllamaChatMessage(role: 'user', content: prompt),
           ];
 
           var model = _selectedModels[AIProvider.ollama];
-          if (imageBase64 != null && model != null && !model.contains('llava') && !model.contains('vision') && !model.contains('moondream')) {
-            model = 'llama3.2-vision'; // Fallback to a common Ollama vision model
+          if (imageBase64 != null &&
+              model != null &&
+              !model.contains('llava') &&
+              !model.contains('vision') &&
+              !model.contains('moondream')) {
+            model =
+                'llama3.2-vision'; // Fallback to a common Ollama vision model
           }
 
           final res = await _ollamaService.chat(
@@ -1234,24 +1523,32 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
             imageBase64: imageBase64,
           );
           return res.content;
-        } catch (e) { 
+        } catch (e) {
           debugPrint('[Ollama Local] Vision/Chat error: $e');
-          return null; 
+          return null;
         }
 
       case AIProvider.ollamaCloud:
         try {
-          final cloudUrl = await _secureStorage.getBaseUrl('ollamaCloud') ?? 'https://api.ollama.com';
+          final cloudUrl =
+              await _secureStorage.getBaseUrl('ollamaCloud') ??
+              'https://api.ollama.com';
           _ollamaService.setBaseUrl(cloudUrl);
-          
+
           final messages = [
-            if (systemPrompt != null) OllamaChatMessage(role: 'system', content: systemPrompt),
+            if (systemPrompt != null)
+              OllamaChatMessage(role: 'system', content: systemPrompt),
             OllamaChatMessage(role: 'user', content: prompt),
           ];
 
           var model = _selectedModels[AIProvider.ollamaCloud];
-          if (imageBase64 != null && model != null && !model.contains('llava') && !model.contains('vision') && !model.contains('moondream')) {
-            model = 'llama3.2-vision'; // Fallback to a common Ollama vision model
+          if (imageBase64 != null &&
+              model != null &&
+              !model.contains('llava') &&
+              !model.contains('vision') &&
+              !model.contains('moondream')) {
+            model =
+                'llama3.2-vision'; // Fallback to a common Ollama vision model
           }
 
           final res = await _ollamaService.chat(
@@ -1261,20 +1558,26 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
             imageBase64: imageBase64,
           );
           return res.content;
-        } catch (e) { 
+        } catch (e) {
           debugPrint('[Ollama Cloud] Vision/Chat error: $e');
-          return null; 
+          return null;
         }
 
       case AIProvider.nvidia:
         final key = await _secureStorage.getApiKey('nvidia');
         if (key == null || key.trim().isEmpty) return null;
         var model = _selectedModels[AIProvider.nvidia];
-        
+
         // Dynamic fetch if no model is selected or forced null
         if (model == null || model.isEmpty) {
-          final models = await NvidiaApiClient(apiKey: key, model: '').fetchModels();
-          model = _pickBestModel(models, hint: imageBase64 != null ? 'vision' : 'llama-3.1');
+          final models = await NvidiaApiClient(
+            apiKey: key,
+            model: '',
+          ).fetchModels();
+          model = _pickBestModel(
+            models,
+            hint: imageBase64 != null ? 'vision' : 'llama-3.1',
+          );
           if (model.isEmpty && models.isNotEmpty) model = models.first;
         }
 
@@ -1295,11 +1598,17 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         final key = await _secureStorage.getApiKey('openRouter');
         if (key == null || key.trim().isEmpty) return null;
         var model = _selectedModels[AIProvider.openRouter];
-        
+
         // Dynamic fetch if no model is selected
         if (model == null || model.isEmpty) {
-          final models = await OpenRouterClient(apiKey: key, model: '').fetchModels();
-          model = _pickBestModel(models, hint: imageBase64 != null ? 'vision' : 'auto');
+          final models = await OpenRouterClient(
+            apiKey: key,
+            model: '',
+          ).fetchModels();
+          model = _pickBestModel(
+            models,
+            hint: imageBase64 != null ? 'vision' : 'auto',
+          );
           if (model.isEmpty && models.isNotEmpty) model = models.first;
         }
         if (model.isEmpty) return null;
@@ -1322,10 +1631,17 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           debugPrint('[AIRouter] Anthropic skipped - no key set');
           return null;
         }
-        debugPrint('[AIRouter] Attempting Anthropic key="${trimmedKey.substring(0, 10)}..."');
-        var model = _selectedModels[AIProvider.anthropic] ?? 'claude-3-5-sonnet-20241022';
+        debugPrint(
+          '[AIRouter] Attempting Anthropic key="${trimmedKey.substring(0, 10)}..."',
+        );
+        var model =
+            _selectedModels[AIProvider.anthropic] ??
+            'claude-3-5-sonnet-20241022';
         try {
-          return await AnthropicApiClient(apiKey: trimmedKey, model: model).generate(
+          return await AnthropicApiClient(
+            apiKey: trimmedKey,
+            model: model,
+          ).generate(
             prompt,
             systemPrompt: systemPrompt,
             maxTokens: maxTokens ?? _getMaxTokens(prompt),
@@ -1334,18 +1650,41 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           debugPrint('[Anthropic] Chat error: $e');
           return null;
         }
+
+      case AIProvider.netless:
+        // On-device Gemma 4 E2B-it — no network required
+        final netless = NetlessService();
+        if (!netless.isAvailable) return null;
+        try {
+          return await netless.generate(prompt, systemPrompt: systemPrompt);
+        } catch (e) {
+          debugPrint('[Netless] Generate error: $e');
+          return null;
+        }
     }
   }
 
-  Future<Stream<String>?> _tryStreamProvider(AIProvider provider, String prompt, {String? systemPrompt, int? maxTokens}) async {
+  Future<Stream<String>?> _tryStreamProvider(
+    AIProvider provider,
+    String prompt, {
+    String? systemPrompt,
+    int? maxTokens,
+  }) async {
     switch (provider) {
       case AIProvider.llamaCpp:
-        final url = await _secureStorage.getBaseUrl('llamaCpp') ?? 'http://127.0.0.1:8080';
+        final url =
+            await _secureStorage.getBaseUrl('llamaCpp') ??
+            'http://127.0.0.1:8080';
         final key = await _secureStorage.getApiKey('llamaCpp');
         final client = LocalModelClient(baseUrl: url, apiKey: key);
-        final available = await client.isAvailable().timeout(const Duration(seconds: 2), onTimeout: () => false);
+        final available = await client.isAvailable().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => false,
+        );
         if (!available) return null;
-        final fullText = systemPrompt != null ? '$systemPrompt\nUser: $prompt' : prompt;
+        final fullText = systemPrompt != null
+            ? '$systemPrompt\nUser: $prompt'
+            : prompt;
         return client.generateStream(fullText);
 
       case AIProvider.gemini:
@@ -1353,19 +1692,30 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         if (key == null || key.isEmpty) return null;
         var model = _selectedModels[AIProvider.gemini];
         if (model == null || model.isEmpty) {
-          model = 'gemini-1.5-flash'; // High-speed default for zero thinking time
+          model =
+              'gemini-1.5-flash'; // High-speed default for zero thinking time
         }
-        return GeminiApiClient(apiKey: key, model: model).generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
+        return GeminiApiClient(apiKey: key, model: model).generateStream(
+          prompt,
+          systemPrompt: systemPrompt,
+          maxTokens: maxTokens ?? _getMaxTokens(prompt),
+        );
 
       case AIProvider.ollama:
-        final localUrl = await _secureStorage.getBaseUrl('ollamaLocal') ?? 'http://127.0.0.1:11434';
+        final localUrl =
+            await _secureStorage.getBaseUrl('ollamaLocal') ??
+            'http://127.0.0.1:11434';
         _ollamaService.setLocalUrl(localUrl);
         // Fast health check before committing to the stream
-        final isUp = await _ollamaService.isLocalAvailable().timeout(const Duration(seconds: 2), onTimeout: () => false);
+        final isUp = await _ollamaService.isLocalAvailable().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => false,
+        );
         if (!isUp) return null;
-        
+
         final messages = [
-          if (systemPrompt != null) OllamaChatMessage(role: 'system', content: systemPrompt),
+          if (systemPrompt != null)
+            OllamaChatMessage(role: 'system', content: systemPrompt),
           OllamaChatMessage(role: 'user', content: prompt),
         ];
 
@@ -1376,15 +1726,26 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         );
 
       case AIProvider.ollamaCloud:
-        final cloudUrl = await _secureStorage.getBaseUrl('ollamaCloud') ?? 'https://api.ollama.com';
-        if (kIsWeb && (cloudUrl == 'https://api.ollama.com' || cloudUrl.isEmpty || cloudUrl == '/api/ollama')) {
-           _ollamaService.setBaseUrl(Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), ''));
+        final cloudUrl =
+            await _secureStorage.getBaseUrl('ollamaCloud') ??
+            'https://api.ollama.com';
+        if (kIsWeb &&
+            (cloudUrl == 'https://api.ollama.com' ||
+                cloudUrl.isEmpty ||
+                cloudUrl == '/api/ollama')) {
+          _ollamaService.setBaseUrl(
+            Uri.base
+                .resolve('/api/ollama')
+                .toString()
+                .replaceAll(RegExp(r'/$'), ''),
+          );
         } else {
-           _ollamaService.setBaseUrl(cloudUrl);
+          _ollamaService.setBaseUrl(cloudUrl);
         }
-        
+
         final messages = [
-          if (systemPrompt != null) OllamaChatMessage(role: 'system', content: systemPrompt),
+          if (systemPrompt != null)
+            OllamaChatMessage(role: 'system', content: systemPrompt),
           OllamaChatMessage(role: 'user', content: prompt),
         ];
 
@@ -1405,7 +1766,10 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         // Only auto-fetch if user has NOT selected a model
         if (model == null || model.isEmpty) {
           try {
-            final models = await NvidiaApiClient(apiKey: trimmedNvKey, model: '').fetchModels();
+            final models = await NvidiaApiClient(
+              apiKey: trimmedNvKey,
+              model: '',
+            ).fetchModels();
             model = _pickBestModel(models, hint: 'llama-3.1');
             if ((model.isEmpty) && models.isNotEmpty) model = models.first;
           } catch (e) {
@@ -1416,8 +1780,17 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           debugPrint('[NVIDIA Stream] No model available - skipping');
           return null;
         }
-        debugPrint('[NVIDIA Stream] Using model: $model, key prefix: ${trimmedNvKey.substring(0, 8)}...');
-        return NvidiaApiClient(apiKey: trimmedNvKey, model: model).generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
+        debugPrint(
+          '[NVIDIA Stream] Using model: $model, key prefix: ${trimmedNvKey.substring(0, 8)}...',
+        );
+        return NvidiaApiClient(
+          apiKey: trimmedNvKey,
+          model: model,
+        ).generateStream(
+          prompt,
+          systemPrompt: systemPrompt,
+          maxTokens: maxTokens ?? _getMaxTokens(prompt),
+        );
 
       case AIProvider.openRouter:
         final key = await _secureStorage.getApiKey('openRouter');
@@ -1425,12 +1798,22 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         var model = _selectedModels[AIProvider.openRouter];
         // Dynamic fetch if no model is selected
         if (model == null || model.isEmpty) {
-          final models = await OpenRouterClient(apiKey: key, model: '').fetchModels();
+          final models = await OpenRouterClient(
+            apiKey: key,
+            model: '',
+          ).fetchModels();
           model = _pickBestModel(models, hint: 'auto');
           if (model.isEmpty && models.isNotEmpty) model = models.first;
         }
         if (model.isEmpty) return null;
-        return OpenRouterClient(apiKey: key, model: _selectedModels[AIProvider.openRouter] ?? 'auto').generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
+        return OpenRouterClient(
+          apiKey: key,
+          model: _selectedModels[AIProvider.openRouter] ?? 'auto',
+        ).generateStream(
+          prompt,
+          systemPrompt: systemPrompt,
+          maxTokens: maxTokens ?? _getMaxTokens(prompt),
+        );
 
       case AIProvider.anthropic:
         final key = await _secureStorage.getApiKey('anthropic');
@@ -1439,29 +1822,57 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           debugPrint('[AIRouter] Anthropic Stream skipped - no key set');
           return null;
         }
-        debugPrint('[AIRouter] Starting Anthropic Stream key="${trimmedKey.substring(0, 10)}..."');
-        return AnthropicApiClient(apiKey: trimmedKey, model: _selectedModels[AIProvider.anthropic] ?? 'claude-3-5-sonnet-20241022').generateStream(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens ?? _getMaxTokens(prompt));
+        debugPrint(
+          '[AIRouter] Starting Anthropic Stream key="${trimmedKey.substring(0, 10)}..."',
+        );
+        return AnthropicApiClient(
+          apiKey: trimmedKey,
+          model:
+              _selectedModels[AIProvider.anthropic] ??
+              'claude-3-5-sonnet-20241022',
+        ).generateStream(
+          prompt,
+          systemPrompt: systemPrompt,
+          maxTokens: maxTokens ?? _getMaxTokens(prompt),
+        );
       case AIProvider.zeera:
         // Handled via _generateZeeraStream directly
         return null;
+
+      case AIProvider.netless:
+        // On-device Gemma 4 E2B-it — streams tokens natively, no internet needed
+        final netless = NetlessService();
+        if (!netless.isAvailable) {
+          debugPrint('[Netless] Model not loaded — skipping stream');
+          return null;
+        }
+        return netless.generateStream(prompt, systemPrompt: systemPrompt);
     }
   }
 
   /// Call Model A (NVIDIA) using STREAMING collect — never times out on slow models like kimi-k2.5.
   /// The SSE connection stays alive as tokens trickle in, so 3-minute models work perfectly.
-  Future<String?> _callZeeraProviderA(String prompt, {String? systemPrompt}) async {
+  Future<String?> _callZeeraProviderA(
+    String prompt, {
+    String? systemPrompt,
+  }) async {
     final key = await _secureStorage.getApiKey('nvidia');
     final trimmedKey = key?.trim() ?? '';
     if (trimmedKey.isEmpty) {
       debugPrint('[Zeera-A] NVIDIA key missing');
       return null;
     }
-    final model = _zeeraModelA ?? _selectedModels[AIProvider.nvidia] ?? 'nvidia/llama-3.1-nemotron-ultra-253b-v1';
+    final model =
+        _zeeraModelA ??
+        _selectedModels[AIProvider.nvidia] ??
+        'nvidia/llama-3.1-nemotron-ultra-253b-v1';
     debugPrint('[Zeera-A] Calling NVIDIA model: $model (stream-collect)');
     try {
       // Use generateCollect() — SSE stream internally, no hard wall-clock timeout on body
-      final result = await NvidiaApiClient(apiKey: trimmedKey, model: model)
-          .generateCollect(prompt, systemPrompt: systemPrompt, maxTokens: 8192);
+      final result = await NvidiaApiClient(
+        apiKey: trimmedKey,
+        model: model,
+      ).generateCollect(prompt, systemPrompt: systemPrompt, maxTokens: 8192);
       return result.isEmpty ? null : result;
     } catch (e) {
       debugPrint('[Zeera-A] NVIDIA failed: $e');
@@ -1470,20 +1881,27 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
   }
 
   /// Call Model B (Ollama Cloud or NVIDIA fallback) using stream-collect for timeout immunity.
-  Future<String?> _callZeeraProviderB(String prompt, {String? systemPrompt}) async {
+  Future<String?> _callZeeraProviderB(
+    String prompt, {
+    String? systemPrompt,
+  }) async {
     final modelB = _zeeraModelB ?? _selectedModels[AIProvider.ollamaCloud];
     debugPrint('[Zeera-B] Calling Ollama Cloud model: ${modelB ?? "default"}');
 
     // Try Ollama Cloud first
     try {
       final messages = [
-        if (systemPrompt != null) OllamaChatMessage(role: 'system', content: systemPrompt),
+        if (systemPrompt != null)
+          OllamaChatMessage(role: 'system', content: systemPrompt),
         OllamaChatMessage(role: 'user', content: prompt),
       ];
       // Collect stream for timeout immunity
       final sb = StringBuffer();
       await for (final chunk in _ollamaService.chatStream(
-          messages: messages, model: modelB, useCloudOverride: true)) {
+        messages: messages,
+        model: modelB,
+        useCloudOverride: true,
+      )) {
         sb.write(chunk);
       }
       final result = sb.toString().trim();
@@ -1496,11 +1914,16 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     final key = await _secureStorage.getApiKey('nvidia');
     final trimmedKey = key?.trim() ?? '';
     if (trimmedKey.isEmpty) return null;
-    final nvModelB = _zeeraModelB ?? _selectedModels[AIProvider.nvidia] ?? 'deepseek-ai/deepseek-r1';
+    final nvModelB =
+        _zeeraModelB ??
+        _selectedModels[AIProvider.nvidia] ??
+        'deepseek-ai/deepseek-r1';
     try {
       debugPrint('[Zeera-B] Fallback to NVIDIA: $nvModelB');
-      final result = await NvidiaApiClient(apiKey: trimmedKey, model: nvModelB)
-          .generateCollect(prompt, systemPrompt: systemPrompt, maxTokens: 8192);
+      final result = await NvidiaApiClient(
+        apiKey: trimmedKey,
+        model: nvModelB,
+      ).generateCollect(prompt, systemPrompt: systemPrompt, maxTokens: 8192);
       return result.isEmpty ? null : result;
     } catch (e2) {
       debugPrint('[Zeera-B] NVIDIA fallback also failed: $e2');
@@ -1513,34 +1936,44 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
   // Models TALK TO EACH OTHER: A reads B's output and responds,
   // B reads A's response and refines. This creates genuine synthesis.
   // ============================================================
-  Stream<String> _generateZeeraStream(String prompt, {String? systemPrompt}) async* {
+  Stream<String> _generateZeeraStream(
+    String prompt, {
+    String? systemPrompt,
+  }) async* {
     _activeProvider = AIProvider.zeera;
     _activeModel = 'ZEERA';
     _setStatus('ZEERA — Initializing Dual-Model Intelligence...');
 
     // Resolve display names
-    final String modelAName = _zeeraModelA ?? _selectedModels[AIProvider.nvidia] ?? 'NVIDIA Brain';
-    final String modelBName = _zeeraModelB ?? _selectedModels[AIProvider.ollamaCloud] ?? 'Ollama Brain';
+    final String modelAName =
+        _zeeraModelA ?? _selectedModels[AIProvider.nvidia] ?? 'NVIDIA Brain';
+    final String modelBName =
+        _zeeraModelB ??
+        _selectedModels[AIProvider.ollamaCloud] ??
+        'Ollama Brain';
 
-    bool isProject = prompt.toLowerCase().contains('build') ||
-                    prompt.toLowerCase().contains('create') ||
-                    prompt.toLowerCase().contains('make a') ||
-                    prompt.toLowerCase().contains('develop') ||
-                    prompt.toLowerCase().contains('app') ||
-                    prompt.toLowerCase().contains('website') ||
-                    prompt.toLowerCase().contains('project') ||
-                    prompt.toLowerCase().contains('architecture');
+    bool isProject =
+        prompt.toLowerCase().contains('build') ||
+        prompt.toLowerCase().contains('create') ||
+        prompt.toLowerCase().contains('make a') ||
+        prompt.toLowerCase().contains('develop') ||
+        prompt.toLowerCase().contains('app') ||
+        prompt.toLowerCase().contains('website') ||
+        prompt.toLowerCase().contains('project') ||
+        prompt.toLowerCase().contains('architecture');
 
     final List<Map<String, String>> dialogueHistory = [];
     final int totalRounds = isProject ? 2 : _zeeraRounds;
 
-    final String zeeraSystemPrompt = systemPrompt ?? 
+    final String zeeraSystemPrompt =
+        systemPrompt ??
         'You are an expert AI collaborating with another AI model to provide the best possible response. Be concise and technical.';
 
     if (isProject) {
       yield '**[ZEERA — ABSOLUTE PROJECT SYNTHESIS]**\n🧠 **$modelAName** ↔ **$modelBName** — True Cross-Model Collaboration\n🎯 Building 100% production-ready, deploy-ready codebase...\n\n';
-      
-      final deploySystemPrompt = '''You are part of the ZEERA Absolute Deployment Engine — the most powerful AI code synthesis system.
+
+      final deploySystemPrompt =
+          '''You are part of the ZEERA Absolute Deployment Engine — the most powerful AI code synthesis system.
 MISSION: Generate 100% COMPLETE, production-ready, immediately deployable code.
 RULES (STRICT):
 - NO placeholders, NO "// implement this", NO "TODO" comments ever.
@@ -1558,7 +1991,8 @@ RULES (STRICT):
 
       // === ROUND 1: Model A designs the complete architecture ===
       _setStatus('ZEERA — $modelAName designing complete architecture...');
-      final archPrompt = '''**TASK:** Design the COMPLETE, PRODUCTION-READY architecture for: "$prompt"
+      final archPrompt =
+          '''**TASK:** Design the COMPLETE, PRODUCTION-READY architecture for: "$prompt"
 
 You MUST specify:
 1. **Tech Stack** — exact versions of every framework, library, runtime
@@ -1572,7 +2006,10 @@ You MUST specify:
 
 Be extremely detailed. Model B will write ALL the code based on your architecture.''';
 
-      final archResp = await _callZeeraProviderA(archPrompt, systemPrompt: deploySystemPrompt);
+      final archResp = await _callZeeraProviderA(
+        archPrompt,
+        systemPrompt: deploySystemPrompt,
+      );
       if (archResp != null && archResp.isNotEmpty) {
         dialogueHistory.add({'role': modelAName, 'content': archResp});
         yield '## 🏗️ [$modelAName — Architecture Design]\n\n$archResp\n\n---\n\n';
@@ -1582,11 +2019,12 @@ Be extremely detailed. Model B will write ALL the code based on your architectur
 
       // === ROUND 2: Model B READS A's architecture and implements EVERYTHING ===
       _setStatus('ZEERA — $modelBName implementing ALL code files...');
-      final implContext = dialogueHistory.isNotEmpty 
-          ? dialogueHistory.last['content']! 
+      final implContext = dialogueHistory.isNotEmpty
+          ? dialogueHistory.last['content']!
           : 'Project: $prompt — implement a complete production-ready version.';
-      
-      final implPrompt = '''**ARCHITECTURE FROM $modelAName:**
+
+      final implPrompt =
+          '''**ARCHITECTURE FROM $modelAName:**
 $implContext
 
 **YOUR TASK:** Write the COMPLETE, PRODUCTION-READY code for EVERY file in the architecture above.
@@ -1606,7 +2044,10 @@ CRITICAL RULES:
 
 Remember: A developer should be able to copy each block and run `docker-compose up` to get a working app.''';
 
-      final implResp = await _callZeeraProviderB(implPrompt, systemPrompt: deploySystemPrompt);
+      final implResp = await _callZeeraProviderB(
+        implPrompt,
+        systemPrompt: deploySystemPrompt,
+      );
       if (implResp != null && implResp.isNotEmpty) {
         dialogueHistory.add({'role': modelBName, 'content': implResp});
         yield '## 💻 [$modelBName — Full Code Implementation]\n\n$implResp\n\n---\n\n';
@@ -1617,7 +2058,8 @@ Remember: A developer should be able to copy each block and run `docker-compose 
       // === ROUND 3: Model A REVIEWS B's code and adds/fixes anything missing ===
       if (dialogueHistory.length >= 2) {
         _setStatus('ZEERA — $modelAName reviewing and completing gaps...');
-        final reviewPrompt = '''You designed this architecture:
+        final reviewPrompt =
+            '''You designed this architecture:
 ${dialogueHistory[0]['content']}
 
 $modelBName implemented this code:
@@ -1637,20 +2079,27 @@ Output ONLY the additional/fixed files using:
 
 If everything is complete, write a deployment checklist instead.''';
 
-        final reviewResp = await _callZeeraProviderA(reviewPrompt, systemPrompt: deploySystemPrompt);
+        final reviewResp = await _callZeeraProviderA(
+          reviewPrompt,
+          systemPrompt: deploySystemPrompt,
+        );
         if (reviewResp != null && reviewResp.isNotEmpty) {
-          dialogueHistory.add({'role': '$modelAName-Review', 'content': reviewResp});
+          dialogueHistory.add({
+            'role': '$modelAName-Review',
+            'content': reviewResp,
+          });
           yield '## 🔍 [$modelAName — Code Review & Gap Fill]\n\n$reviewResp\n\n---\n\n';
         }
       }
-
     } else {
       // === COLLABORATIVE REASONING MODE (non-project) ===
       yield '**[ZEERA — COLLABORATIVE INTELLIGENCE]**\n🧠 **$modelAName** ↔ **$modelBName** — Each model reads the other\'s output\n\n';
 
       for (int i = 1; i <= totalRounds; i++) {
         // === Model A turn — reads ALL previous dialogue ===
-        _setStatus('ZEERA — $modelAName thinking (Round $i of $totalRounds)...');
+        _setStatus(
+          'ZEERA — $modelAName thinking (Round $i of $totalRounds)...',
+        );
 
         final promptA = i == 1
             ? '''You are collaborating with another AI ($modelBName) to answer: "$prompt"
@@ -1667,7 +2116,10 @@ ${dialogueHistory.last['content']}
 Now: (1) Build upon the strong points, (2) Correct any errors you see, (3) Add what is missing, (4) Synthesize into a stronger answer.
 Be direct about disagreements and explain why.''';
 
-        final respA = await _callZeeraProviderA(promptA, systemPrompt: zeeraSystemPrompt);
+        final respA = await _callZeeraProviderA(
+          promptA,
+          systemPrompt: zeeraSystemPrompt,
+        );
         if (respA != null && respA.isNotEmpty) {
           dialogueHistory.add({'role': modelAName, 'content': respA});
           yield '\n**[$modelAName — Round $i]**\n$respA\n\n';
@@ -1676,10 +2128,15 @@ Be direct about disagreements and explain why.''';
         }
 
         // === Model B turn — explicitly reads Model A's latest response ===
-        _setStatus('ZEERA — $modelBName responding (Round $i of $totalRounds)...');
+        _setStatus(
+          'ZEERA — $modelBName responding (Round $i of $totalRounds)...',
+        );
 
-        final lastAResp = dialogueHistory.isNotEmpty ? dialogueHistory.last['content'] : '';
-        final promptB = '''You are collaborating with $modelAName to answer: "$prompt"
+        final lastAResp = dialogueHistory.isNotEmpty
+            ? dialogueHistory.last['content']
+            : '';
+        final promptB =
+            '''You are collaborating with $modelAName to answer: "$prompt"
 
 $modelAName just said:
 ---
@@ -1689,7 +2146,10 @@ $lastAResp
 Your job: (1) Agree with what is correct, (2) Challenge what is wrong with evidence, (3) Add dimensions $modelAName missed, (4) Push toward the most complete, accurate answer possible.
 This is a collaborative reasoning session — be rigorous and specific.''';
 
-        final respB = await _callZeeraProviderB(promptB, systemPrompt: zeeraSystemPrompt);
+        final respB = await _callZeeraProviderB(
+          promptB,
+          systemPrompt: zeeraSystemPrompt,
+        );
         if (respB != null && respB.isNotEmpty) {
           dialogueHistory.add({'role': modelBName, 'content': respB});
           yield '\n**[$modelBName — Round $i Response]**\n$respB\n\n';
@@ -1718,9 +2178,12 @@ This is a collaborative reasoning session — be rigorous and specific.''';
       return;
     }
 
-    final synthModel = _zeeraSynthesisModel ?? _selectedModels[AIProvider.nvidia] ?? 'nvidia/llama-3.1-nemotron-ultra-253b-v1';
+    final synthModel =
+        _zeeraSynthesisModel ??
+        _selectedModels[AIProvider.nvidia] ??
+        'nvidia/llama-3.1-nemotron-ultra-253b-v1';
     debugPrint('[Zeera-Synthesis] Final synthesis via: $synthModel');
-    
+
     final synthesisSystemPrompt = isProject
         ? '''You are ZEERA — the world's most advanced AI code synthesis engine.
 You receive outputs from two AI models collaborating on a software project.
@@ -1767,7 +2230,11 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
         yield '> 📋 **Each file is in its own code block. Copy the content of each block to create the file.**\n\n';
       }
       final stream = NvidiaApiClient(apiKey: nvidiaKey, model: synthModel)
-          .generateStream(synthesisPrompt, systemPrompt: synthesisSystemPrompt, maxTokens: 16000);
+          .generateStream(
+            synthesisPrompt,
+            systemPrompt: synthesisSystemPrompt,
+            maxTokens: 16000,
+          );
 
       await for (final chunk in stream) {
         yield chunk;
@@ -1787,7 +2254,9 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
 
   String _formatDialogue(List<Map<String, String>> history) {
     if (history.isEmpty) return "None.";
-    return history.map((m) => "[${m['role']}]: ${m['content']}").join('\n\n---\n\n');
+    return history
+        .map((m) => "[${m['role']}]: ${m['content']}")
+        .join('\n\n---\n\n');
   }
 
   /// Helper to pick the "best" model from a list, prioritizing hints or common defaults.
@@ -1796,11 +2265,15 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
 
     // Prioritize models that contain the hint
     if (hint != null) {
-      final matchingModels = models.where((m) => m.toLowerCase().contains(hint.toLowerCase())).toList();
+      final matchingModels = models
+          .where((m) => m.toLowerCase().contains(hint.toLowerCase()))
+          .toList();
       if (matchingModels.isNotEmpty) {
         // Try to find a "chat" or "instruct" version if hint is generic
         final chatInstruct = matchingModels.firstWhere(
-          (m) => m.toLowerCase().contains('chat') || m.toLowerCase().contains('instruct'),
+          (m) =>
+              m.toLowerCase().contains('chat') ||
+              m.toLowerCase().contains('instruct'),
           orElse: () => matchingModels.first,
         );
         return chatInstruct;
@@ -1809,15 +2282,15 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
 
     // Fallback to common defaults if no hint or no match
     final commonDefaults = [
-      'deepseek', 
+      'deepseek',
       'llama-3.3', // Added newer llama
-      'llama-3.1', 
-      'llama3', 
+      'llama-3.1',
+      'llama3',
       'nemotron', // NVIDIA specific
-      'gemini-pro', 
-      'gpt-4', 
-      'mixtral', 
-      'gemma'
+      'gemini-pro',
+      'gpt-4',
+      'mixtral',
+      'gemma',
     ];
     for (final defaultModel in commonDefaults) {
       final found = models.firstWhere(
@@ -1840,16 +2313,28 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
           if (key == null || key.isEmpty) return [];
           return await GeminiApiClient(apiKey: key).fetchModels();
         case AIProvider.ollama:
-          final localUrl = await _secureStorage.getBaseUrl('ollamaLocal') ?? 'http://127.0.0.1:11434';
+          final localUrl =
+              await _secureStorage.getBaseUrl('ollamaLocal') ??
+              'http://127.0.0.1:11434';
           _ollamaService.setLocalUrl(localUrl);
           final all = await _ollamaService.fetchAvailableModels();
           return all.where((m) => !m.isCloud).map((m) => m.name).toList();
         case AIProvider.ollamaCloud:
-          final cloudUrl = await _secureStorage.getBaseUrl('ollamaCloud') ?? 'https://api.ollama.com';
-          if (kIsWeb && (cloudUrl == 'https://api.ollama.com' || cloudUrl.isEmpty || cloudUrl == '/api/ollama')) {
-             _ollamaService.setBaseUrl(Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), ''));
+          final cloudUrl =
+              await _secureStorage.getBaseUrl('ollamaCloud') ??
+              'https://api.ollama.com';
+          if (kIsWeb &&
+              (cloudUrl == 'https://api.ollama.com' ||
+                  cloudUrl.isEmpty ||
+                  cloudUrl == '/api/ollama')) {
+            _ollamaService.setBaseUrl(
+              Uri.base
+                  .resolve('/api/ollama')
+                  .toString()
+                  .replaceAll(RegExp(r'/$'), ''),
+            );
           } else {
-             _ollamaService.setBaseUrl(cloudUrl);
+            _ollamaService.setBaseUrl(cloudUrl);
           }
           final all = await _ollamaService.fetchAvailableModels();
           return all.where((m) => m.isCloud).map((m) => m.name).toList();
@@ -1866,11 +2351,14 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
           if (key == null || key.isEmpty) return [];
           return await AnthropicApiClient(apiKey: key).fetchModels();
         case AIProvider.llamaCpp:
-          return ['LLaMA-3', 'Mistral']; 
+          return ['LLaMA-3', 'Mistral'];
         case AIProvider.zeera:
           final key = await _secureStorage.getApiKey('zeeraSynthesis');
           if (key == null || key.isEmpty) return [];
           return await NvidiaApiClient(apiKey: key, model: '').fetchModels();
+        case AIProvider.netless:
+          // On-device model — single fixed model, no list needed
+          return ['Gemma 4 E2B-it (Offline)'];
       }
     } catch (e) {
       debugPrint('[AIRouter] Failed to fetch models for ${provider.name}: $e');
@@ -1885,9 +2373,12 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
     try {
       _setStatus('Searching the web...');
       final results = await _ollamaService.webSearch(query);
-      final now = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
-      final dateStr = '${now.day.toString().padLeft(2,'0')}/${now.month.toString().padLeft(2,'0')}/${now.year} '
-                      '${now.hour.toString().padLeft(2,'0')}:${now.minute.toString().padLeft(2,'0')} IST';
+      final now = DateTime.now().toUtc().add(
+        const Duration(hours: 5, minutes: 30),
+      );
+      final dateStr =
+          '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} '
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} IST';
 
       if (results.isEmpty) {
         return '🔍 **Web Search:** "$query" — No results found at $dateStr.';
@@ -1899,8 +2390,8 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
       // Present top 5 results with full content for AI to synthesize
       int n = 1;
       for (final r in results.take(5)) {
-        final title   = (r['title']   as String? ?? '').trim();
-        final url     = (r['url']     as String? ?? '').trim();
+        final title = (r['title'] as String? ?? '').trim();
+        final url = (r['url'] as String? ?? '').trim();
         final content = (r['content'] as String? ?? '').trim();
         if (title.isEmpty && content.isEmpty) continue;
         sb.writeln('SOURCE $n: $title');
@@ -1910,7 +2401,9 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
         n++;
       }
       sb.writeln('---');
-      sb.writeln('Based ONLY on the above real-time sources (as of $dateStr), answer the user query accurately. Do NOT invent numbers or dates. Cite sources.');
+      sb.writeln(
+        'Based ONLY on the above real-time sources (as of $dateStr), answer the user query accurately. Do NOT invent numbers or dates. Cite sources.',
+      );
       return sb.toString();
     } catch (e) {
       debugPrint('[AIRouter] webSearch failed: $e');
@@ -1920,15 +2413,24 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
 
   String _providerName(AIProvider p) {
     switch (p) {
-      case AIProvider.llamaCpp: return 'llama.cpp';
-      case AIProvider.gemini: return 'Gemini';
-      case AIProvider.ollama: return 'Ollama (Local)';
-      case AIProvider.ollamaCloud: return 'Ollama Cloud';
-      case AIProvider.nvidia: return 'NVIDIA';
-      case AIProvider.openRouter: return 'OpenRouter';
-      case AIProvider.zeera: return 'Zeera';
-      case AIProvider.anthropic: return 'Anthropic';
+      case AIProvider.llamaCpp:
+        return 'llama.cpp';
+      case AIProvider.gemini:
+        return 'Gemini';
+      case AIProvider.ollama:
+        return 'Ollama (Local)';
+      case AIProvider.ollamaCloud:
+        return 'Ollama Cloud';
+      case AIProvider.nvidia:
+        return 'NVIDIA';
+      case AIProvider.openRouter:
+        return 'OpenRouter';
+      case AIProvider.zeera:
+        return 'Zeera';
+      case AIProvider.anthropic:
+        return 'Anthropic';
+      case AIProvider.netless:
+        return 'Netless (Offline)';
     }
   }
 }
-

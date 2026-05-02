@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../../theme/jarvis_theme.dart';
@@ -356,6 +357,70 @@ class _IntegrationCardState extends State<_IntegrationCard> {
         widget.onTap();
       },
       onTapCancel: () => setState(() => _pressed = false),
+      onLongPress: () async {
+        setState(() => _pressed = false);
+        if (widget.integration.url.isEmpty) return;
+        final confirm = await showModalBottomSheet<bool>(
+          context: context,
+          backgroundColor: const Color(0xFF1E1E2A),
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          builder: (ctx) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 60, height: 60,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [_primary, _secondary]),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Center(child: Text(widget.integration.emoji, style: const TextStyle(fontSize: 30))),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Add ${widget.integration.name} to Homescreen?', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  const Text('Create a quick access shortcut on your device homescreen.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 14)),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Add'),
+                        ),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
+        );
+        if (confirm == true) {
+          try {
+            await const MethodChannel('jarvis.ai.os/shortcuts').invokeMethod('pinShortcut', {
+              'id': widget.integration.id,
+              'label': widget.integration.name,
+              'url': widget.integration.url,
+            });
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Adding ${widget.integration.name} to homescreen...')));
+          } catch (e) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to add shortcut: $e')));
+          }
+        }
+      },
       child: AnimatedScale(
         scale: _pressed ? 0.95 : 1.0,
         duration: const Duration(milliseconds: 120),

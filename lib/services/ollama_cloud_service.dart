@@ -23,14 +23,19 @@ class OllamaModel {
     required this.isCloud,
   });
 
-  factory OllamaModel.fromJson(Map<String, dynamic> json, {bool? isCloudOverride}) {
+  factory OllamaModel.fromJson(
+    Map<String, dynamic> json, {
+    bool? isCloudOverride,
+  }) {
     final name = json['name'] as String? ?? json['model'] as String? ?? '';
     return OllamaModel(
       name: name,
       id: json['digest'] as String? ?? json['id'] as String? ?? '',
       size: _formatSize(json['size'] as int? ?? 0),
       modifiedAt: json['modified_at'] as String? ?? '',
-      isCloud: isCloudOverride ?? (name.contains('-cloud') || (json['details']?['format'] == null)),
+      isCloud:
+          isCloudOverride ??
+          (name.contains('-cloud') || (json['details']?['format'] == null)),
     );
   }
 
@@ -42,14 +47,13 @@ class OllamaModel {
     return '$bytes B';
   }
 
-  String get displayName => name
-      .replaceAll('-cloud', '')
-      .replaceAll(':latest', '');
+  String get displayName =>
+      name.replaceAll('-cloud', '').replaceAll(':latest', '');
   String get tag => isCloud ? 'cloud' : 'local';
 }
 
 class OllamaChatMessage {
-  final String role;    // 'user' | 'assistant' | 'system'
+  final String role; // 'user' | 'assistant' | 'system'
   final String content;
   OllamaChatMessage({required this.role, required this.content});
   Map<String, dynamic> toJson() => {'role': role, 'content': content};
@@ -74,42 +78,54 @@ class OllamaResponse {
 // ─────────────────────────────────────────────
 
 class OllamaCloudService {
-  static const String _prefKeyMode  = 'ollama_use_cloud';
+  static const String _prefKeyMode = 'ollama_use_cloud';
   static const String _prefKeyModel = 'ollama_selected_model';
 
-  String _apiKey        = '';
-  String _cloudBaseUrl  = kIsWeb ? Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), '') : 'https://api.ollama.com';
-  String _localUrl      = 'http://127.0.0.1:11434';
-  bool   _useCloud      = true;
+  String _apiKey = '';
+  String _cloudBaseUrl = kIsWeb
+      ? Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), '')
+      : 'https://api.ollama.com';
+  String _localUrl = 'http://127.0.0.1:11434';
+  bool _useCloud = true;
   String _selectedModel = 'gpt-oss:120b';
   List<OllamaModel> _availableModels = [];
   final SecureStorageService _secureStorage = SecureStorageService();
-  
+
   // Reusable client for better performance (connection pooling)
   final http.Client _client = http.Client();
 
   // ── Getters ───────────────────────────────
-  String            get selectedModel    => _selectedModel;
-  List<OllamaModel> get availableModels  => _availableModels;
-  bool              get useCloud         => _useCloud;
-  String            get apiKey           => _apiKey;
-  String            get cloudBaseUrl     => _cloudBaseUrl;
-  bool              get isConfigured     => _apiKey.isNotEmpty || !_useCloud;
+  String get selectedModel => _selectedModel;
+  List<OllamaModel> get availableModels => _availableModels;
+  bool get useCloud => _useCloud;
+  String get apiKey => _apiKey;
+  String get cloudBaseUrl => _cloudBaseUrl;
+  bool get isConfigured => _apiKey.isNotEmpty || !_useCloud;
 
   // ── Init / persist ────────────────────────
   Future<void> init() async {
-    final prefs    = await SharedPreferences.getInstance();
-    _apiKey        = await _secureStorage.getApiKey('ollamaCloud') ?? '';
-    
-    final savedCloudUrl = await _secureStorage.getBaseUrl('ollamaCloud') ?? 'https://api.ollama.com';
-    if (kIsWeb && (savedCloudUrl == 'https://api.ollama.com' || savedCloudUrl.isEmpty || savedCloudUrl == '/api/ollama')) {
-      _cloudBaseUrl = Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), '');
+    final prefs = await SharedPreferences.getInstance();
+    _apiKey = await _secureStorage.getApiKey('ollamaCloud') ?? '';
+
+    final savedCloudUrl =
+        await _secureStorage.getBaseUrl('ollamaCloud') ??
+        'https://api.ollama.com';
+    if (kIsWeb &&
+        (savedCloudUrl == 'https://api.ollama.com' ||
+            savedCloudUrl.isEmpty ||
+            savedCloudUrl == '/api/ollama')) {
+      _cloudBaseUrl = Uri.base
+          .resolve('/api/ollama')
+          .toString()
+          .replaceAll(RegExp(r'/$'), '');
     } else {
       _cloudBaseUrl = savedCloudUrl;
     }
-    
-    _localUrl      = await _secureStorage.getBaseUrl('ollamaLocal') ?? 'http://127.0.0.1:11434';
-    _useCloud      = prefs.getBool(_prefKeyMode)    ?? true;
+
+    _localUrl =
+        await _secureStorage.getBaseUrl('ollamaLocal') ??
+        'http://127.0.0.1:11434';
+    _useCloud = prefs.getBool(_prefKeyMode) ?? true;
     _selectedModel = prefs.getString(_prefKeyModel) ?? 'gpt-oss:120b';
   }
 
@@ -117,29 +133,31 @@ class OllamaCloudService {
     String? apiKey,
     String? baseUrl,
     String? localUrl,
-    bool?   useCloud,
+    bool? useCloud,
     String? selectedModel,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    if (apiKey        != null) { 
-      _apiKey = apiKey; 
-      await _secureStorage.saveApiKey('ollamaCloud', apiKey); 
+    if (apiKey != null) {
+      _apiKey = apiKey;
+      await _secureStorage.saveApiKey('ollamaCloud', apiKey);
     }
-    if (baseUrl       != null) { 
-      _cloudBaseUrl = baseUrl.trim().isEmpty ? 'https://api.ollama.com' : baseUrl.trim(); 
-      await _secureStorage.saveBaseUrl('ollamaCloud', _cloudBaseUrl); 
+    if (baseUrl != null) {
+      _cloudBaseUrl = baseUrl.trim().isEmpty
+          ? 'https://api.ollama.com'
+          : baseUrl.trim();
+      await _secureStorage.saveBaseUrl('ollamaCloud', _cloudBaseUrl);
     }
-    if (localUrl      != null) { 
-      _localUrl = localUrl; 
-      await _secureStorage.saveBaseUrl('ollamaLocal', localUrl); 
+    if (localUrl != null) {
+      _localUrl = localUrl;
+      await _secureStorage.saveBaseUrl('ollamaLocal', localUrl);
     }
-    if (useCloud      != null) { 
-      _useCloud = useCloud; 
-      await prefs.setBool(_prefKeyMode, useCloud); 
+    if (useCloud != null) {
+      _useCloud = useCloud;
+      await prefs.setBool(_prefKeyMode, useCloud);
     }
-    if (selectedModel != null) { 
-      _selectedModel = selectedModel; 
-      await prefs.setString(_prefKeyModel, selectedModel); 
+    if (selectedModel != null) {
+      _selectedModel = selectedModel;
+      await prefs.setString(_prefKeyModel, selectedModel);
     }
   }
 
@@ -155,14 +173,18 @@ class OllamaCloudService {
     if (url.isNotEmpty) {
       _localUrl = url;
       // Ensure no trailing slash for consistency
-      if (_localUrl.endsWith('/')) _localUrl = _localUrl.substring(0, _localUrl.length - 1);
+      if (_localUrl.endsWith('/')) {
+        _localUrl = _localUrl.substring(0, _localUrl.length - 1);
+      }
     }
   }
 
   // ── Fetch models ──────────────────────────
   Future<bool> isLocalAvailable() async {
     try {
-      final res = await _client.get(Uri.parse('$_localUrl/api/tags')).timeout(const Duration(seconds: 1));
+      final res = await _client
+          .get(Uri.parse('$_localUrl/api/tags'))
+          .timeout(const Duration(seconds: 1));
       return res.statusCode == 200;
     } catch (_) {
       return false;
@@ -206,27 +228,45 @@ class OllamaCloudService {
       if (res.statusCode != 200) return [];
       final json = jsonDecode(res.body) as Map<String, dynamic>;
       final list = json['models'] as List<dynamic>? ?? [];
-      return list.map((e) => OllamaModel.fromJson(e as Map<String, dynamic>, isCloudOverride: false)).toList();
+      return list
+          .map(
+            (e) => OllamaModel.fromJson(
+              e as Map<String, dynamic>,
+              isCloudOverride: false,
+            ),
+          )
+          .toList();
     } catch (_) {
       return [];
     }
   }
 
   Future<List<OllamaModel>> _fetchCloudModels() async {
-    final res = await _client.get(
-      Uri.parse('$_cloudBaseUrl/api/tags'),
-      headers: {
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-      },
-    ).timeout(const Duration(seconds: 12));
+    final res = await _client
+        .get(
+          Uri.parse('$_cloudBaseUrl/api/tags'),
+          headers: {
+            'Authorization': 'Bearer $_apiKey',
+            'Content-Type': 'application/json',
+          },
+        )
+        .timeout(const Duration(seconds: 12));
 
     if (res.statusCode == 401) throw Exception('Invalid API key');
-    if (res.statusCode != 200) throw Exception('Cloud API returned ${res.statusCode}');
+    if (res.statusCode != 200) {
+      throw Exception('Cloud API returned ${res.statusCode}');
+    }
 
     final json = jsonDecode(res.body) as Map<String, dynamic>;
     final list = json['models'] as List<dynamic>? ?? [];
-    return list.map((e) => OllamaModel.fromJson(e as Map<String, dynamic>, isCloudOverride: true)).toList();
+    return list
+        .map(
+          (e) => OllamaModel.fromJson(
+            e as Map<String, dynamic>,
+            isCloudOverride: true,
+          ),
+        )
+        .toList();
   }
 
   // ── Chat (non-streaming) ──────────────────
@@ -237,9 +277,9 @@ class OllamaCloudService {
     bool? useCloudOverride,
     String? imageBase64,
   }) async {
-    final targetModel  = model ?? _selectedModel;
-    final allMessages  = <Map<String, dynamic>>[];
-    final goCloud      = useCloudOverride ?? _useCloud;
+    final targetModel = model ?? _selectedModel;
+    final allMessages = <Map<String, dynamic>>[];
+    final goCloud = useCloudOverride ?? _useCloud;
 
     if (systemPrompt != null) {
       allMessages.add({'role': 'system', 'content': systemPrompt});
@@ -254,46 +294,101 @@ class OllamaCloudService {
       allMessages.add(msgJson);
     }
 
-    final body = jsonEncode({
-      'model':    targetModel,
-      'messages': allMessages,
-      'stream':   false,
-    });
+    // --- Auto-detect OpenAI-compatible models on Ollama Cloud ---
+    // Models like kimi-k2.6, deepseek-v4-flash/pro need /v1/chat/completions
+    final bool useOpenAiEndpoint =
+        goCloud &&
+        (targetModel.contains('kimi') ||
+            targetModel.contains('deepseek-v4') ||
+            targetModel.contains('deepseek-r2') ||
+            targetModel.contains('qwen') ||
+            targetModel.contains('command') ||
+            targetModel.contains('mistral') ||
+            targetModel.contains('mixtral'));
 
     final http.Response res;
 
     if (goCloud) {
-       if (_apiKey.isEmpty) {
-         throw Exception('Ollama Cloud Key is required. Please enter it in Settings.');
-       }
-      res = await _client.post(
-        Uri.parse('$_cloudBaseUrl/api/chat'), 
-        headers: {
-          'Authorization': 'Bearer $_apiKey',
-          'Content-Type':  'application/json',
-        },
-        body: body,
-      ).timeout(const Duration(seconds: 120)); 
+      if (_apiKey.isEmpty) {
+        throw Exception(
+          'Ollama Cloud Key is required. Please enter it in Settings.',
+        );
+      }
+
+      if (useOpenAiEndpoint) {
+        // OpenAI-compatible path for newer models
+        final body = jsonEncode({
+          'model': targetModel,
+          'messages': allMessages,
+          'stream': false,
+        });
+        res = await _client
+            .post(
+              Uri.parse('$_cloudBaseUrl/v1/chat/completions'),
+              headers: {
+                'Authorization': 'Bearer $_apiKey',
+                'Content-Type': 'application/json',
+              },
+              body: body,
+            )
+            .timeout(const Duration(seconds: 120));
+
+        if (res.statusCode == 401) throw Exception('API key invalid or expired');
+        if (res.statusCode == 404) throw Exception('Model "$targetModel" not found on cloud');
+        if (res.statusCode != 200) throw Exception('Ollama error ${res.statusCode}: ${res.body}');
+
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final content = data['choices']?[0]?['message']?['content'] as String? ?? '';
+        return OllamaResponse(content: content, done: true);
+      } else {
+        // Legacy Ollama /api/chat path
+        final body = jsonEncode({
+          'model': targetModel,
+          'messages': allMessages,
+          'stream': false,
+        });
+        res = await _client
+            .post(
+              Uri.parse('$_cloudBaseUrl/api/chat'),
+              headers: {
+                'Authorization': 'Bearer $_apiKey',
+                'Content-Type': 'application/json',
+              },
+              body: body,
+            )
+            .timeout(const Duration(seconds: 120));
+      }
     } else {
-      res = await _client.post(
-        Uri.parse('$_localUrl/api/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      ).timeout(const Duration(seconds: 30));
+      final body = jsonEncode({
+        'model': targetModel,
+        'messages': allMessages,
+        'stream': false,
+      });
+      res = await _client
+          .post(
+            Uri.parse('$_localUrl/api/chat'),
+            headers: {'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 30));
     }
 
     if (res.statusCode == 401) throw Exception('API key invalid or expired');
-    if (res.statusCode == 404) throw Exception('Model "$targetModel" not found');
-    if (res.statusCode != 200) throw Exception('Ollama error ${res.statusCode}: ${res.body}');
+    if (res.statusCode == 404) {
+      throw Exception('Model "$targetModel" not found');
+    }
+    if (res.statusCode != 200) {
+      throw Exception('Ollama error ${res.statusCode}: ${res.body}');
+    }
 
-    final json    = jsonDecode(res.body) as Map<String, dynamic>;
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
     final message = json['message'] as Map<String, dynamic>? ?? {};
 
     return OllamaResponse(
-      content:       message['content'] as String? ?? '',
-      done:          json['done']          as bool?  ?? true,
+      content: message['content'] as String? ?? '',
+      done: json['done'] as bool? ?? true,
       totalDuration: json['total_duration'] as int?,
-      evalCount:     json['eval_count']     as int?,
+      evalCount: json['eval_count'] as int?,
     );
   }
 
@@ -302,27 +397,46 @@ class OllamaCloudService {
     required List<OllamaChatMessage> messages,
     String? model,
     String? systemPrompt,
-    bool? useCloudOverride, // ← ADDED
+    bool? useCloudOverride,
   }) async* {
     final targetModel = model ?? _selectedModel;
     final allMessages = <Map<String, dynamic>>[];
-    final goCloud      = useCloudOverride ?? _useCloud; // ← CHANGED
+    final goCloud = useCloudOverride ?? _useCloud;
 
     if (systemPrompt != null) {
       allMessages.add({'role': 'system', 'content': systemPrompt});
     }
     allMessages.addAll(messages.map((m) => m.toJson()));
 
+    // --- Auto-detect OpenAI-compatible models on Ollama Cloud ---
+    final bool useOpenAiEndpoint =
+        goCloud &&
+        (targetModel.contains('kimi') ||
+            targetModel.contains('deepseek-v4') ||
+            targetModel.contains('deepseek-r2') ||
+            targetModel.contains('qwen') ||
+            targetModel.contains('command') ||
+            targetModel.contains('mistral') ||
+            targetModel.contains('mixtral'));
+
+    final String endpoint;
+    if (goCloud) {
+      endpoint = useOpenAiEndpoint
+          ? '$_cloudBaseUrl/v1/chat/completions'
+          : '$_cloudBaseUrl/api/chat';
+    } else {
+      endpoint = '$_localUrl/api/chat';
+    }
+
     final body = jsonEncode({
-      'model':    targetModel,
+      'model': targetModel,
       'messages': allMessages,
-      'stream':   true,
+      'stream': true,
     });
 
-    final baseUrl = goCloud ? _cloudBaseUrl : _localUrl; // ← CHANGED
-    final request = http.Request('POST', Uri.parse('$baseUrl/api/chat'))
+    final request = http.Request('POST', Uri.parse(endpoint))
       ..headers['Content-Type'] = 'application/json'
-      ..headers['Accept']       = 'application/json'
+      ..headers['Accept'] = 'application/json'
       ..body = body;
 
     if (goCloud) {
@@ -331,22 +445,46 @@ class OllamaCloudService {
     }
 
     try {
-      final streamed = await _client.send(request).timeout(const Duration(seconds: 120));
+      final streamed = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 120));
 
       if (streamed.statusCode != 200) {
-        throw Exception('Server error ${streamed.statusCode}');
+        final errBody = await streamed.stream.bytesToString();
+        throw Exception('Server error ${streamed.statusCode}: $errBody');
       }
 
-      await for (final line in streamed.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())) {
+      await for (final line
+          in streamed.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())) {
         if (line.trim().isEmpty) continue;
         try {
-          final json    = jsonDecode(line) as Map<String, dynamic>;
+          String jsonStr = line.trim();
+          if (jsonStr.startsWith('data: ')) {
+            jsonStr = jsonStr.substring(6).trim();
+            if (jsonStr == '[DONE]') break;
+          }
+          final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+          // Try Ollama format first
           final message = json['message'] as Map<String, dynamic>?;
-          final content = message?['content'] as String?;
-          if (content != null && content.isNotEmpty) yield content;
-          if (json['done'] == true) break;
+          if (message != null) {
+            final content = message['content'] as String?;
+            if (content != null && content.isNotEmpty) yield content;
+            if (json['done'] == true) break;
+          } else {
+            // OpenAI SSE format (kimi, deepseek-v4 etc.)
+            final choices = json['choices'] as List<dynamic>?;
+            if (choices != null && choices.isNotEmpty) {
+              final choice = choices[0] as Map<String, dynamic>?;
+              final delta = choice?['delta'] as Map<String, dynamic>?;
+              final text =
+                  delta?['content'] as String? ?? choice?['text'] as String?;
+              if (text != null && text.isNotEmpty) yield text;
+              if (choice?['finish_reason'] != null) break;
+            }
+          }
         } catch (_) {}
       }
     } finally {
@@ -355,20 +493,22 @@ class OllamaCloudService {
   }
 
   // ── Web Search ───────────────────────────
-  Future<List<Map<String, dynamic>>> webSearch(String query, {int maxResults = 5}) async {
+  Future<List<Map<String, dynamic>>> webSearch(
+    String query, {
+    int maxResults = 5,
+  }) async {
     if (_apiKey.isEmpty) throw Exception('API key required for web search');
-    
-    final res = await _client.post(
-      Uri.parse('https://ollama.com/api/web_search'),
-      headers: {
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'query': query,
-        'max_results': maxResults,
-      }),
-    ).timeout(const Duration(seconds: 15));
+
+    final res = await _client
+        .post(
+          Uri.parse('https://ollama.com/api/web_search'),
+          headers: {
+            'Authorization': 'Bearer $_apiKey',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'query': query, 'max_results': maxResults}),
+        )
+        .timeout(const Duration(seconds: 15));
 
     if (res.statusCode != 200) {
       throw Exception('Web search failed: ${res.statusCode} ${res.body}');
@@ -381,7 +521,7 @@ class OllamaCloudService {
       final results = data['results'];
       if (results is List) return results.cast<Map<String, dynamic>>();
     }
-    
+
     // Fallback or empty
     return [];
   }
@@ -390,7 +530,7 @@ class OllamaCloudService {
   Future<String> generate(String prompt, {String? model}) async {
     final res = await chat(
       messages: [OllamaChatMessage(role: 'user', content: prompt)],
-      model:    model,
+      model: model,
     );
     return res.content;
   }
@@ -398,15 +538,15 @@ class OllamaCloudService {
   // ── Test connection ───────────────────────
   Future<Map<String, dynamic>> testConnection() async {
     try {
-      final start    = DateTime.now();
+      final start = DateTime.now();
       final response = await generate('Reply with exactly: OK');
-      final ms       = DateTime.now().difference(start).inMilliseconds;
+      final ms = DateTime.now().difference(start).inMilliseconds;
       return {
-        'success':    true,
-        'model':      _selectedModel,
-        'response':   response.trim(),
+        'success': true,
+        'model': _selectedModel,
+        'response': response.trim(),
         'latency_ms': ms,
-        'mode':       _useCloud ? 'cloud' : 'local',
+        'mode': _useCloud ? 'cloud' : 'local',
       };
     } catch (e) {
       return {'success': false, 'error': e.toString()};

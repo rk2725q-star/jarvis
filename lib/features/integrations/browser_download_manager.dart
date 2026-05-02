@@ -51,7 +51,23 @@ class BrowserDownloadManager extends ChangeNotifier {
   static final BrowserDownloadManager globalState = BrowserDownloadManager();
 
   final List<DownloadTask> tasks = [];
-  final Dio dio = Dio();
+  final Dio dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(hours: 6),
+    sendTimeout: const Duration(seconds: 60),
+    followRedirects: true,
+    maxRedirects: 15,
+    validateStatus: (status) => (status ?? 0) < 500, // Accept 2xx, 3xx, 4xx (some CDNs return 206)
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'identity',
+      'Connection': 'keep-alive',
+      'DNT': '1',
+      'Upgrade-Insecure-Requests': '1',
+    },
+  ));
   int _blockedAdsCount = 0;
   bool isAdBlockEnabled = true;
 

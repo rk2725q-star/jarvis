@@ -21,13 +21,32 @@ import 'services/google_docs_service.dart';
 import 'features/assignment/assignment_provider.dart';
 import 'features/integrations/integrations_provider.dart';
 import 'package:flutter_file_view/flutter_file_view.dart';
+import 'package:audio_service/audio_service.dart';
+import 'features/youtube/yt_audio_handler.dart';
+import 'features/youtube/youtube_download_manager.dart';
 import 'app.dart';
+
+late YTAudioHandler ytAudioHandler;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Init background audio service (YouTube Premium-style: plays on home/lock,
+  // stops when user clears app from recents)
+  ytAudioHandler = await AudioService.init(
+    builder: () => YTAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId:          'com.jarvis.yt.channel.audio',
+      androidNotificationChannelName:        'YouTube Background Play',
+      androidNotificationChannelDescription: 'Keeps YouTube audio playing in background',
+      androidStopForegroundOnPause:          false,  // keep foreground service alive on pause
+      notificationColor:                     Color(0xFFFF0000),
+    ),
+  );
   
-  // Pre-initialize X5 engine check (non-blocking)
+  // Pre-initialize X5 engine (non-blocking)
   FlutterFileView.init();
+
 
   // System UI
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -101,6 +120,7 @@ Future<void> main() async {
         ChangeNotifierProvider<VibeCodeController>.value(value: vibecodeController),
         ChangeNotifierProvider<AssignmentProvider>.value(value: assignmentProvider),
         ChangeNotifierProvider<IntegrationsProvider>.value(value: integrationsProvider),
+        ChangeNotifierProvider<YTDownloadProvider>(create: (_) => YTDownloadProvider()),
         Provider<SecureStorageService>.value(value: secureStorage),
         Provider<MemoryService>.value(value: memory),
         Provider<SessionService>.value(value: sessionService),

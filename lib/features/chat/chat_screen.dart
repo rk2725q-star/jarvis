@@ -12,6 +12,10 @@ import '../sessions/sessions_drawer.dart';
 import '../diagram/diagram_trigger.dart';
 import 'package:flutter/services.dart';
 import '../files/jarvis_file_viewer.dart';
+import '../youtube/youtube_screen.dart';
+
+import '../integrations/integrations_model.dart';
+import '../integrations/integration_browser_screen.dart';
 import 'chat_provider.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -35,11 +39,34 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       context.read<ChatProvider>().checkPendingNotification();
       _initReceiveSharingIntent();
       _initFileOpenChannel();
+      _initShortcutChannel();
     });
   }
 
   StreamSubscription? _intentDataStreamSubscription;
   static const _fileOpenChannel = MethodChannel('jarvis.ai.os/file_open');
+  static const _shortcutChannel = MethodChannel('jarvis.ai.os/shortcuts');
+
+  void _initShortcutChannel() {
+    _shortcutChannel.invokeMethod<String>('getInitialIntegrationId').then((id) {
+      if (id != null && id.isNotEmpty && mounted) {
+        // Special handling for native integrations
+        if (id == 'youtube') {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const YouTubeScreen()),
+          );
+          return;
+        }
+        final integration = kAIIntegrations.firstWhere(
+          (i) => i.id == id,
+          orElse: () => kAIIntegrations.first,
+        );
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => IntegrationBrowserScreen(integration: integration)),
+        );
+      }
+    }).catchError((_) {});
+  }
 
   void _initReceiveSharingIntent() {
     // Listen to media/text shared while the app is in memory
@@ -62,7 +89,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final provider = context.read<ChatProvider>();
     for (var file in files) {
       if (file.type == SharedMediaType.text) {
-        provider.sendMessage(file.path);
+        final text = file.path;
+        // Check if it's a YouTube link
+        final isYtLink = text.contains('youtube.com/') || text.contains('youtu.be/');
+        if (isYtLink) {
+          // Extract ID using basic logic since youtube_explode_dart.VideoId can do it:
+          final reg = RegExp(r'(?:v=|youtu\.be/|shorts/)([^&?\s]+)');
+          final match = reg.firstMatch(text);
+          final String vidId = match != null ? match.group(1) ?? '' : '';
+          if (vidId.isNotEmpty) {
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => YouTubeScreen(initialVideoId: vidId),
+            ));
+            return; // Stop processing further for youtube share
+          }
+        }
+        provider.sendMessage(text);
       } else {
         provider.attachFile(file.path);
       }
