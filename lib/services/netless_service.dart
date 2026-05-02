@@ -225,10 +225,10 @@ class NetlessService extends ChangeNotifier {
         fileType: ModelFileType.litertlm,
       ).fromFile(_modelPath!).install();
 
-      // Lower maxTokens to prevent OOM and use auto backend for better device compatibility
+      // Lower maxTokens to prevent OOM and use cpu backend for better device compatibility
       _model = await FlutterGemma.getActiveModel(
         maxTokens: 1024,
-        preferredBackend: PreferredBackend.auto,
+        preferredBackend: PreferredBackend.cpu,
       );
 
       _isLoaded = true;

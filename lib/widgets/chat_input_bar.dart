@@ -6,12 +6,10 @@ import '../../theme/jarvis_theme.dart';
 import '../features/chat/chat_provider.dart';
 import '../features/vibecode/vibecode_screen.dart';
 
-import '../features/imagiya/screens/imagiya_screen.dart';
 import '../features/integrations/integrations_screen.dart';
 import '../features/integrations/integrations_provider.dart';
 import '../features/integrations/integrations_model.dart';
 import '../services/netless_service.dart';
-import '../services/tts_service.dart';
 import '../core/router/ai_router.dart';
 
 enum ChatInputMode { chat, imagiya, codesign }
@@ -49,7 +47,10 @@ class _ChatInputBarState extends State<ChatInputBar>
   // — Input Mode —
   ChatInputMode _inputMode = ChatInputMode.chat;
   String _imagiyaQuality = 'hd';
+  String _imagiyaStyle = 'realistic';
   String _codesignType = 'landing';
+
+  bool get _isCreativeMode => _inputMode == ChatInputMode.imagiya || _inputMode == ChatInputMode.codesign;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -630,7 +631,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
     String finalText = text;
     if (_inputMode == ChatInputMode.imagiya && !text.startsWith('@')) {
-      finalText = '[IMAGIYA] $_imagiyaQuality| $text';
+      finalText = '[IMAGIYA] $_imagiyaQuality $_imagiyaStyle| $text';
     } else if (_inputMode == ChatInputMode.codesign && !text.startsWith('@')) {
       finalText = '[CODESIGN] $_codesignType| $text';
     }
@@ -661,15 +662,45 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   Widget _buildImagiyaOptions() {
     return Container(
-      height: 40,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildChip('Standard', _imagiyaQuality == 'standard', () => setState(() => _imagiyaQuality = 'standard')),
-          const SizedBox(width: 8),
-          _buildChip('HD', _imagiyaQuality == 'hd', () => setState(() => _imagiyaQuality = 'hd')),
+          // Quality row
+          Container(
+            height: 36,
+            margin: const EdgeInsets.only(bottom: 4),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _buildChip('★ Standard', _imagiyaQuality == 'standard', () => setState(() => _imagiyaQuality = 'standard')),
+                const SizedBox(width: 8),
+                _buildChip('✨ HD', _imagiyaQuality == 'hd', () => setState(() => _imagiyaQuality = 'hd')),
+                const SizedBox(width: 8),
+                _buildChip('💎 Ultra HD', _imagiyaQuality == 'uhd', () => setState(() => _imagiyaQuality = 'uhd')),
+              ],
+            ),
+          ),
+          // Style row
+          SizedBox(
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _buildChip('📷 Realistic', _imagiyaStyle == 'realistic', () => setState(() => _imagiyaStyle = 'realistic')),
+                const SizedBox(width: 8),
+                _buildChip('🎨 Artistic', _imagiyaStyle == 'artistic', () => setState(() => _imagiyaStyle = 'artistic')),
+                const SizedBox(width: 8),
+                _buildChip('🌟 Anime', _imagiyaStyle == 'anime', () => setState(() => _imagiyaStyle = 'anime')),
+                const SizedBox(width: 8),
+                _buildChip('🎥 Cinematic', _imagiyaStyle == 'cinematic', () => setState(() => _imagiyaStyle = 'cinematic')),
+                const SizedBox(width: 8),
+                _buildChip('🌀 Abstract', _imagiyaStyle == 'abstract', () => setState(() => _imagiyaStyle = 'abstract')),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -980,326 +1011,328 @@ class _ChatInputBarState extends State<ChatInputBar>
 
             // ── Main full-width input bar ───────────────────────────────────
             Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: JarvisColors.border, width: 0.5),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 18),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF0A0A12).withValues(alpha: 0.0),
+                    const Color(0xFF0A0A12),
+                  ],
                 ),
               ),
               child: SafeArea(
                 top: false,
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 250),
                   decoration: BoxDecoration(
                     color: _focusNode.hasFocus
-                        ? const Color(0xFF1A1A2E)
-                        : const Color(0xFF141420),
-                    borderRadius: BorderRadius.circular(28),
+                        ? const Color(0xFF16162A)
+                        : const Color(0xFF111120),
+                    borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: _focusNode.hasFocus
-                          ? JarvisColors.accentPrimary.withValues(alpha: 0.6)
-                          : JarvisColors.border.withValues(alpha: 0.5),
+                      color: _inputMode != ChatInputMode.chat
+                          ? Colors.deepPurpleAccent.withValues(alpha: _focusNode.hasFocus ? 0.7 : 0.35)
+                          : _focusNode.hasFocus
+                              ? JarvisColors.accentPrimary.withValues(alpha: 0.55)
+                              : JarvisColors.border.withValues(alpha: 0.4),
                       width: 1.2,
                     ),
                     boxShadow: _focusNode.hasFocus
                         ? [
                             BoxShadow(
-                              color: JarvisColors.accentPrimary.withValues(
-                                alpha: 0.12,
-                              ),
-                              blurRadius: 20,
-                              spreadRadius: 2,
+                              color: (_inputMode != ChatInputMode.chat
+                                      ? Colors.deepPurpleAccent
+                                      : JarvisColors.accentPrimary)
+                                  .withValues(alpha: 0.14),
+                              blurRadius: 24,
+                              spreadRadius: 0,
                             ),
                           ]
                         : [],
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // + button inside bar — premium accent circle
-                      _InBarButton(
-                        onTap: () => _showActionMenu(chatProvider),
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: JarvisColors.accentPrimary.withValues(alpha: 0.13),
-                            border: Border.all(
-                              color: JarvisColors.accentPrimary.withValues(alpha: 0.35),
-                              width: 1.2,
+                      // ── Top row: mode badge + text field ──
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          // Left: + button
+                          _InBarButton(
+                            onTap: () => _showActionMenu(chatProvider),
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              margin: const EdgeInsets.only(left: 6, bottom: 6),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: JarvisColors.accentPrimary.withValues(alpha: 0.10),
+                                border: Border.all(
+                                  color: JarvisColors.accentPrimary.withValues(alpha: 0.28),
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Icon(Icons.add_rounded, color: JarvisColors.accentPrimary, size: 18),
                             ),
                           ),
-                          child: const Icon(
-                            Icons.add_rounded,
-                            color: JarvisColors.accentPrimary,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                      // ── Creative Popup Menu ──
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6, bottom: 4),
-                        child: PopupMenuButton<ChatInputMode>(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          color: const Color(0xFF1E1E2A),
-                          offset: const Offset(0, -120),
-                          tooltip: 'Input Mode',
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _inputMode == ChatInputMode.chat ? Colors.white10 : Colors.deepPurpleAccent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: _inputMode == ChatInputMode.chat ? Colors.white24 : Colors.deepPurpleAccent.withValues(alpha: 0.4)),
+                          // Text field — fills all available space
+                          Expanded(
+                            child: TextField(
+                              controller: _controller,
+                              focusNode: _focusNode,
+                              maxLines: 6,
+                              minLines: 1,
+                              style: const TextStyle(
+                                color: JarvisColors.textPrimary,
+                                fontSize: 15,
+                                height: 1.45,
+                              ),
+                              cursorColor: JarvisColors.accentPrimary,
+                              decoration: InputDecoration(
+                                hintText: _inputMode == ChatInputMode.chat
+                                    ? 'Message JARVIS...'
+                                    : _inputMode == ChatInputMode.imagiya
+                                        ? '✨ Describe your image...'
+                                        : '🎨 Describe your UI...',
+                                hintStyle: TextStyle(
+                                  color: JarvisColors.textMuted.withValues(alpha: 0.55),
+                                  fontSize: 14.5,
+                                ),
+                                border: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                filled: false,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                                isDense: true,
+                              ),
+                              onSubmitted: (_) => _send(),
                             ),
+                          ),
+                          // Right cluster: model, mic, send
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6, bottom: 6),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Icon(
-                                  _inputMode == ChatInputMode.chat ? Icons.chat_bubble_outline : (_inputMode == ChatInputMode.imagiya ? Icons.image : Icons.design_services), 
-                                  color: _inputMode == ChatInputMode.chat ? Colors.white70 : Colors.deepPurpleAccent, 
-                                  size: 12
-                                ),
-                                const SizedBox(width: 4),
-                                Text(_inputMode == ChatInputMode.chat ? 'Chat' : (_inputMode == ChatInputMode.imagiya ? 'Imagiya' : 'CoDesign'), style: TextStyle(color: _inputMode == ChatInputMode.chat ? Colors.white70 : Colors.deepPurpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                          onSelected: (mode) {
-                            setState(() {
-                              _inputMode = mode;
-                            });
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: ChatInputMode.chat,
-                              child: Row(children: [
-                                Icon(Icons.chat_bubble_outline, color: Colors.white70, size: 20),
-                                SizedBox(width: 12),
-                                Text('JARVIS Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                              ]),
-                            ),
-                            const PopupMenuItem(
-                              value: ChatInputMode.imagiya,
-                              child: Row(children: [
-                                Icon(Icons.image, color: Colors.deepPurpleAccent, size: 20),
-                                SizedBox(width: 12),
-                                Text('Imagiya Image', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                              ]),
-                            ),
-                            const PopupMenuItem(
-                              value: ChatInputMode.codesign,
-                              child: Row(children: [
-                                Icon(Icons.design_services, color: Colors.indigoAccent, size: 20),
-                                SizedBox(width: 12),
-                                Text('CoDesign UI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                              ]),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Text field - takes remaining space
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          maxLines: 5,
-                          minLines: 1,
-                          style: const TextStyle(
-                            color: JarvisColors.textPrimary,
-                            fontSize: 15,
-                            height: 1.4,
-                          ),
-                          cursorColor: JarvisColors.accentPrimary,
-                          decoration: InputDecoration(
-                            hintText: _inputMode == ChatInputMode.chat 
-                                ? 'Message JARVIS...' 
-                                : _inputMode == ChatInputMode.imagiya 
-                                    ? 'Describe your image to Imagiya...' 
-                                    : 'Describe UI to CoDesign...',
-                            hintStyle: TextStyle(
-                              color: JarvisColors.textPrimary.withValues(alpha: 0.6),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            border: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            filled: false,
-                            fillColor: Colors.transparent,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                            isDense: true,
-                          ),
-                          onSubmitted: (_) => _send(),
-                        ),
-                      ),
-
-                      // ── Model picker + Mic + Send ──────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6, right: 6),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-
-                            // ── Model picker button (\u221e / wifi-off) ─────────────
-                            if (_speechAvailable)
-                              Builder(
-                                builder: (btnCtx) => GestureDetector(
-                                  onTap: () => _showModelPicker(btnCtx, chatProvider),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 220),
-                                    width: 34,
-                                    height: 34,
-                                    margin: const EdgeInsets.only(right: 6),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: _selectedMode == 'netless'
-                                          ? const Color(0xFF00E676).withValues(alpha: 0.15)
-                                          : JarvisColors.accentPrimary.withValues(alpha: 0.13),
-                                      border: Border.all(
-                                        color: _selectedMode == 'netless'
-                                            ? const Color(0xFF00E676).withValues(alpha: 0.5)
-                                            : JarvisColors.accentPrimary.withValues(alpha: 0.35),
-                                        width: 1.2,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
+                                // Model picker button
+                                if (_speechAvailable)
+                                  Builder(
+                                    builder: (btnCtx) => GestureDetector(
+                                      onTap: () => _showModelPicker(btnCtx, chatProvider),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 220),
+                                        width: 32,
+                                        height: 32,
+                                        margin: const EdgeInsets.only(right: 5),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
                                           color: _selectedMode == 'netless'
-                                              ? const Color(0xFF00E676).withValues(alpha: 0.18)
+                                              ? const Color(0xFF00E676).withValues(alpha: 0.13)
                                               : JarvisColors.accentPrimary.withValues(alpha: 0.10),
-                                          blurRadius: 10,
-                                          spreadRadius: 0,
+                                          border: Border.all(
+                                            color: _selectedMode == 'netless'
+                                                ? const Color(0xFF00E676).withValues(alpha: 0.45)
+                                                : JarvisColors.accentPrimary.withValues(alpha: 0.28),
+                                            width: 1,
+                                          ),
                                         ),
-                                      ],
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        _selectedMode == 'netless'
-                                            ? Icons.wifi_off_rounded
-                                            : Icons.all_inclusive_rounded,
-                                        color: _selectedMode == 'netless'
-                                            ? const Color(0xFF00E676)
-                                            : JarvisColors.accentPrimary,
-                                        size: 16,
+                                        child: Center(
+                                          child: Icon(
+                                            _selectedMode == 'netless'
+                                                ? Icons.wifi_off_rounded
+                                                : Icons.all_inclusive_rounded,
+                                            color: _selectedMode == 'netless'
+                                                ? const Color(0xFF00E676)
+                                                : JarvisColors.accentPrimary,
+                                            size: 15,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ),
-
-                            // ── Mic button ────────────────────────────────────
-                            if (_speechAvailable)
-                              AnimatedBuilder(
-                                animation: _pulseAnimation,
-                                builder: (ctx, child) => GestureDetector(
-                                  onTap: _toggleListening,
+                                // Mic button
+                                if (_speechAvailable)
+                                  AnimatedBuilder(
+                                    animation: _pulseAnimation,
+                                    builder: (ctx, child) => GestureDetector(
+                                      onTap: _toggleListening,
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        width: 32,
+                                        height: 32,
+                                        margin: const EdgeInsets.only(right: 5),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: _isListening
+                                              ? JarvisColors.accentPrimary.withValues(alpha: 0.20)
+                                              : JarvisColors.surfaceElevated,
+                                          border: Border.all(
+                                            color: _isListening
+                                                ? JarvisColors.accentPrimary.withValues(alpha: 0.6 * _pulseAnimation.value)
+                                                : JarvisColors.border.withValues(alpha: 0.3),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                                            color: _isListening ? JarvisColors.accentPrimary : JarvisColors.textMuted,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                // Send button
+                                GestureDetector(
+                                  onTap: (widget.isGenerating && !_isCreativeMode) ? null : _send,
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    width: 36,
-                                    height: 36,
-                                    margin: const EdgeInsets.only(right: 8),
+                                    width: 38,
+                                    height: 38,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      gradient: _isListening
-                                          ? RadialGradient(colors: [
-                                              JarvisColors.accentPrimary.withValues(alpha: 0.35),
-                                              JarvisColors.accentPrimary.withValues(alpha: 0.08),
-                                            ])
+                                      gradient: (!(widget.isGenerating && !_isCreativeMode) && _hasText)
+                                          ? const LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [Color(0xFF7B5FFF), Color(0xFF9B88FF)],
+                                            )
                                           : null,
-                                      color: _isListening
+                                      color: (!(widget.isGenerating && !_isCreativeMode) && _hasText)
                                           ? null
                                           : JarvisColors.surfaceElevated,
                                       border: Border.all(
-                                        color: _isListening
-                                            ? JarvisColors.accentPrimary.withValues(alpha: 0.55 * _pulseAnimation.value)
+                                        color: (!(widget.isGenerating && !_isCreativeMode) && _hasText)
+                                            ? Colors.transparent
                                             : JarvisColors.border.withValues(alpha: 0.4),
-                                        width: 1.2,
+                                        width: 1,
                                       ),
-                                      boxShadow: _isListening
+                                      boxShadow: (!(widget.isGenerating && !_isCreativeMode) && _hasText)
                                           ? [
                                               BoxShadow(
-                                                color: JarvisColors.accentPrimary.withValues(
-                                                  alpha: 0.30 * _pulseAnimation.value,
-                                                ),
+                                                color: const Color(0xFF7B5FFF).withValues(alpha: 0.5),
                                                 blurRadius: 14,
-                                                spreadRadius: 2,
+                                                offset: const Offset(0, 3),
                                               ),
                                             ]
-                                          : [],
+                                          : null,
                                     ),
-                                    child: Center(
-                                      child: Icon(
-                                        _isListening
-                                            ? Icons.mic_rounded
-                                            : Icons.mic_none_rounded,
-                                        color: _isListening
-                                            ? JarvisColors.accentPrimary
-                                            : JarvisColors.textMuted,
-                                        size: 18,
-                                      ),
-                                    ),
+                                    child: (widget.isGenerating && !_isCreativeMode)
+                                        ? const Padding(
+                                            padding: EdgeInsets.all(10),
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor: AlwaysStoppedAnimation(JarvisColors.accentPrimary),
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.arrow_upward_rounded,
+                                            color: _hasText ? Colors.white : JarvisColors.textMuted,
+                                            size: 19,
+                                          ),
                                   ),
                                 ),
-                              ),
-
-                            // ── Send button ───────────────────────────────────
-                            GestureDetector(
-                              onTap: widget.isGenerating ? null : _send,
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      // ── Bottom row: mode selector pill ──
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10, right: 10, bottom: 8),
+                        child: Row(
+                          children: [
+                            // Mode selector
+                            PopupMenuButton<ChatInputMode>(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              color: const Color(0xFF1A1A2E),
+                              offset: const Offset(0, -130),
+                              tooltip: 'Switch Mode',
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
-                                width: 38,
-                                height: 38,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: (!widget.isGenerating && _hasText)
-                                      ? const LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [
-                                            Color(0xFF7B5FFF),
-                                            Color(0xFF9B88FF),
-                                          ],
-                                        )
-                                      : null,
-                                  color: (!widget.isGenerating && _hasText)
-                                      ? null
-                                      : JarvisColors.surfaceElevated,
+                                  color: _inputMode == ChatInputMode.chat
+                                      ? Colors.white.withValues(alpha: 0.06)
+                                      : Colors.deepPurpleAccent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: (!widget.isGenerating && _hasText)
-                                        ? Colors.transparent
-                                        : JarvisColors.border.withValues(alpha: 0.4),
-                                    width: 1,
+                                    color: _inputMode == ChatInputMode.chat
+                                        ? Colors.white12
+                                        : Colors.deepPurpleAccent.withValues(alpha: 0.45),
                                   ),
-                                  boxShadow: (!widget.isGenerating && _hasText)
-                                      ? [
-                                          BoxShadow(
-                                            color: const Color(0xFF7B5FFF).withValues(alpha: 0.55),
-                                            blurRadius: 16,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ]
-                                      : null,
                                 ),
-                                child: widget.isGenerating
-                                    ? Padding(
-                                        padding: const EdgeInsets.all(9),
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation(
-                                            JarvisColors.accentPrimary,
-                                          ),
-                                        ),
-                                      )
-                                    : Icon(
-                                        Icons.arrow_upward_rounded,
-                                        color: _hasText
-                                            ? Colors.white
-                                            : JarvisColors.textMuted,
-                                        size: 19,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _inputMode == ChatInputMode.chat
+                                          ? Icons.chat_bubble_outline_rounded
+                                          : _inputMode == ChatInputMode.imagiya
+                                              ? Icons.auto_awesome_rounded
+                                              : Icons.design_services_rounded,
+                                      size: 13,
+                                      color: _inputMode == ChatInputMode.chat
+                                          ? Colors.white54
+                                          : Colors.deepPurpleAccent,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      _inputMode == ChatInputMode.chat
+                                          ? 'Chat'
+                                          : _inputMode == ChatInputMode.imagiya
+                                              ? 'Imagiya'
+                                              : 'CoDesign',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: _inputMode == ChatInputMode.chat
+                                            ? Colors.white54
+                                            : Colors.deepPurpleAccent,
                                       ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Icon(
+                                      Icons.expand_less_rounded,
+                                      size: 13,
+                                      color: _inputMode == ChatInputMode.chat
+                                          ? Colors.white30
+                                          : Colors.deepPurpleAccent.withValues(alpha: 0.6),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              onSelected: (mode) => setState(() => _inputMode = mode),
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: ChatInputMode.chat,
+                                  child: Row(children: [
+                                    Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 18),
+                                    SizedBox(width: 12),
+                                    Text('JARVIS Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                  ]),
+                                ),
+                                const PopupMenuItem(
+                                  value: ChatInputMode.imagiya,
+                                  child: Row(children: [
+                                    Icon(Icons.auto_awesome_rounded, color: Colors.deepPurpleAccent, size: 18),
+                                    SizedBox(width: 12),
+                                    Text('Imagiya · Image', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                  ]),
+                                ),
+                                const PopupMenuItem(
+                                  value: ChatInputMode.codesign,
+                                  child: Row(children: [
+                                    Icon(Icons.design_services_rounded, color: Colors.indigoAccent, size: 18),
+                                    SizedBox(width: 12),
+                                    Text('CoDesign · UI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                  ]),
+                                ),
+                              ],
                             ),
                           ],
                         ),

@@ -14,6 +14,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'dart:convert';
+import 'package:gal/gal.dart';
+import 'package:http/http.dart' as http;
 import '../../theme/jarvis_theme.dart';
 import '../../models/message.dart';
 import 'integration_card_bubble.dart';
@@ -40,7 +42,8 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (message.isUser) {
-      if (message.provider != null && message.provider!.isNotEmpty) {
+      if (message.provider != null && message.provider!.isNotEmpty &&
+          message.provider != 'imagiya' && message.provider != 'codesign') {
         return Column(
           children: [
             _UserBubble(message: message),
@@ -49,6 +52,11 @@ class MessageBubble extends StatelessWidget {
         );
       }
       return _UserBubble(message: message);
+    } else if (message.provider == 'imagiya') {
+      // Extract URL from markdown image syntax: ![Generated Image](url)
+      final imgMatch = RegExp(r'!\[.*?\]\((.+?)\)').firstMatch(message.content);
+      final imageUrl = imgMatch?.group(1) ?? '';
+      return _ImagiyaImageBubble(imageUrl: imageUrl, providerColor: const Color(0xFF9B88FF));
     } else if (IntegrationCardBubble.isIntegrationCard(message.content)) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
@@ -220,9 +228,176 @@ class _InlineIntegrationBrowserState extends State<_InlineIntegrationBrowser> {
   }
 }
 
+// ── Imagiya Image Bubble ──────────────────────────────────────────────────────
+class _ImagiyaImageBubble extends StatefulWidget {
+  final String imageUrl;
+  final Color providerColor;
+  const _ImagiyaImageBubble({required this.imageUrl, required this.providerColor});
+
+  @override
+  State<_ImagiyaImageBubble> createState() => _ImagiyaImageBubbleState();
+}
+
+class _ImagiyaImageBubbleState extends State<_ImagiyaImageBubble> {
+  bool _saving = false;
+
+  Future<void> _downloadToGallery() async {
+    if (widget.imageUrl.isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      final response = await http.get(Uri.parse(widget.imageUrl));
+      if (response.statusCode == 200) {
+        await Gal.putImageBytes(response.bodyBytes, name: 'jarvis_imagiya_${DateTime.now().millisecondsSinceEpoch}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Image saved to gallery!'), backgroundColor: Color(0xFF22C55E)),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.90),
+        margin: const EdgeInsets.only(left: 16, right: 8, bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Provider badge
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: widget.providerColor)),
+                  const SizedBox(width: 8),
+                  Text('IMAGIYA · AI Image', style: TextStyle(color: widget.providerColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.0)),
+                ],
+              ),
+            ),
+            // Image with rounded corners
+            if (widget.imageUrl.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  widget.imageUrl,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (ctx, child, progress) {
+                    if (progress == null) return child;
+                    return Container(
+                      height: 220,
+                      decoration: BoxDecoration(color: const Color(0xFF1A1A2E), borderRadius: BorderRadius.circular(16)),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(
+                              value: progress.expectedTotalBytes != null
+                                  ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                  : null,
+                              color: widget.providerColor,
+                              strokeWidth: 2,
+                            ),
+                            const SizedBox(height: 12),
+                            Text('Generating image...', style: TextStyle(color: widget.providerColor.withValues(alpha: 0.7), fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (ctx, err, st) => Container(
+                    height: 100,
+                    decoration: BoxDecoration(color: const Color(0xFF1A1A2E), borderRadius: BorderRadius.circular(16)),
+                    child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white30, size: 40)),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 10),
+            // Action bar
+            Row(
+              children: [
+                _ImageActionBtn(
+                  icon: _saving ? Icons.hourglass_top_rounded : Icons.download_rounded,
+                  label: _saving ? 'Saving...' : 'Download',
+                  color: const Color(0xFF22C55E),
+                  onTap: _saving ? null : _downloadToGallery,
+                ),
+                const SizedBox(width: 8),
+                _ImageActionBtn(
+                  icon: Icons.share_rounded,
+                  label: 'Share',
+                  color: widget.providerColor,
+                  onTap: () => Share.share(widget.imageUrl, subject: 'JARVIS Imagiya Image'),
+                ),
+                const SizedBox(width: 8),
+                _ImageActionBtn(
+                  icon: Icons.copy_rounded,
+                  label: 'Copy URL',
+                  color: Colors.white54,
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: widget.imageUrl));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Image URL copied!'), duration: Duration(seconds: 1)),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ).animate().slideX(begin: -0.05, end: 0, duration: 200.ms, curve: Curves.easeOut).fadeIn(duration: 150.ms);
+  }
+}
+
+class _ImageActionBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+  const _ImageActionBtn({required this.icon, required this.label, required this.color, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 5),
+            Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _UserBubble extends StatelessWidget {
   final Message message;
   const _UserBubble({required this.message});
+
 
   @override
   Widget build(BuildContext context) {
@@ -424,6 +599,7 @@ class _AIBubble extends StatelessWidget {
   }
 
   Widget _buildActionRow(BuildContext context) {
+    final isDiagram = message.content.startsWith('<!--JARVIS_DIAGRAM-->');
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -461,6 +637,18 @@ class _AIBubble extends StatelessWidget {
         JarvisPDFButton(
           responseText: _getSharableContent(message.content, includeDiagramCode: true),
         ),
+        if (isDiagram) ...[
+          const SizedBox(width: 12),
+          _ActionButton(
+            icon: Icons.download_rounded,
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Long-press the diagram to save it'), duration: Duration(seconds: 2)),
+              );
+            },
+            tooltip: 'Save diagram',
+          ),
+        ],
       ],
     );
   }

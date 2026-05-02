@@ -187,9 +187,16 @@ class ChatProvider extends ChangeNotifier {
     if (combinedText.startsWith('[IMAGIYA]')) {
       isImagiya = true;
       final parts = combinedText.substring(9).split('|');
-      final quality = parts.isNotEmpty ? parts[0].trim() : 'hd';
+      final qualityStyle = parts.isNotEmpty ? parts[0].trim() : 'hd realistic';
+      final qualityParts = qualityStyle.split(' ');
+      final quality = qualityParts.isNotEmpty ? qualityParts[0] : 'hd';
+      final style = qualityParts.length > 1 ? qualityParts.skip(1).join(' ') : 'realistic';
       imagiyaPrompt = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
-      imagiyaUrl = 'https://image.pollinations.ai/prompt/${Uri.encodeComponent(imagiyaPrompt)}?nologo=true&enhance=${quality == 'hd' ? 'true' : 'false'}';
+      // Append style to prompt for better results
+      final fullPrompt = '$imagiyaPrompt, $style style';
+      final width = quality == 'uhd' ? 1920 : (quality == 'hd' ? 1280 : 768);
+      final height = quality == 'uhd' ? 1080 : (quality == 'hd' ? 720 : 512);
+      imagiyaUrl = 'https://image.pollinations.ai/prompt/${Uri.encodeComponent(fullPrompt)}?nologo=true&enhance=${quality != 'standard' ? 'true' : 'false'}&width=$width&height=$height';
     } else if (combinedText.startsWith('[CODESIGN]')) {
       final parts = combinedText.substring(10).split('|');
       final type = parts.isNotEmpty ? parts[0].trim() : 'ui';
