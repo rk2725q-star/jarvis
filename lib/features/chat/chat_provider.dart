@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -202,25 +204,9 @@ class ChatProvider extends ChangeNotifier {
       final parts = combinedText.substring(10).split('|');
       final agentType = parts.isNotEmpty ? parts[0].trim() : 'landing';
       final designQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
-      imagiyaPrompt = designQuery;
-      // Build a design-focused Pollinations prompt based on the agent type
-      final designPromptMap = {
-        'landing': 'professional landing page UI design mockup, hero section, modern SaaS website, clean layout, vibrant gradient, glassmorphism cards',
-        'dashboard': 'admin dashboard UI design, data visualization, charts, sidebar navigation, dark theme, modern analytics interface',
-        'mobile': 'mobile app UI design, iOS/Android style, clean cards, bottom navigation, modern mobile interface, flat design',
-        'component': 'UI component design, button set, form elements, card components, modern design system, clean flat design',
-        'ecommerce': 'e-commerce product page UI, product cards, shopping cart, checkout flow, modern online store design',
-        'portfolio': 'creative portfolio website design, gallery grid, minimal aesthetic, dark theme, modern typography layout',
-        'saas': 'SaaS pricing page UI, feature comparison, modern web app design, clean pricing cards, gradient hero',
-        'auth': 'login and signup page UI design, authentication flow, form design, modern clean auth screen, glass effect',
-        'blog': 'blog/article page UI design, readable typography, clean layout, minimal aesthetic, content-first design',
-        'social': 'social media app UI design, feed layout, user profile, stories, modern mobile social interface',
-      };
-      final baseDesignPrompt = designPromptMap[agentType] ?? 'modern UI design mockup, clean professional interface';
-      final fullDesignPrompt = designQuery.isNotEmpty
-          ? '$baseDesignPrompt, specifically: $designQuery, high fidelity UI mockup, professional design'
-          : '$baseDesignPrompt, high fidelity UI mockup, professional design';
-      imagiyaUrl = 'https://image.pollinations.ai/prompt/${Uri.encodeComponent(fullDesignPrompt)}?nologo=true&enhance=true&width=1280&height=720&model=flux';
+      imagiyaPrompt = designQuery.isNotEmpty ? designQuery : agentType;
+      // CoDesign generates HTML via text.pollinations.ai — stored in imagiyaUrl as special marker
+      imagiyaUrl = '[CODESIGN_PENDING]|$agentType|$designQuery';
       resolvedProvider = 'codesign';
     }
 
@@ -389,18 +375,63 @@ class ChatProvider extends ChangeNotifier {
     await sessionService.addMessage(userMsg);
     notifyListeners();
     
-    // Both Imagiya and CoDesign generate images immediately via Pollinations – no LLM streaming
-    if (isImagiya || isCodesign) {
+    // Imagiya: immediate Pollinations image URL
+    if (isImagiya) {
       final aiMsg = Message(
         id: _uuid.v4(),
         content: '![Generated Image]($imagiyaUrl)',
         isUser: false,
         timestamp: DateTime.now(),
         sessionId: _currentSessionId!,
-        provider: isCodesign ? 'codesign' : 'imagiya',
+        provider: 'imagiya',
       );
       _messages.add(aiMsg);
       await sessionService.addMessage(aiMsg);
+      notifyListeners();
+      return;
+    }
+
+    // CoDesign: generate actual HTML/CSS/JS via text.pollinations.ai
+    if (isCodesign) {
+      // Parse the pending marker
+      final pendingParts = imagiyaUrl.substring('[CODESIGN_PENDING]|'.length).split('|');
+      final agentType = pendingParts.isNotEmpty ? pendingParts[0].trim() : 'landing';
+      final designQuery = pendingParts.length > 1 ? pendingParts.skip(1).join('|').trim() : '';
+
+      // Show generating status
+      _setAnalysisStatus('✨ Designing $agentType UI...');
+
+      // Placeholder message while generating
+      final placeholderMsg = Message(
+        id: _uuid.v4(),
+        content: '[CODESIGN_GENERATING]',
+        isUser: false,
+        timestamp: DateTime.now(),
+        sessionId: _currentSessionId!,
+        provider: 'codesign',
+      );
+      _messages.add(placeholderMsg);
+      notifyListeners();
+
+      // Generate HTML code
+      final htmlCode = await _generateCodesignHtml(agentType, designQuery);
+
+      // Replace placeholder with final result
+      final idx = _messages.indexWhere((m) => m.id == placeholderMsg.id);
+      if (idx != -1) {
+        final finalMsg = Message(
+          id: placeholderMsg.id,
+          content: '[CODESIGN_HTML]$htmlCode',
+          isUser: false,
+          timestamp: DateTime.now(),
+          sessionId: _currentSessionId!,
+          provider: 'codesign',
+        );
+        _messages[idx] = finalMsg;
+        await sessionService.addMessage(finalMsg);
+      }
+
+      _setAnalysisStatus('', active: false);
       notifyListeners();
       return;
     }
@@ -932,9 +963,145 @@ class ChatProvider extends ChangeNotifier {
         .trim();
   }
 
+  /// Generate real interactive HTML/CSS/JS using Pollinations text API
+  /// Powered by open-codesign craft directives for professional-grade output
+  Future<String> _generateCodesignHtml(String agentType, String userQuery) async {
+    const agentContextMap = {
+      'landing': 'a full SaaS landing page with hero, features grid, testimonials, pricing teaser, and footer CTA. Use bold modern typography, glassmorphism cards, and gradient accents.',
+      'dashboard': 'an admin analytics dashboard with KPI cards, live chart (SVG), sidebar navigation, activity feed, and a header with a real-time clock. Include LIVE pulse badges.',
+      'mobile': 'a mobile app screen (375×812 viewport) with bottom tab bar, header, main content cards, and proper iOS safe-area respect. Use a device frame wrapper.',
+      'component': 'a comprehensive UI component library page showing buttons (primary/secondary/ghost/danger), form inputs, checkboxes, toggles, badges, cards, modals, and tooltips.',
+      'ecommerce': 'an e-commerce product listing page with filter sidebar, product cards with hover effects, cart badge counter, and a product detail modal.',
+      'portfolio': 'a creative portfolio website with a bold hero, project grid with hover reveals, skills section, and a contact form with validation.',
+      'saas': 'a SaaS pricing page with three pricing tiers, feature comparison table, FAQ accordion, and a highlighted recommended plan.',
+      'auth': 'a login/signup auth screen with tab switching, social auth buttons, form validation, and a glassmorphism card on a gradient background.',
+      'blog': 'a blog/article page with a reading progress bar, author card, rich typography, code highlight blocks, and a related articles section.',
+      'social': 'a social media feed UI with story row, post cards (like/comment/share interactions), trending sidebar, and a new post composer.',
+    };
+
+    final agentContext = agentContextMap[agentType] ?? 'a modern web UI with clean design, interactive elements, and professional polish.';
+    final brief = userQuery.isNotEmpty ? userQuery : agentType;
+
+    final systemPrompt = '''You are an expert UI/UX designer and frontend developer. Generate a single, complete, self-contained HTML file with embedded CSS and JavaScript.
+
+DESIGN PHILOSOPHY (from open-codesign craft directives):
+- ARTIFACT TYPE: ${agentType.toUpperCase()} — $agentContext
+- Use oklch() color system with 9±3 design tokens declared as CSS variables at the top
+- Two font families: display font (via Google Fonts @import) + workhorse sans
+- Full-bleed sections: set html,body background to match dominant bg color
+- DARK THEME: warm accents, subtle gradient/glow above fold, borders at oklch(L C h/0.15)
+- DENSITY: Rich, editorial level. Minimum 4 substantive blocks per page
+
+INTERACTIVE DEPTH (MANDATORY — every artifact must have):
+1. ≥3 functional state changes (tab switch, accordion, modal, toggle, filter)
+2. Animated view transitions (opacity + translateY, 200ms ease-out)
+3. Every button does something — zero dead buttons
+4. Hover + press feedback: transform:scale(0.97) on :active, translateY(-2px) on hover
+5. Focus rings: 2px offset ring in accent color
+6. CRAFT TOUCHES (≥3): loading skeleton, tooltip with delay, copy-to-clipboard, dismissible toast, scroll-linked header, time-aware elements, animated empty state
+
+ANTI-SLOP RULES — NEVER:
+- Use lorem ipsum, "John Doe", "Acme Corp", round numbers (100%, \$10k)
+- Use hotlinked images from unsplash/picsum/placeholder.com — use CSS gradients/SVG instead
+- Use emoji as logos or section icons
+- Center-align body paragraphs
+- Use pure black (#000) for text — use near-black with slight hue cast
+- Use Inter/Roboto/Arial — pick distinctive fonts
+
+ANIMATION BUDGET: Only 4 named CSS keyframes: fadeUp, breathe, pulse-ring, spin. Apply with staggered delays.
+
+USER BRIEF: "$brief"
+
+Output ONLY the complete HTML document. No markdown fences, no explanations. Start with <!DOCTYPE html>.''';
+
+    try {
+      final encodedPrompt = Uri.encodeComponent(brief);
+      final encodedSystem = Uri.encodeComponent(systemPrompt);
+      final url = 'https://text.pollinations.ai/$encodedPrompt?model=openai&system=$encodedSystem&seed=${DateTime.now().millisecondsSinceEpoch % 9999}';
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Accept': 'text/html,text/plain,*/*'},
+      ).timeout(const Duration(seconds: 90));
+
+      if (response.statusCode == 200) {
+        String body = utf8.decode(response.bodyBytes, allowMalformed: true);
+        // Extract just the HTML if wrapped in markdown fences
+        final htmlMatch = RegExp(r'```html?\s*([\s\S]+?)\s*```', caseSensitive: false).firstMatch(body);
+        if (htmlMatch != null) {
+          body = htmlMatch.group(1)!;
+        }
+        // Ensure it starts with a proper HTML tag
+        if (body.contains('<!DOCTYPE') || body.contains('<html')) {
+          return body.trim();
+        }
+        // If the response is HTML content without doctype, wrap it
+        if (body.contains('<div') || body.contains('<section') || body.contains('<style')) {
+          return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>CoDesign · JARVIS</title></head><body>$body</body></html>';
+        }
+        return _getFallbackHtml(agentType, brief);
+      }
+      return _getFallbackHtml(agentType, brief);
+    } catch (e) {
+      debugPrint('CoDesign generation error: $e');
+      return _getFallbackHtml(agentType, brief);
+    }
+  }
+
+  /// Fallback HTML when generation fails — still looks great
+  String _getFallbackHtml(String agentType, String query) {
+    return '''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoDesign · $agentType</title>
+<style>
+  :root {
+    --bg: oklch(12% 0.02 260);
+    --surface: oklch(18% 0.025 260);
+    --border: oklch(30% 0.03 260 / 0.4);
+    --text: oklch(92% 0.01 260);
+    --muted: oklch(65% 0.015 260);
+    --accent: oklch(72% 0.2 200);
+    --accentL: oklch(72% 0.2 200 / 0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+  .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+  .badge { display: inline-flex; align-items: center; gap: 8px; background: var(--accentL); border: 1px solid var(--accent); border-radius: 999px; padding: 6px 16px; font-size: 12px; color: var(--accent); font-weight: 600; letter-spacing: 0.05em; margin-bottom: 2rem; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  .title { font-size: clamp(2.5rem, 8vw, 5rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; background: linear-gradient(135deg, var(--text), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .sub { font-size: 1.1rem; color: var(--muted); max-width: 500px; line-height: 1.7; margin-bottom: 2.5rem; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: oklch(12% 0.02 260); border: none; border-radius: 12px; padding: 14px 28px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.15s ease; }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--accentL); }
+  .btn:active { transform: scale(0.97); }
+  .msg { margin-top: 3rem; padding: 16px 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; font-size: 13px; color: var(--muted); }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  .hero > * { animation: fadeUp 0.6s ease both; }
+  .hero > *:nth-child(2) { animation-delay: 0.1s; }
+  .hero > *:nth-child(3) { animation-delay: 0.2s; }
+  .hero > *:nth-child(4) { animation-delay: 0.3s; }
+  .hero > *:nth-child(5) { animation-delay: 0.4s; }
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="badge"><span class="dot"></span> CODESIGN · JARVIS</div>
+  <h1 class="title">${agentType[0].toUpperCase()}${agentType.substring(1)} Design</h1>
+  <p class="sub">Generating your $agentType UI for: <em>"$query"</em><br>Retry for a fresh AI-generated design.</p>
+  <button class="btn" onclick="window.location.reload()">🔄 Regenerate Design</button>
+  <div class="msg">💡 Tip: Add more details to your prompt for a more specific design result.</div>
+</div>
+</body>
+</html>''';
+  }
+
   @override
   void dispose() {
     _fileProcessor.dispose();
     super.dispose();
   }
 }
+

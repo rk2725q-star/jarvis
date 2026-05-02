@@ -1,4 +1,6 @@
 // ignore_for_file: deprecated_member_use
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -13,9 +15,9 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'dart:convert';
 import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import '../../theme/jarvis_theme.dart';
 import '../../models/message.dart';
 import 'integration_card_bubble.dart';
@@ -62,14 +64,25 @@ class MessageBubble extends StatelessWidget {
         label: 'IMAGIYA · AI Image',
       );
     } else if (message.provider == 'codesign') {
-      // CoDesign uses Pollinations image generation, same bubble with different branding
+      // CoDesign: render actual HTML in WebView (open-codesign architecture)
+      if (message.content == '[CODESIGN_GENERATING]') {
+        return _CodesignGeneratingBubble();
+      }
+      if (message.content.startsWith('[CODESIGN_HTML]')) {
+        final htmlCode = message.content.substring('[CODESIGN_HTML]'.length);
+        return _CodesignHtmlBubble(htmlCode: htmlCode);
+      }
+      // Legacy fallback: Pollinations image
       final imgMatch = RegExp(r'!\[.*?\]\((.+?)\)').firstMatch(message.content);
       final imageUrl = imgMatch?.group(1) ?? '';
-      return _ImagiyaImageBubble(
-        imageUrl: imageUrl,
-        providerColor: const Color(0xFF4DD0E1),
-        label: 'CODESIGN · AI Design',
-      );
+      if (imageUrl.isNotEmpty) {
+        return _ImagiyaImageBubble(
+          imageUrl: imageUrl,
+          providerColor: const Color(0xFF4DD0E1),
+          label: 'CODESIGN · AI Design',
+        );
+      }
+      return _CodesignGeneratingBubble();
     } else if (IntegrationCardBubble.isIntegrationCard(message.content)) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
@@ -411,6 +424,254 @@ class _ImageActionBtn extends StatelessWidget {
     );
   }
 }
+
+// ── CoDesign Generating Pulse Bubble ──────────────────────────────────────────
+class _CodesignGeneratingBubble extends StatelessWidget {
+  const _CodesignGeneratingBubble();
+
+  @override
+  Widget build(BuildContext context) {
+    const teal = Color(0xFF4DD0E1);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(left: 16, right: 8, bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1117),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: teal.withValues(alpha: 0.25)),
+          boxShadow: [BoxShadow(color: teal.withValues(alpha: 0.08), blurRadius: 20, spreadRadius: 2)],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 28, height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2, color: teal,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('CoDesign', style: TextStyle(color: teal, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
+                const SizedBox(height: 2),
+                Text('Crafting your UI...', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 300.ms).shimmer(delay: 500.ms, duration: 1500.ms, color: teal.withValues(alpha: 0.08));
+  }
+}
+
+// ── CoDesign HTML WebView Bubble ───────────────────────────────────────────────
+class _CodesignHtmlBubble extends StatefulWidget {
+  final String htmlCode;
+  const _CodesignHtmlBubble({required this.htmlCode});
+
+  @override
+  State<_CodesignHtmlBubble> createState() => _CodesignHtmlBubbleState();
+}
+
+class _CodesignHtmlBubbleState extends State<_CodesignHtmlBubble> {
+  bool _isFullscreen = false;
+  bool _codeCopied = false;
+
+  static const _teal = Color(0xFF4DD0E1);
+
+  void _copyHtmlCode() {
+    Clipboard.setData(ClipboardData(text: widget.htmlCode));
+    setState(() => _codeCopied = true);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _codeCopied = false);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('✅ HTML code copied!'), duration: Duration(seconds: 2), backgroundColor: Color(0xFF22C55E)),
+    );
+  }
+
+  Future<void> _shareHtml() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/codesign_jarvis_${DateTime.now().millisecondsSinceEpoch}.html');
+      await file.writeAsString(widget.htmlCode, flush: true);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'text/html')],
+        subject: 'CoDesign by JARVIS',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _openInBrowser() async {
+    final dataUrl = 'data:text/html;charset=utf-8,${Uri.encodeComponent(widget.htmlCode)}';
+    final uri = Uri.parse(dataUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _toggleFullscreen() {
+    setState(() => _isFullscreen = !_isFullscreen);
+    if (_isFullscreen) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => Dialog.fullscreen(
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF0D1117),
+              leading: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: Row(children: [
+                Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: _teal)),
+                const SizedBox(width: 8),
+                const Text('CoDesign Preview', style: TextStyle(color: _teal, fontSize: 13, fontWeight: FontWeight.w700)),
+              ]),
+              actions: [
+                IconButton(icon: const Icon(Icons.code, color: Colors.white70), onPressed: () { Navigator.pop(context); _copyHtmlCode(); }),
+                const SizedBox(width: 8),
+              ],
+            ),
+            body: _buildWebView(fullscreen: true),
+          ),
+        ),
+      ).then((_) => setState(() => _isFullscreen = false));
+    }
+  }
+
+  Widget _buildWebView({bool fullscreen = false}) {
+    return InAppWebView(
+      initialData: InAppWebViewInitialData(
+        data: widget.htmlCode,
+        mimeType: 'text/html',
+        encoding: 'utf-8',
+        baseUrl: WebUri('about:blank'),
+      ),
+      initialSettings: InAppWebViewSettings(
+        javaScriptEnabled: true,
+        transparentBackground: false,
+        supportZoom: fullscreen,
+        domStorageEnabled: true,
+        databaseEnabled: true,
+        mediaPlaybackRequiresUserGesture: false,
+        allowFileAccessFromFileURLs: true,
+        allowUniversalAccessFromFileURLs: true,
+      ),
+      onWebViewCreated: (_) {},
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        width: screenWidth - 24,
+        margin: const EdgeInsets.only(left: 16, right: 8, bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Provider badge
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8, height: 8,
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: _teal,
+                      boxShadow: [BoxShadow(color: Color(0x664DD0E1), blurRadius: 8, spreadRadius: 1)],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('CODESIGN · Live Preview', style: TextStyle(color: _teal, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.0)),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _toggleFullscreen,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _teal.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _teal.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.open_in_full_rounded, color: _teal, size: 11),
+                          SizedBox(width: 4),
+                          Text('Expand', style: TextStyle(color: _teal, fontSize: 10, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // WebView preview
+            Container(
+              height: 380,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _teal.withValues(alpha: 0.2)),
+                boxShadow: [BoxShadow(color: _teal.withValues(alpha: 0.06), blurRadius: 20)],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: _buildWebView(),
+            ),
+            const SizedBox(height: 10),
+            // Action bar
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _ImageActionBtn(
+                  icon: Icons.open_in_full_rounded,
+                  label: 'Fullscreen',
+                  color: _teal,
+                  onTap: _toggleFullscreen,
+                ),
+                _ImageActionBtn(
+                  icon: _codeCopied ? Icons.check_rounded : Icons.code_rounded,
+                  label: _codeCopied ? 'Copied!' : 'Copy HTML',
+                  color: _codeCopied ? const Color(0xFF22C55E) : Colors.white70,
+                  onTap: _copyHtmlCode,
+                ),
+                _ImageActionBtn(
+                  icon: Icons.share_rounded,
+                  label: 'Share',
+                  color: _teal,
+                  onTap: _shareHtml,
+                ),
+                _ImageActionBtn(
+                  icon: Icons.open_in_browser_rounded,
+                  label: 'Browser',
+                  color: Colors.white54,
+                  onTap: _openInBrowser,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ).animate().slideX(begin: -0.05, end: 0, duration: 200.ms, curve: Curves.easeOut).fadeIn(duration: 150.ms);
+  }
+}
+
 
 class _UserBubble extends StatelessWidget {
   final Message message;
