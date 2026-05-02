@@ -181,6 +181,7 @@ class ChatProvider extends ChangeNotifier {
     
     // ── Creative Modes Interception ──────────────────────────────────────────
     bool isImagiya = false;
+    bool isCodesign = false;
     String imagiyaUrl = '';
     String imagiyaPrompt = '';
     
@@ -192,17 +193,34 @@ class ChatProvider extends ChangeNotifier {
       final quality = qualityParts.isNotEmpty ? qualityParts[0] : 'hd';
       final style = qualityParts.length > 1 ? qualityParts.skip(1).join(' ') : 'realistic';
       imagiyaPrompt = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
-      // Append style to prompt for better results
       final fullPrompt = '$imagiyaPrompt, $style style';
       final width = quality == 'uhd' ? 1920 : (quality == 'hd' ? 1280 : 768);
       final height = quality == 'uhd' ? 1080 : (quality == 'hd' ? 720 : 512);
       imagiyaUrl = 'https://image.pollinations.ai/prompt/${Uri.encodeComponent(fullPrompt)}?nologo=true&enhance=${quality != 'standard' ? 'true' : 'false'}&width=$width&height=$height';
     } else if (combinedText.startsWith('[CODESIGN]')) {
+      isCodesign = true;
       final parts = combinedText.substring(10).split('|');
-      final type = parts.isNotEmpty ? parts[0].trim() : 'ui';
-      final codeQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
-      
-      combinedText = 'You are an expert frontend developer. Create a stunning, modern, fully functional single-file HTML/CSS/JS for a "$type" with this requirement: "$codeQuery".\nIMPORTANT: Start your response EXACTLY with `<!--JARVIS_DIAGRAM-->` followed by the raw `<html>...</html>` code. Do not use markdown code blocks like ```html. Do not add any conversational text.';
+      final agentType = parts.isNotEmpty ? parts[0].trim() : 'landing';
+      final designQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
+      imagiyaPrompt = designQuery;
+      // Build a design-focused Pollinations prompt based on the agent type
+      final designPromptMap = {
+        'landing': 'professional landing page UI design mockup, hero section, modern SaaS website, clean layout, vibrant gradient, glassmorphism cards',
+        'dashboard': 'admin dashboard UI design, data visualization, charts, sidebar navigation, dark theme, modern analytics interface',
+        'mobile': 'mobile app UI design, iOS/Android style, clean cards, bottom navigation, modern mobile interface, flat design',
+        'component': 'UI component design, button set, form elements, card components, modern design system, clean flat design',
+        'ecommerce': 'e-commerce product page UI, product cards, shopping cart, checkout flow, modern online store design',
+        'portfolio': 'creative portfolio website design, gallery grid, minimal aesthetic, dark theme, modern typography layout',
+        'saas': 'SaaS pricing page UI, feature comparison, modern web app design, clean pricing cards, gradient hero',
+        'auth': 'login and signup page UI design, authentication flow, form design, modern clean auth screen, glass effect',
+        'blog': 'blog/article page UI design, readable typography, clean layout, minimal aesthetic, content-first design',
+        'social': 'social media app UI design, feed layout, user profile, stories, modern mobile social interface',
+      };
+      final baseDesignPrompt = designPromptMap[agentType] ?? 'modern UI design mockup, clean professional interface';
+      final fullDesignPrompt = designQuery.isNotEmpty
+          ? '$baseDesignPrompt, specifically: $designQuery, high fidelity UI mockup, professional design'
+          : '$baseDesignPrompt, high fidelity UI mockup, professional design';
+      imagiyaUrl = 'https://image.pollinations.ai/prompt/${Uri.encodeComponent(fullDesignPrompt)}?nologo=true&enhance=true&width=1280&height=720&model=flux';
       resolvedProvider = 'codesign';
     }
 
@@ -301,16 +319,21 @@ class ChatProvider extends ChangeNotifier {
     }
 
     // ── 1. Set Status ────────────────────────
-    bool hasImages = _attachedFilePaths.any(
-      (p) =>
-          p.toLowerCase().endsWith('.jpg') ||
-          p.toLowerCase().endsWith('.png') ||
-          p.toLowerCase().endsWith('.jpeg'),
-    );
-    if (_attachedFilePaths.isNotEmpty) {
-      _setAnalysisStatus(hasImages ? "analyze image..." : "analyze file...");
+    // Skip thinking status for creative image modes (Imagiya / CoDesign)
+    if (isImagiya || isCodesign) {
+      // No thinking indicator for image generation
     } else {
-      _setAnalysisStatus("thinking...");
+      bool hasImages = _attachedFilePaths.any(
+        (p) =>
+            p.toLowerCase().endsWith('.jpg') ||
+            p.toLowerCase().endsWith('.png') ||
+            p.toLowerCase().endsWith('.jpeg'),
+      );
+      if (_attachedFilePaths.isNotEmpty) {
+        _setAnalysisStatus(hasImages ? "analyze image..." : "analyze file...");
+      } else {
+        _setAnalysisStatus("thinking...");
+      }
     }
 
     // ── 2. Process files ──────────────────────
@@ -349,8 +372,9 @@ class ChatProvider extends ChangeNotifier {
       displayText = '🎨 Generate Image: $imagiyaPrompt';
     } else if (text.startsWith('[CODESIGN]')) {
       final parts = text.substring(10).split('|');
-      final codeQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
-      displayText = '✨ Generate UI: $codeQuery';
+      final agentType = parts.isNotEmpty ? parts[0].trim() : 'landing';
+      final designQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
+      displayText = '🎨 CoDesign · ${agentType[0].toUpperCase()}${agentType.substring(1)}: $designQuery';
     }
 
     final userMsg = Message(
@@ -365,14 +389,15 @@ class ChatProvider extends ChangeNotifier {
     await sessionService.addMessage(userMsg);
     notifyListeners();
     
-    if (isImagiya) {
+    // Both Imagiya and CoDesign generate images immediately via Pollinations – no LLM streaming
+    if (isImagiya || isCodesign) {
       final aiMsg = Message(
         id: _uuid.v4(),
         content: '![Generated Image]($imagiyaUrl)',
         isUser: false,
         timestamp: DateTime.now(),
         sessionId: _currentSessionId!,
-        provider: 'imagiya',
+        provider: isCodesign ? 'codesign' : 'imagiya',
       );
       _messages.add(aiMsg);
       await sessionService.addMessage(aiMsg);
@@ -380,7 +405,7 @@ class ChatProvider extends ChangeNotifier {
       return;
     }
 
-    if (userMsg.provider != null && userMsg.provider!.isNotEmpty && userMsg.provider != 'codesign') {
+    if (userMsg.provider != null && userMsg.provider!.isNotEmpty) {
       // The user mentioned an integration. Render the UI card only! No jarvis text.
       _setAnalysisStatus("thinking...", active: false);
       notifyListeners();

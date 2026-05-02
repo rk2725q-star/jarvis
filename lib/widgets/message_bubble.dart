@@ -56,7 +56,20 @@ class MessageBubble extends StatelessWidget {
       // Extract URL from markdown image syntax: ![Generated Image](url)
       final imgMatch = RegExp(r'!\[.*?\]\((.+?)\)').firstMatch(message.content);
       final imageUrl = imgMatch?.group(1) ?? '';
-      return _ImagiyaImageBubble(imageUrl: imageUrl, providerColor: const Color(0xFF9B88FF));
+      return _ImagiyaImageBubble(
+        imageUrl: imageUrl,
+        providerColor: const Color(0xFF9B88FF),
+        label: 'IMAGIYA · AI Image',
+      );
+    } else if (message.provider == 'codesign') {
+      // CoDesign uses Pollinations image generation, same bubble with different branding
+      final imgMatch = RegExp(r'!\[.*?\]\((.+?)\)').firstMatch(message.content);
+      final imageUrl = imgMatch?.group(1) ?? '';
+      return _ImagiyaImageBubble(
+        imageUrl: imageUrl,
+        providerColor: const Color(0xFF4DD0E1),
+        label: 'CODESIGN · AI Design',
+      );
     } else if (IntegrationCardBubble.isIntegrationCard(message.content)) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
@@ -228,11 +241,16 @@ class _InlineIntegrationBrowserState extends State<_InlineIntegrationBrowser> {
   }
 }
 
-// ── Imagiya Image Bubble ──────────────────────────────────────────────────────
+// ── Imagiya / CoDesign Image Bubble ────────────────────────────────────────────
 class _ImagiyaImageBubble extends StatefulWidget {
   final String imageUrl;
   final Color providerColor;
-  const _ImagiyaImageBubble({required this.imageUrl, required this.providerColor});
+  final String label;
+  const _ImagiyaImageBubble({
+    required this.imageUrl,
+    required this.providerColor,
+    this.label = 'IMAGIYA · AI Image',
+  });
 
   @override
   State<_ImagiyaImageBubble> createState() => _ImagiyaImageBubbleState();
@@ -284,7 +302,7 @@ class _ImagiyaImageBubbleState extends State<_ImagiyaImageBubble> {
                 children: [
                   Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: widget.providerColor)),
                   const SizedBox(width: 8),
-                  Text('IMAGIYA · AI Image', style: TextStyle(color: widget.providerColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.0)),
+                  Text(widget.label, style: TextStyle(color: widget.providerColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.0)),
                 ],
               ),
             ),

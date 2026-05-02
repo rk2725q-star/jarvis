@@ -707,22 +707,88 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   Widget _buildCodesignOptions() {
-    return Container(
-      height: 40,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [
-          _buildChip('Landing Page', _codesignType == 'landing', () => setState(() => _codesignType = 'landing')),
-          const SizedBox(width: 8),
-          _buildChip('Dashboard', _codesignType == 'dashboard', () => setState(() => _codesignType = 'dashboard')),
-          const SizedBox(width: 8),
-          _buildChip('Component', _codesignType == 'component', () => setState(() => _codesignType = 'component')),
-          const SizedBox(width: 8),
-          _buildChip('Mobile UI', _codesignType == 'mobile', () => setState(() => _codesignType = 'mobile')),
-        ],
-      ),
+    const agents = [
+      ('🚀', 'Landing', 'landing'),
+      ('📊', 'Dashboard', 'dashboard'),
+      ('📱', 'Mobile UI', 'mobile'),
+      ('🧩', 'Component', 'component'),
+      ('🛒', 'E-Commerce', 'ecommerce'),
+      ('🎨', 'Portfolio', 'portfolio'),
+      ('💰', 'SaaS Page', 'saas'),
+      ('🔐', 'Auth Page', 'auth'),
+      ('📝', 'Blog/Article', 'blog'),
+      ('💬', 'Social App', 'social'),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 16, bottom: 4),
+          child: Text(
+            'CoDesign Agent · Pollinations AI',
+            style: TextStyle(
+              color: const Color(0xFF4DD0E1).withValues(alpha: 0.8),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 38,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: agents.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final (emoji, label, value) = agents[index];
+              final isSelected = _codesignType == value;
+              return GestureDetector(
+                onTap: () => setState(() => _codesignType = value),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF4DD0E1).withValues(alpha: 0.18)
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFF4DD0E1).withValues(alpha: 0.6)
+                          : Colors.white.withValues(alpha: 0.12),
+                      width: isSelected ? 1.2 : 0.8,
+                    ),
+                    boxShadow: isSelected ? [
+                      BoxShadow(
+                        color: const Color(0xFF4DD0E1).withValues(alpha: 0.15),
+                        blurRadius: 8,
+                      ),
+                    ] : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(emoji, style: const TextStyle(fontSize: 12)),
+                      const SizedBox(width: 5),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: isSelected ? const Color(0xFF4DD0E1) : Colors.white60,
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 
