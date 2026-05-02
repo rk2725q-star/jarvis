@@ -106,6 +106,10 @@ dependencies:
   # On-device LLM — Netless (Gemma 4 E2B-it offline)
   flutter_gemma: ^0.14.1
 
+  # Imagiya / CoDesign
+  flutter_painter_v2: ^2.1.0
+  gal: any
+
 dependency_overrides:
   dio: ^5.7.0
 

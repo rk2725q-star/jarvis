@@ -5,11 +5,16 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../theme/jarvis_theme.dart';
 import '../features/chat/chat_provider.dart';
 import '../features/vibecode/vibecode_screen.dart';
+
+import '../features/imagiya/screens/imagiya_screen.dart';
 import '../features/integrations/integrations_screen.dart';
 import '../features/integrations/integrations_provider.dart';
 import '../features/integrations/integrations_model.dart';
 import '../services/netless_service.dart';
+import '../services/tts_service.dart';
 import '../core/router/ai_router.dart';
+
+enum ChatInputMode { chat, imagiya, codesign }
 
 class ChatInputBar extends StatefulWidget {
   final Function(String) onSubmit;
@@ -40,6 +45,11 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   // — Netless / Infinity model selector —
   String _selectedMode = 'infinity'; // 'netless' | 'infinity'
+
+  // — Input Mode —
+  ChatInputMode _inputMode = ChatInputMode.chat;
+  String _imagiyaQuality = 'hd';
+  String _codesignType = 'landing';
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -195,10 +205,12 @@ class _ChatInputBarState extends State<ChatInputBar>
         // Switch router to netless provider
         chatProvider.router.setLastSelectedProvider(AIProvider.netless);
         final netless = NetlessService();
-        if (!netless.isLoaded && !netless.isLoading && !netless.isDownloading) {
-          // Schedule dialog after current frame to avoid BuildContext async-gap lint
+        
+        // Show dialog if not loaded, OR if it's already the selected mode (allows management)
+        if (!netless.isLoading && !netless.isDownloading && 
+            (!netless.isLoaded || _selectedMode == 'netless')) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _showNetlessDownloadDialog(this.context, netless);
+            if (mounted) _showNetlessActionDialog(this.context, netless);
           });
         }
       } else {
@@ -208,10 +220,23 @@ class _ChatInputBarState extends State<ChatInputBar>
     });
   }
 
-  void _showNetlessDownloadDialog(
+  void _showNetlessActionDialog(
     BuildContext context,
     NetlessService netless,
   ) {
+    final hasFile = netless.hasFile;
+    final isLoaded = netless.isLoaded;
+
+    String title = 'Download Netless';
+    String actionLabel = 'Download';
+    if (hasFile && !isLoaded) {
+      title = 'Load Netless';
+      actionLabel = 'Load Model';
+    } else if (isLoaded) {
+      title = 'Unload Netless';
+      actionLabel = 'Unload';
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -222,19 +247,19 @@ class _ChatInputBarState extends State<ChatInputBar>
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                color: isLoaded ? const Color(0xFFFF9800).withValues(alpha: 0.15) : const Color(0xFF00E676).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
-                Icons.wifi_off_rounded,
-                color: Color(0xFF00E676),
+              child: Icon(
+                isLoaded ? Icons.stop_circle_rounded : Icons.wifi_off_rounded,
+                color: isLoaded ? const Color(0xFFFF9800) : const Color(0xFF00E676),
                 size: 22,
               ),
             ),
             const SizedBox(width: 12),
-            const Text(
-              'Download Netless',
-              style: TextStyle(
+            Text(
+              title,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -246,9 +271,11 @@ class _ChatInputBarState extends State<ChatInputBar>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Netless runs Google Gemma 4 E2B-it entirely on your device — no internet needed.',
-              style: TextStyle(color: Color(0xFFB0B0C8), fontSize: 14),
+            Text(
+              isLoaded 
+                  ? 'Gemma 4 is currently loaded in RAM. Unload it to free up memory?'
+                  : 'Netless runs Google Gemma 4 E2B-it entirely on your device — no internet needed.',
+              style: const TextStyle(color: Color(0xFFB0B0C8), fontSize: 14),
             ),
             const SizedBox(height: 12),
             Container(
@@ -257,14 +284,14 @@ class _ChatInputBarState extends State<ChatInputBar>
                 color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _InfoRow(icon: Icons.storage_rounded, text: 'Size: ~1.5 GB'),
-                  SizedBox(height: 6),
-                  _InfoRow(icon: Icons.memory_rounded, text: 'Model: Gemma 4 E2B-it'),
-                  SizedBox(height: 6),
-                  _InfoRow(icon: Icons.wifi_off_rounded, text: 'Works 100% offline'),
+                  _InfoRow(icon: Icons.storage_rounded, text: hasFile ? 'Status: Downloaded (~2.5 GB)' : 'Size: ~2.5 GB'),
+                  const SizedBox(height: 6),
+                  _InfoRow(icon: Icons.memory_rounded, text: isLoaded ? 'Status: Active in RAM' : 'Model: Gemma 4 E2B-it'),
+                  const SizedBox(height: 6),
+                  const _InfoRow(icon: Icons.wifi_off_rounded, text: 'Works 100% offline'),
                 ],
               ),
             ),
@@ -273,11 +300,11 @@ class _ChatInputBarState extends State<ChatInputBar>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Later', style: TextStyle(color: Color(0xFF7070A0))),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF7070A0))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00E676),
+              backgroundColor: isLoaded ? const Color(0xFFFF9800) : const Color(0xFF00E676),
               foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -285,9 +312,15 @@ class _ChatInputBarState extends State<ChatInputBar>
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              netless.downloadAndLoad();
+              if (isLoaded) {
+                netless.unloadModel();
+              } else if (hasFile) {
+                netless.loadModel();
+              } else {
+                netless.downloadAndLoad();
+              }
             },
-            child: const Text('Download', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(actionLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -595,7 +628,71 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (text.startsWith('@')) {
       _focusNode.unfocus();
     }
-    widget.onSubmit(text);
+    String finalText = text;
+    if (_inputMode == ChatInputMode.imagiya && !text.startsWith('@')) {
+      finalText = '[IMAGIYA] $_imagiyaQuality| $text';
+    } else if (_inputMode == ChatInputMode.codesign && !text.startsWith('@')) {
+      finalText = '[CODESIGN] $_codesignType| $text';
+    }
+    widget.onSubmit(finalText);
+  }
+
+  Widget _buildChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? JarvisColors.accentPrimary.withValues(alpha: 0.15) : JarvisColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? JarvisColors.accentPrimary : JarvisColors.border.withValues(alpha: 0.5)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : JarvisColors.textSecondary,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImagiyaOptions() {
+    return Container(
+      height: 40,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          _buildChip('Standard', _imagiyaQuality == 'standard', () => setState(() => _imagiyaQuality = 'standard')),
+          const SizedBox(width: 8),
+          _buildChip('HD', _imagiyaQuality == 'hd', () => setState(() => _imagiyaQuality = 'hd')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCodesignOptions() {
+    return Container(
+      height: 40,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          _buildChip('Landing Page', _codesignType == 'landing', () => setState(() => _codesignType = 'landing')),
+          const SizedBox(width: 8),
+          _buildChip('Dashboard', _codesignType == 'dashboard', () => setState(() => _codesignType = 'dashboard')),
+          const SizedBox(width: 8),
+          _buildChip('Component', _codesignType == 'component', () => setState(() => _codesignType = 'component')),
+          const SizedBox(width: 8),
+          _buildChip('Mobile UI', _codesignType == 'mobile', () => setState(() => _codesignType = 'mobile')),
+        ],
+      ),
+    );
   }
 
   void _selectAtIntegration(AIIntegration integration) {
@@ -787,6 +884,10 @@ class _ChatInputBarState extends State<ChatInputBar>
             // @ mention picker overlay
             if (_showAtPicker) _buildAtPicker(intProv),
 
+            // Creative Mode UI extensions
+            if (_inputMode == ChatInputMode.imagiya) _buildImagiyaOptions(),
+            if (_inputMode == ChatInputMode.codesign) _buildCodesignOptions(),
+
             // Analysis indicator
             if (chatProvider.isAnalyzing)
               Container(
@@ -936,32 +1037,98 @@ class _ChatInputBarState extends State<ChatInputBar>
                           ),
                         ),
                       ),
+                      // ── Creative Popup Menu ──
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6, bottom: 4),
+                        child: PopupMenuButton<ChatInputMode>(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          color: const Color(0xFF1E1E2A),
+                          offset: const Offset(0, -120),
+                          tooltip: 'Input Mode',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _inputMode == ChatInputMode.chat ? Colors.white10 : Colors.deepPurpleAccent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _inputMode == ChatInputMode.chat ? Colors.white24 : Colors.deepPurpleAccent.withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _inputMode == ChatInputMode.chat ? Icons.chat_bubble_outline : (_inputMode == ChatInputMode.imagiya ? Icons.image : Icons.design_services), 
+                                  color: _inputMode == ChatInputMode.chat ? Colors.white70 : Colors.deepPurpleAccent, 
+                                  size: 12
+                                ),
+                                const SizedBox(width: 4),
+                                Text(_inputMode == ChatInputMode.chat ? 'Chat' : (_inputMode == ChatInputMode.imagiya ? 'Imagiya' : 'CoDesign'), style: TextStyle(color: _inputMode == ChatInputMode.chat ? Colors.white70 : Colors.deepPurpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          onSelected: (mode) {
+                            setState(() {
+                              _inputMode = mode;
+                            });
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: ChatInputMode.chat,
+                              child: Row(children: [
+                                Icon(Icons.chat_bubble_outline, color: Colors.white70, size: 20),
+                                SizedBox(width: 12),
+                                Text('JARVIS Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                              ]),
+                            ),
+                            const PopupMenuItem(
+                              value: ChatInputMode.imagiya,
+                              child: Row(children: [
+                                Icon(Icons.image, color: Colors.deepPurpleAccent, size: 20),
+                                SizedBox(width: 12),
+                                Text('Imagiya Image', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                              ]),
+                            ),
+                            const PopupMenuItem(
+                              value: ChatInputMode.codesign,
+                              child: Row(children: [
+                                Icon(Icons.design_services, color: Colors.indigoAccent, size: 20),
+                                SizedBox(width: 12),
+                                Text('CoDesign UI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                              ]),
+                            ),
+                          ],
+                        ),
+                      ),
 
                       // Text field - takes remaining space
                       Expanded(
                         child: TextField(
                           controller: _controller,
                           focusNode: _focusNode,
-                          maxLines: 8,
-                          minLines: 3,
+                          maxLines: 5,
+                          minLines: 1,
                           style: const TextStyle(
                             color: JarvisColors.textPrimary,
                             fontSize: 15,
                             height: 1.4,
                           ),
                           cursorColor: JarvisColors.accentPrimary,
-                          decoration: const InputDecoration(
-                            hintText: 'Ask JARVIS...',
+                          decoration: InputDecoration(
+                            hintText: _inputMode == ChatInputMode.chat 
+                                ? 'Message JARVIS...' 
+                                : _inputMode == ChatInputMode.imagiya 
+                                    ? 'Describe your image to Imagiya...' 
+                                    : 'Describe UI to CoDesign...',
                             hintStyle: TextStyle(
-                              color: JarvisColors.textMuted,
-                              fontSize: 14,
+                              color: JarvisColors.textPrimary.withValues(alpha: 0.6),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
                             ),
                             border: InputBorder.none,
                             focusedBorder: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             filled: false,
                             fillColor: Colors.transparent,
-                            contentPadding: EdgeInsets.symmetric(vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                             isDense: true,
                           ),
                           onSubmitted: (_) => _send(),

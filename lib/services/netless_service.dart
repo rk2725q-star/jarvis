@@ -48,6 +48,7 @@ class NetlessService extends ChangeNotifier {
   String get status => _status;
   bool get isAvailable => _isLoaded && _model != null;
   String? get modelPath => _modelPath;
+  bool get hasFile => _modelPath != null && File(_modelPath!).existsSync();
 
   // ── Init (call on app start) ──────────────────────────────────────────────
   Future<void> init() async {
@@ -191,6 +192,7 @@ class NetlessService extends ChangeNotifier {
       await prefs.setString(_prefKeyPath, savePath);
 
       _setStatus('Download complete — loading model…');
+      notifyListeners();
       await _showProgressNotif(100, 'Download complete! Loading…');
 
       await loadModel();
@@ -223,9 +225,10 @@ class NetlessService extends ChangeNotifier {
         fileType: ModelFileType.litertlm,
       ).fromFile(_modelPath!).install();
 
+      // Lower maxTokens to prevent OOM and use auto backend for better device compatibility
       _model = await FlutterGemma.getActiveModel(
-        maxTokens: 2048,
-        preferredBackend: PreferredBackend.gpu,
+        maxTokens: 1024,
+        preferredBackend: PreferredBackend.auto,
       );
 
       _isLoaded = true;

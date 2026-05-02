@@ -178,6 +178,27 @@ class ChatProvider extends ChangeNotifier {
         combinedText = combinedText.substring(atMatch.end).trim();
       }
     }
+    
+    // ── Creative Modes Interception ──────────────────────────────────────────
+    bool isImagiya = false;
+    String imagiyaUrl = '';
+    String imagiyaPrompt = '';
+    
+    if (combinedText.startsWith('[IMAGIYA]')) {
+      isImagiya = true;
+      final parts = combinedText.substring(9).split('|');
+      final quality = parts.isNotEmpty ? parts[0].trim() : 'hd';
+      imagiyaPrompt = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
+      imagiyaUrl = 'https://image.pollinations.ai/prompt/${Uri.encodeComponent(imagiyaPrompt)}?nologo=true&enhance=${quality == 'hd' ? 'true' : 'false'}';
+    } else if (combinedText.startsWith('[CODESIGN]')) {
+      final parts = combinedText.substring(10).split('|');
+      final type = parts.isNotEmpty ? parts[0].trim() : 'ui';
+      final codeQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
+      
+      combinedText = 'You are an expert frontend developer. Create a stunning, modern, fully functional single-file HTML/CSS/JS for a "$type" with this requirement: "$codeQuery".\nIMPORTANT: Start your response EXACTLY with `<!--JARVIS_DIAGRAM-->` followed by the raw `<html>...</html>` code. Do not use markdown code blocks like ```html. Do not add any conversational text.';
+      resolvedProvider = 'codesign';
+    }
+
     // NOTE: Autonomous keyword-based integration routing is intentionally disabled.
     // Integrations are ONLY triggered when the user explicitly uses @mention.
 
@@ -316,7 +337,15 @@ class ChatProvider extends ChangeNotifier {
 
     // Add user message — store ORIGINAL text only (not the history-injected combinedText)
     // combinedText (with [RECENT CHAT HISTORY]) is only sent to the AI, never displayed
-    final displayText = text.isEmpty ? "Analyzed attached files" : text.trim();
+    String displayText = text.isEmpty ? "Analyzed attached files" : text.trim();
+    if (text.startsWith('[IMAGIYA]')) {
+      displayText = '🎨 Generate Image: $imagiyaPrompt';
+    } else if (text.startsWith('[CODESIGN]')) {
+      final parts = text.substring(10).split('|');
+      final codeQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
+      displayText = '✨ Generate UI: $codeQuery';
+    }
+
     final userMsg = Message(
       id: _uuid.v4(),
       content: displayText,
@@ -328,8 +357,23 @@ class ChatProvider extends ChangeNotifier {
     _messages.add(userMsg);
     await sessionService.addMessage(userMsg);
     notifyListeners();
+    
+    if (isImagiya) {
+      final aiMsg = Message(
+        id: _uuid.v4(),
+        content: '![Generated Image]($imagiyaUrl)',
+        isUser: false,
+        timestamp: DateTime.now(),
+        sessionId: _currentSessionId!,
+        provider: 'imagiya',
+      );
+      _messages.add(aiMsg);
+      await sessionService.addMessage(aiMsg);
+      notifyListeners();
+      return;
+    }
 
-    if (userMsg.provider != null && userMsg.provider!.isNotEmpty) {
+    if (userMsg.provider != null && userMsg.provider!.isNotEmpty && userMsg.provider != 'codesign') {
       // The user mentioned an integration. Render the UI card only! No jarvis text.
       _setAnalysisStatus("thinking...", active: false);
       notifyListeners();

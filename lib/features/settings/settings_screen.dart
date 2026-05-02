@@ -84,7 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               children: [
                                 Text('Browse All AI Providers', style: TextStyle(color: JarvisColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
                                 SizedBox(height: 2),
-                                Text('Get API keys, view docs, compare 7 providers + 200+ models', style: TextStyle(color: JarvisColors.textMuted, fontSize: 11)),
+                                Text('Get API keys, view docs, compare 7 providers + 200+ models', style: TextStyle(color: JarvisColors.textMuted, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
                               ],
                             ),
                           ),
@@ -136,6 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       Text(
                                         isReady ? 'Netless Active' : hasFile ? 'Gemma Downloaded — Tap to Load' : 'Gemma 4 E2B-it (Offline)',
                                         style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 3),
                                       Text(
