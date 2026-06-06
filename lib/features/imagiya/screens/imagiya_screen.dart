@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../../core/api/api_client.dart';
+import 'package:provider/provider.dart';
+import '../../../core/router/ai_router.dart';
 import '../../codesign/models/codesign_models.dart';
 import '../../codesign/services/codesign_service.dart';
 import '../../codesign/widgets/codesign_panel.dart';
@@ -12,6 +14,8 @@ import '../services/imagiya_service.dart';
 import '../widgets/image_viewport.dart';
 import '../widgets/prompt_composer.dart';
 import 'image_editor_screen.dart';
+import 'ebook_generator_screen.dart';
+import 'video_gen_screen.dart';
 
 class ImagiyaScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -25,8 +29,8 @@ class ImagiyaScreen extends StatefulWidget {
 class _ImagiyaScreenState extends State<ImagiyaScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
-  final _imagiyaService = ImagiyaService();
-  final _codesignService = CodesignService();
+  late final ImagiyaService _imagiyaService;
+  late final CodesignService _codesignService;
   final _downloadService = DownloadService();
 
   GeneratedImage? _currentImage;
@@ -38,7 +42,9 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this, initialIndex: widget.initialTabIndex);
+    _imagiyaService = ImagiyaService(router: context.read<AIRouter>());
+    _codesignService = CodesignService(router: context.read<AIRouter>());
+    _tabs = TabController(length: 4, vsync: this, initialIndex: widget.initialTabIndex);
   }
 
   @override
@@ -115,9 +121,13 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
         iconTheme: const IconThemeData(color: Colors.white),
         bottom: TabBar(
           controller: _tabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: const [
             Tab(icon: Icon(Icons.image), text: 'Imagiya'),
             Tab(icon: Icon(Icons.design_services), text: 'CoDesign'),
+            Tab(icon: Icon(Icons.auto_stories), text: 'eBook'),
+            Tab(icon: Icon(Icons.videocam_rounded), text: 'Video Gen'),
           ],
           indicatorColor: Colors.deepPurpleAccent,
           labelColor: Colors.deepPurpleAccent,
@@ -189,12 +199,17 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
           ),
 
           // ── CoDesign Tab ──
-          SingleChildScrollView(
+          Padding(
             padding: const EdgeInsets.all(16),
             child: CodesignPanel(
               artifact: _currentArtifact,
               onGenerate: _generateCodesign,
               onEdit: _editArtifact,
+              onRestore: (restored) {
+                setState(() {
+                  _currentArtifact = restored;
+                });
+              },
               onSaveImage: (bytes) async {
                 final result = await _downloadService.saveToGallery(
                   bytes.toList(),
@@ -220,6 +235,12 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
               isLoading: _isDesigning,
             ),
           ),
+
+          // ── eBook Tab ──
+          const EBookGeneratorScreen(),
+
+          // ── Video Gen Tab ──
+          const VideoGenScreen(),
         ],
       ),
     );

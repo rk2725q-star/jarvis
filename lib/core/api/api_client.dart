@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -37,11 +38,20 @@ class ApiClient {
     }
   }
 
-  /// Fetch image as bytes (for Pollinations)
+  /// Fetch image as bytes
   Future<List<int>> fetchImageBytes(
     String url, {
     CancelToken? cancelToken,
   }) async {
+    if (url.startsWith('data:image/')) {
+      try {
+        final base64String = url.split(',').last;
+        return base64Decode(base64String);
+      } catch (e) {
+        throw ApiException('Failed to parse base64 image: $e');
+      }
+    }
+
     final response = await _dio.get<List<int>>(
       url,
       cancelToken: cancelToken,

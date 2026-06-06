@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/image_models.dart';
@@ -27,20 +28,26 @@ class ImageViewport extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           child: Stack(
             children: [
-              CachedNetworkImage(
-                imageUrl: image.imageUrl,
-                fit: BoxFit.contain,
-                placeholder: (context, url) => Container(
-                  height: 300,
-                  color: Colors.grey[200],
-                  child: const Center(child: CircularProgressIndicator()),
+              if (image.imageUrl.startsWith('data:image/'))
+                Image.memory(
+                  base64Decode(image.imageUrl.split(',').last),
+                  fit: BoxFit.contain,
+                )
+              else
+                CachedNetworkImage(
+                  imageUrl: image.imageUrl,
+                  fit: BoxFit.contain,
+                  placeholder: (context, url) => Container(
+                    height: 300,
+                    color: Colors.grey[200],
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    height: 300,
+                    color: Colors.red[50],
+                    child: const Center(child: Icon(Icons.broken_image, color: Colors.red)),
+                  ),
                 ),
-                errorWidget: (context, url, error) => Container(
-                  height: 300,
-                  color: Colors.red[50],
-                  child: const Center(child: Icon(Icons.broken_image, color: Colors.red)),
-                ),
-              ),
               if (image.status == ImageStatus.generating)
                 Positioned.fill(
                   child: Container(

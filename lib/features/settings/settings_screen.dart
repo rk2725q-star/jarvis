@@ -243,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             apiKeyHint: 'ollama_...',
                             apiKeyLabel: 'Ollama Cloud Key',
                             showUrlInput: true,
-                            urlHint: 'https://api.ollama.com',
+                            urlHint: 'https://ollama.com',
                             urlLabel: 'Cloud Endpoint',
                             storageKey: 'ollamaCloud',
                           ),
@@ -347,7 +347,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 28),
 
 
-                   const SizedBox(height: 28),
+                  const SizedBox(height: 28),
+
+                  // About & Legal section
+                  _SectionHeader(title: 'About & Legal', icon: Icons.info_outline_rounded),
+                  const SizedBox(height: 12),
+                  _InfoCard(
+                    children: [
+                      _SettingsRow(
+                        label: 'Open Source Licenses',
+                        trailing: TextButton(
+                          onPressed: () {
+                            showLicensePage(
+                              context: context,
+                              applicationName: 'WFY (JARVIS)',
+                              applicationLegalese: 'Licensed under the Apache License, Version 2.0',
+                            );
+                          },
+                          child: const Text('VIEW', style: TextStyle(color: JarvisColors.accentPrimary, fontSize: 13, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 28),
 
                   // Meta Intelligence section
                   _SectionHeader(title: 'Meta Intelligence', icon: Icons.mediation_rounded),

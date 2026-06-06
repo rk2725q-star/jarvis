@@ -1,7 +1,24 @@
+/*
+ * Copyright 2024
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' as rp;
 
 import 'core/memory/memory_service.dart';
 import 'core/router/ai_router.dart';
@@ -20,6 +37,7 @@ import 'features/vibecode/vibecode_controller.dart';
 import 'services/google_docs_service.dart';
 import 'features/assignment/assignment_provider.dart';
 import 'features/integrations/integrations_provider.dart';
+import 'services/skill_service.dart';
 import 'package:flutter_file_view/flutter_file_view.dart';
 import 'package:audio_service/audio_service.dart';
 import 'features/youtube/yt_audio_handler.dart';
@@ -73,10 +91,12 @@ Future<void> main() async {
   final ttsService = TtsService();
   final fileProcessor = FileProcessor();
   final googleDocs = GoogleDocsService();
+  final skillService = SkillService();
 
   await memory.init();
   await sessionService.init();
   await ttsService.init();
+  await skillService.init();
 
   final ollamaProvider = OllamaProvider();
   await ollamaProvider.init();
@@ -91,6 +111,7 @@ Future<void> main() async {
     fileProcessor: fileProcessor,
     ollamaService: ollamaProvider.service,
     googleDocs: googleDocs,
+    skillService: skillService,
   );
   await router.init(); 
 
@@ -112,23 +133,27 @@ Future<void> main() async {
 
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider<AIRouter>.value(value: router),
-        ChangeNotifierProvider<ChatProvider>.value(value: chatProvider),
-        ChangeNotifierProvider<OllamaProvider>.value(value: ollamaProvider),
-        ChangeNotifierProvider<VibeCodeController>.value(value: vibecodeController),
-        ChangeNotifierProvider<AssignmentProvider>.value(value: assignmentProvider),
-        ChangeNotifierProvider<IntegrationsProvider>.value(value: integrationsProvider),
-        ChangeNotifierProvider<YTDownloadProvider>(create: (_) => YTDownloadProvider()),
-        Provider<SecureStorageService>.value(value: secureStorage),
-        Provider<MemoryService>.value(value: memory),
-        Provider<SessionService>.value(value: sessionService),
-        Provider<TtsService>.value(value: ttsService),
-        Provider<FileProcessor>.value(value: fileProcessor),
-        Provider<GoogleDocsService>.value(value: googleDocs),
-      ],
-      child: const JarvisApp(),
+    rp.ProviderScope(
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AIRouter>.value(value: router),
+          ChangeNotifierProvider<ChatProvider>.value(value: chatProvider),
+          ChangeNotifierProvider<OllamaProvider>.value(value: ollamaProvider),
+          ChangeNotifierProvider<VibeCodeController>.value(value: vibecodeController),
+          ChangeNotifierProvider<AssignmentProvider>.value(value: assignmentProvider),
+          ChangeNotifierProvider<IntegrationsProvider>.value(value: integrationsProvider),
+          ChangeNotifierProvider<SkillService>.value(value: skillService),
+          ChangeNotifierProvider<YTDownloadProvider>(create: (_) => YTDownloadProvider()),
+          Provider<SecureStorageService>.value(value: secureStorage),
+          Provider<MemoryService>.value(value: memory),
+          Provider<SessionService>.value(value: sessionService),
+          Provider<TtsService>.value(value: ttsService),
+          Provider<FileProcessor>.value(value: fileProcessor),
+          Provider<GoogleDocsService>.value(value: googleDocs),
+          Provider<SkillService>.value(value: skillService),
+        ],
+        child: const JarvisApp(),
+      ),
     ),
   );
 }

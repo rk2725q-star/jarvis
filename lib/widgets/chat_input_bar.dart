@@ -5,12 +5,17 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../theme/jarvis_theme.dart';
 import '../features/chat/chat_provider.dart';
 import '../features/vibecode/vibecode_screen.dart';
+import '../features/agents/agentica_screen.dart';
+import '../features/skills/skills_screen.dart';
+import '../services/skill_service.dart';
+import '../models/jarvis_skill.dart';
 
 import '../features/integrations/integrations_screen.dart';
 import '../features/integrations/integrations_provider.dart';
 import '../features/integrations/integrations_model.dart';
 import '../services/netless_service.dart';
 import '../core/router/ai_router.dart';
+import '../features/imagiya/screens/imagiya_screen.dart';
 
 enum ChatInputMode { chat, imagiya, codesign }
 
@@ -40,6 +45,10 @@ class _ChatInputBarState extends State<ChatInputBar>
   // @ mention picker state
   bool _showAtPicker = false;
   String _atQuery = '';
+
+  // / skill picker state
+  bool _showSlashPicker = false;
+  String _slashQuery = '';
 
   // — Netless / Infinity model selector —
   String _selectedMode = 'infinity'; // 'netless' | 'infinity'
@@ -79,19 +88,39 @@ class _ChatInputBarState extends State<ChatInputBar>
     final cursor = _controller.selection.baseOffset;
     if (cursor > 0 && cursor <= text.length) {
       final before = text.substring(0, cursor);
+
+      // ── @ mention picker ──
       final atIdx = before.lastIndexOf('@');
       if (atIdx >= 0) {
         final afterAt = before.substring(atIdx + 1);
         if (!afterAt.contains(' ')) {
           setState(() {
             _showAtPicker = true;
+            _showSlashPicker = false;
             _atQuery = afterAt.toLowerCase();
           });
           return;
         }
       }
+
+      // ── / skill picker ──
+      final slashIdx = before.lastIndexOf('/');
+      if (slashIdx == 0) {
+        final afterSlash = before.substring(slashIdx + 1);
+        if (!afterSlash.contains(' ')) {
+          setState(() {
+            _showSlashPicker = true;
+            _showAtPicker = false;
+            _slashQuery = afterSlash.toLowerCase();
+          });
+          return;
+        }
+      }
     }
-    setState(() => _showAtPicker = false);
+    setState(() {
+      _showAtPicker = false;
+      _showSlashPicker = false;
+    });
   }
 
   Future<void> _initSpeech() async {
@@ -449,6 +478,48 @@ class _ChatInputBarState extends State<ChatInputBar>
             );
           },
         ),
+        const SizedBox(height: 12),
+        _ActionTile(
+          icon: Icons.bolt_rounded,
+          title: 'Agentica OS',
+          subtitle: 'Autonomous control of any Android app',
+          iconColor: Colors.amber,
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AgenticaScreen()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _ActionTile(
+          icon: Icons.auto_awesome,
+          title: 'Imagiya Creative',
+          subtitle: 'Generate images, eBooks & AI videos',
+          iconColor: Colors.deepPurpleAccent,
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ImagiyaScreen()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _ActionTile(
+          icon: Icons.videocam_rounded,
+          title: 'Video Generator',
+          subtitle: 'AI-generated 2-min cinematic video',
+          iconColor: const Color(0xFF64FFDA),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ImagiyaScreen(initialTabIndex: 3)),
+            );
+          },
+        ),
         const SizedBox(height: 20),
       ],
     );
@@ -718,6 +789,16 @@ class _ChatInputBarState extends State<ChatInputBar>
       ('🔐', 'Auth Page', 'auth'),
       ('📝', 'Blog/Article', 'blog'),
       ('💬', 'Social App', 'social'),
+      ('⚙️', 'Settings', 'settings'),
+      ('📋', 'Admin Panel', 'admin'),
+      ('💵', 'Pricing', 'pricing'),
+      ('👤', 'Profile', 'profile'),
+      ('📧', 'Email Template', 'email'),
+      ('📈', 'Analytics', 'analytics'),
+      ('🎮', 'Gaming UI', 'gaming'),
+      ('🎓', 'EdTech UI', 'edtech'),
+      ('🏥', 'Health App', 'health'),
+      ('💳', 'Fintech App', 'fintech'),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -808,6 +889,343 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
     setState(() => _showAtPicker = false);
     _focusNode.requestFocus();
+  }
+
+  /// When user selects a skill from /picker, inject it as a [USE SKILL] tag in the text
+  void _selectSlashSkill(JarvisSkill skill) {
+    final text = _controller.text;
+    final cursor = _controller.selection.baseOffset.clamp(0, text.length);
+    final before = text.substring(0, cursor);
+    final slashIdx = before.lastIndexOf('/');
+    final after = text.substring(cursor);
+    // Replace the /query with an invisible [SKILL:name] tag — the user message
+    // reads naturally; JARVIS engine sees the tag and activates the skill.
+    final tag = '[USE_SKILL:${skill.name}] ';
+    final newText = '${text.substring(0, slashIdx)}$tag$after';
+    _controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: slashIdx + tag.length),
+    );
+    setState(() => _showSlashPicker = false);
+    _focusNode.requestFocus();
+  }
+
+  /// Build the / skill picker overlay
+  Widget _buildSlashPicker(SkillService skillService) {
+    final allSkills = skillService.skills.where((s) => s.isActive).toList();
+    final dnaSkills = allSkills.where((s) => s.id.startsWith('jarvis-dna-')).toList();
+    final otherSkills = allSkills.where((s) => !s.id.startsWith('jarvis-dna-')).toList();
+
+    // Filter by search query
+    bool matchesQuery(JarvisSkill s) {
+      if (_slashQuery.isEmpty) return true;
+      return s.name.toLowerCase().contains(_slashQuery) ||
+          s.description.toLowerCase().contains(_slashQuery);
+    }
+
+    final filteredDna = dnaSkills.where(matchesQuery).toList();
+    final filteredOther = otherSkills.where(matchesQuery).take(30).toList();
+
+    final dnaEmojis = {
+      'claude-sonnet-4-6': '⚡',
+      'claude-opus-4-6': '🧠',
+      'claude-opus-4-7': '🔬',
+      'claude-opus-4-8': '🏆',
+      'gemini-3-5-flash': '⚡',
+      'gpt-5-5': '🧩',
+      'kimi-k2-6': '🌊',
+    };
+
+    String dnaEmoji(JarvisSkill s) {
+      for (final entry in dnaEmojis.entries) {
+        if (s.id.contains(entry.key)) return entry.value;
+      }
+      return '🧠';
+    }
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 340),
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFF7C3AED).withValues(alpha: 0.4),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
+            blurRadius: 24,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.4)),
+                  ),
+                  child: const Text(
+                    '/ SKILLS',
+                    style: TextStyle(
+                      color: Color(0xFFA78BFA),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${allSkills.length} skills active',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 10,
+                  ),
+                ),
+                const Spacer(),
+                // Open Skills Hub button
+                GestureDetector(
+                  onTap: () {
+                    setState(() => _showSlashPicker = false);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SkillsScreen()),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Manage ›',
+                      style: TextStyle(
+                        color: Color(0xFFA78BFA),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Create new skill row
+          GestureDetector(
+            onTap: () {
+              setState(() => _showSlashPicker = false);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SkillsScreen()),
+              );
+            },
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.25),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7C3AED).withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add_rounded, size: 16, color: Color(0xFFA78BFA)),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Create New Skill',
+                          style: TextStyle(
+                            color: Color(0xFFA78BFA),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'Build a custom AI capability for JARVIS',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF7C3AED)),
+                ],
+              ),
+            ),
+          ),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              children: [
+                // ── Elite Model DNA section (always shown first) ──
+                if (filteredDna.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, top: 4, bottom: 4),
+                    child: Row(
+                      children: [
+                        const Text('👑 ', style: TextStyle(fontSize: 10)),
+                        const Text(
+                          'ELITE MODEL DNA — Always Active',
+                          style: TextStyle(
+                            color: Color(0xFFFFD700),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ...filteredDna.map((skill) => _buildSkillTile(
+                    skill,
+                    emoji: dnaEmoji(skill),
+                    accentColor: const Color(0xFFFFD700),
+                    badge: 'ALWAYS ON',
+                    badgeColor: const Color(0xFFFFD700),
+                  )),
+                  const SizedBox(height: 4),
+                ],
+                // ── Contextual skills section ──
+                if (filteredOther.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, top: 4, bottom: 4),
+                    child: Text(
+                      '⚡ EXPERT SKILLS (${otherSkills.length} available)',
+                      style: const TextStyle(
+                        color: Color(0xFF7C3AED),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                  ...filteredOther.map((skill) => _buildSkillTile(
+                    skill,
+                    emoji: '🧠',
+                    accentColor: const Color(0xFF7C3AED),
+                  )),
+                ],
+                if (filteredDna.isEmpty && filteredOther.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'No skills match " $_slashQuery "',
+                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkillTile(
+    JarvisSkill skill, {
+    required String emoji,
+    required Color accentColor,
+    String? badge,
+    Color? badgeColor,
+  }) {
+    return GestureDetector(
+      onTap: () => _selectSlashSkill(skill),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: accentColor.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: accentColor.withValues(alpha: 0.18),
+            width: 0.7,
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 15)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    skill.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    skill.description,
+                    style: TextStyle(
+                      color: accentColor.withValues(alpha: 0.7),
+                      fontSize: 10,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (badge != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (badgeColor ?? accentColor).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(
+                    color: (badgeColor ?? accentColor).withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Text(
+                  badge,
+                  style: TextStyle(
+                    color: badgeColor ?? accentColor,
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildAtPicker(IntegrationsProvider intProv) {
@@ -975,9 +1393,13 @@ class _ChatInputBarState extends State<ChatInputBar>
     return Consumer<ChatProvider>(
       builder: (context, chatProvider, _) {
         final intProv = context.watch<IntegrationsProvider>();
+        final skillService = context.watch<SkillService>();
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // / skill picker overlay
+            if (_showSlashPicker) _buildSlashPicker(skillService),
+
             // @ mention picker overlay
             if (_showAtPicker) _buildAtPicker(intProv),
 
@@ -1077,7 +1499,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
             // ── Main full-width input bar ───────────────────────────────────
             Container(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 18),
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 18),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -1090,39 +1512,150 @@ class _ChatInputBarState extends State<ChatInputBar>
               ),
               child: SafeArea(
                 top: false,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  decoration: BoxDecoration(
-                    color: _focusNode.hasFocus
-                        ? const Color(0xFF16162A)
-                        : const Color(0xFF111120),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: _inputMode != ChatInputMode.chat
-                          ? Colors.deepPurpleAccent.withValues(alpha: _focusNode.hasFocus ? 0.7 : 0.35)
-                          : _focusNode.hasFocus
-                              ? JarvisColors.accentPrimary.withValues(alpha: 0.55)
-                              : JarvisColors.border.withValues(alpha: 0.4),
-                      width: 1.2,
-                    ),
-                    boxShadow: _focusNode.hasFocus
-                        ? [
-                            BoxShadow(
-                              color: (_inputMode != ChatInputMode.chat
-                                      ? Colors.deepPurpleAccent
-                                      : JarvisColors.accentPrimary)
-                                  .withValues(alpha: 0.14),
-                              blurRadius: 24,
-                              spreadRadius: 0,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Mode selector above the input bar
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, bottom: 8),
+                      child: PopupMenuButton<String>(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        color: const Color(0xFF1A1A2E),
+                        offset: const Offset(0, -130),
+                        tooltip: 'Switch Mode',
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _inputMode == ChatInputMode.chat
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.deepPurpleAccent.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _inputMode == ChatInputMode.chat
+                                  ? Colors.white12
+                                  : Colors.deepPurpleAccent.withValues(alpha: 0.45),
                             ),
-                          ]
-                        : [],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // ── Top row: mode badge + text field ──
-                      Row(
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _inputMode == ChatInputMode.chat
+                                    ? Icons.chat_bubble_outline_rounded
+                                    : _inputMode == ChatInputMode.imagiya
+                                        ? Icons.auto_awesome_rounded
+                                        : Icons.design_services_rounded,
+                                size: 14,
+                                color: _inputMode == ChatInputMode.chat
+                                    ? Colors.white54
+                                    : Colors.deepPurpleAccent,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _inputMode == ChatInputMode.chat
+                                    ? 'Chat'
+                                    : _inputMode == ChatInputMode.imagiya
+                                        ? 'Imagiya'
+                                        : 'CoDesign',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _inputMode == ChatInputMode.chat
+                                      ? Colors.white54
+                                      : Colors.deepPurpleAccent,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.expand_less_rounded,
+                                size: 14,
+                                color: _inputMode == ChatInputMode.chat
+                                    ? Colors.white30
+                                    : Colors.deepPurpleAccent.withValues(alpha: 0.6),
+                              ),
+                            ],
+                          ),
+                        ),
+                        onSelected: (value) {
+                          if (value == 'agentica') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AgenticaScreen()),
+                            );
+                          } else {
+                            setState(() => _inputMode = ChatInputMode.values.firstWhere(
+                              (m) => m.name == value,
+                              orElse: () => ChatInputMode.chat,
+                            ));
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'chat',
+                            child: Row(children: [
+                              Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 18),
+                              SizedBox(width: 12),
+                              Text('JARVIS Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                          const PopupMenuItem(
+                            value: 'imagiya',
+                            child: Row(children: [
+                              Icon(Icons.auto_awesome_rounded, color: Colors.deepPurpleAccent, size: 18),
+                              SizedBox(width: 12),
+                              Text('Imagiya · Image', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                          const PopupMenuItem(
+                            value: 'codesign',
+                            child: Row(children: [
+                              Icon(Icons.design_services_rounded, color: Colors.indigoAccent, size: 18),
+                              SizedBox(width: 12),
+                              Text('CoDesign · UI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                          const PopupMenuItem(
+                            value: 'agentica',
+                            child: Row(children: [
+                              Icon(Icons.bolt_rounded, color: Colors.amber, size: 18),
+                              SizedBox(width: 12),
+                              Text('Agentica OS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      decoration: BoxDecoration(
+                        color: _focusNode.hasFocus
+                            ? const Color(0xFF16162A)
+                            : const Color(0xFF111120),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: _inputMode != ChatInputMode.chat
+                              ? Colors.deepPurpleAccent.withValues(alpha: _focusNode.hasFocus ? 0.7 : 0.35)
+                              : _focusNode.hasFocus
+                                  ? JarvisColors.accentPrimary.withValues(alpha: 0.55)
+                                  : JarvisColors.border.withValues(alpha: 0.4),
+                          width: 1.2,
+                        ),
+                        boxShadow: _focusNode.hasFocus
+                            ? [
+                                BoxShadow(
+                                  color: (_inputMode != ChatInputMode.chat
+                                          ? Colors.deepPurpleAccent
+                                          : JarvisColors.accentPrimary)
+                                      .withValues(alpha: 0.14),
+                                  blurRadius: 24,
+                                  spreadRadius: 0,
+                                ),
+                              ]
+                            : [],
+                      ),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           // Left: + button
@@ -1307,104 +1840,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                           ),
                         ],
                       ),
-                      // ── Bottom row: mode selector pill ──
-                      Padding(
-                        padding: const EdgeInsets.only(left: 10, right: 10, bottom: 8),
-                        child: Row(
-                          children: [
-                            // Mode selector
-                            PopupMenuButton<ChatInputMode>(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              color: const Color(0xFF1A1A2E),
-                              offset: const Offset(0, -130),
-                              tooltip: 'Switch Mode',
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: _inputMode == ChatInputMode.chat
-                                      ? Colors.white.withValues(alpha: 0.06)
-                                      : Colors.deepPurpleAccent.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: _inputMode == ChatInputMode.chat
-                                        ? Colors.white12
-                                        : Colors.deepPurpleAccent.withValues(alpha: 0.45),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      _inputMode == ChatInputMode.chat
-                                          ? Icons.chat_bubble_outline_rounded
-                                          : _inputMode == ChatInputMode.imagiya
-                                              ? Icons.auto_awesome_rounded
-                                              : Icons.design_services_rounded,
-                                      size: 13,
-                                      color: _inputMode == ChatInputMode.chat
-                                          ? Colors.white54
-                                          : Colors.deepPurpleAccent,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      _inputMode == ChatInputMode.chat
-                                          ? 'Chat'
-                                          : _inputMode == ChatInputMode.imagiya
-                                              ? 'Imagiya'
-                                              : 'CoDesign',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: _inputMode == ChatInputMode.chat
-                                            ? Colors.white54
-                                            : Colors.deepPurpleAccent,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Icon(
-                                      Icons.expand_less_rounded,
-                                      size: 13,
-                                      color: _inputMode == ChatInputMode.chat
-                                          ? Colors.white30
-                                          : Colors.deepPurpleAccent.withValues(alpha: 0.6),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              onSelected: (mode) => setState(() => _inputMode = mode),
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: ChatInputMode.chat,
-                                  child: Row(children: [
-                                    Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 18),
-                                    SizedBox(width: 12),
-                                    Text('JARVIS Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                                  ]),
-                                ),
-                                const PopupMenuItem(
-                                  value: ChatInputMode.imagiya,
-                                  child: Row(children: [
-                                    Icon(Icons.auto_awesome_rounded, color: Colors.deepPurpleAccent, size: 18),
-                                    SizedBox(width: 12),
-                                    Text('Imagiya · Image', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                                  ]),
-                                ),
-                                const PopupMenuItem(
-                                  value: ChatInputMode.codesign,
-                                  child: Row(children: [
-                                    Icon(Icons.design_services_rounded, color: Colors.indigoAccent, size: 18),
-                                    SizedBox(width: 12),
-                                    Text('CoDesign · UI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                                  ]),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1440,16 +1877,19 @@ class _ActionTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final Color? iconColor; // optional tint override
 
   const _ActionTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = iconColor ?? JarvisColors.accentPrimary;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1467,10 +1907,10 @@ class _ActionTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: JarvisColors.accentPrimary.withValues(alpha: 0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: JarvisColors.accentPrimary, size: 20),
+                child: Icon(icon, color: color, size: 20),
               ),
               const SizedBox(width: 16),
               Expanded(

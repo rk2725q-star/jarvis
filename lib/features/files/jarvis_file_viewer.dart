@@ -17,6 +17,7 @@ import 'package:flutter_markdown_latex/flutter_markdown_latex.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:archive/archive.dart';
+import '../../widgets/message_bubble.dart';
 
 import 'models/doc_models.dart';
 import 'parsers/docx_parser.dart';
@@ -1097,15 +1098,23 @@ class _ChatBubble extends StatelessWidget {
                     ),
                   )
                 : MarkdownBody(
-                    data: text,
+                    data: replaceMermaidDiagrams(replaceMarkdownTables(text)),
                     builders: {
                       'latex': LatexElementBuilder(
                         textStyle: TextStyle(color: JarvisColors.textPrimary, fontSize: 13.5),
                         textScaleFactor: 1.1,
                       ),
+                      'customtable': CustomTableBuilder(),
+                      'custommermaid': CustomMermaidBuilder(),
                     },
+                    styleSheetTheme: MarkdownStyleSheetBaseTheme.cupertino,
                     extensionSet: md.ExtensionSet(
-                      [LatexBlockSyntax(), ...md.ExtensionSet.gitHubFlavored.blockSyntaxes],
+                      [
+                        LatexBlockSyntax(),
+                        const CustomTableSyntax(),
+                        const CustomMermaidSyntax(),
+                        ...md.ExtensionSet.gitHubFlavored.blockSyntaxes
+                      ],
                       [LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
                     ),
                     styleSheet: MarkdownStyleSheet(

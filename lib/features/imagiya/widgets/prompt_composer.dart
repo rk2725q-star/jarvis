@@ -19,7 +19,7 @@ class PromptComposer extends StatefulWidget {
 class _PromptComposerState extends State<PromptComposer> {
   final _controller = TextEditingController();
   ImageResolution _resolution = ImageResolution.hd;
-  String _model = 'flux';
+  String _model = 'minimax-m3';
 
   @override
   Widget build(BuildContext context) {

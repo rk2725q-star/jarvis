@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import '../files/jarvis_file_viewer.dart';
 import '../youtube/youtube_screen.dart';
 
+
 import '../integrations/integrations_model.dart';
 import '../integrations/integration_browser_screen.dart';
 import 'chat_provider.dart';
@@ -30,6 +31,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   int _lastMessageCount = 0;
+  // Throttle scroll-during-streaming so we never flood the UI thread
+  Timer? _scrollThrottle;
+  bool _isScrollThrottled = false;
 
   @override
   void initState() {
@@ -140,6 +144,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     _intentDataStreamSubscription?.cancel();
+    _scrollThrottle?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
@@ -168,14 +173,33 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
   }
 
+  /// Throttled scroll-during-streaming: fires at most once per 400ms.
+  void _throttledScrollToBottom() {
+    if (_isScrollThrottled) return;
+    _isScrollThrottled = true;
+    _scrollThrottle?.cancel();
+    _scrollThrottle = Timer(const Duration(milliseconds: 400), () {
+      _isScrollThrottled = false;
+      if (_scrollController.hasClients) {
+        final pos = _scrollController.position;
+        if (pos.maxScrollExtent - pos.pixels < 200) {
+          pos.jumpTo(pos.maxScrollExtent);
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ChatProvider>(
       builder: (context, chatProvider, child) {
-        // Auto-scroll on new messages
-        if (chatProvider.isGenerating || chatProvider.messages.length > _lastMessageCount) {
+        // Auto-scroll only when new messages arrive (not on every streaming tick)
+        if (chatProvider.messages.length > _lastMessageCount) {
           _lastMessageCount = chatProvider.messages.length;
           _scrollToBottom();
+        } else if (chatProvider.isGenerating) {
+          // Use throttled scroll — never add postFrameCallback on every build
+          _throttledScrollToBottom();
         }
 
         return Scaffold(
@@ -305,6 +329,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
 
 
+
+
           // Settings
           IconButton(
             icon: const Icon(Icons.settings_rounded, color: JarvisColors.textSecondary, size: 22),
@@ -377,7 +403,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Widget _buildSuggestions() {
     final suggestions = [
-      ('💡', 'What can you do?'),
+      ('🗺️', 'Show AI Roadmap 2026'),
       ('🚀', 'Explain quantum computing'),
       ('🎨', 'Write a creative story'),
       ('📊', 'Help me plan my day'),

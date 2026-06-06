@@ -132,9 +132,54 @@ class MainActivity : AudioServiceActivity() {
                     "isAccessibilityEnabled" -> {
                         result.success(isServiceEnabled(this, JarvisAccessibilityService::class.java))
                     }
+                    "getAccessibilityStatus" -> {
+                        val isEnabled = isServiceEnabled(this, JarvisAccessibilityService::class.java)
+                        val isRunning = JarvisAccessibilityService.instance != null
+                        val status = mapOf(
+                            "enabled" to isEnabled,
+                            "running" to isRunning
+                        )
+                        result.success(status)
+                    }
                     "requestAccessibility" -> {
                         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         result.success(true)
+                    }
+                    "startForegroundMode" -> {
+                        val prompt = call.argument<String>("prompt") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else {
+                            service.startForegroundMode(prompt)
+                            result.success(true)
+                        }
+                    }
+                    "stopForegroundMode" -> {
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else {
+                            service.stopForegroundMode()
+                            result.success(true)
+                        }
+                    }
+                    "toggleTorch" -> {
+                        val state = call.argument<String>("state") ?: "off"
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.toggleTorch(state))
+                    }
+                    "openSystemSetting" -> {
+                        val name = call.argument<String>("name") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.openSystemSetting(name))
+                    }
+                    "directCall" -> {
+                        val number = call.argument<String>("number") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.directCall(number))
+                    }
+                    "directSms" -> {
+                        val number = call.argument<String>("number") ?: ""
+                        val body = call.argument<String>("body") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.directSms(number, body))
                     }
                     "getActivePackage" -> {
                         if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
@@ -142,9 +187,69 @@ class MainActivity : AudioServiceActivity() {
                     }
 
                     // ── Observe ────────────────────────────────────
+                    // OpenClaw-style snapshot — assigns @e1..@eN refs
+                    "takeRefSnapshot" -> {
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else {
+                            Thread {
+                                val snap = service.takeRefSnapshot()
+                                runOnUiThread { result.success(snap) }
+                            }.start()
+                        }
+                    }
+                    "takeIncrementalSnapshot" -> {
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else {
+                            Thread {
+                                val snap = service.takeIncrementalSnapshot()
+                                runOnUiThread { result.success(snap) }
+                            }.start()
+                        }
+                    }
+                    "findRefByText" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else {
+                            Thread {
+                                val ref = service.findRefByText(text)
+                                runOnUiThread { result.success(ref) }
+                            }.start()
+                        }
+                    }
+                    "getRefCenter" -> {
+                        val ref = call.argument<String>("ref") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.getRefCenter(ref))
+                    }
+
+                    // ── Ref-based Actions (accurate, no coordinate guessing) ──
+                    "clickRef" -> {
+                        val ref = call.argument<String>("ref") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.clickRef(ref))
+                    }
+                    "typeIntoRef" -> {
+                        val ref = call.argument<String>("ref") ?: ""
+                        val text = call.argument<String>("text") ?: ""
+                        val clearFirst = call.argument<Boolean>("clearFirst") ?: true
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.typeIntoRef(ref, text, clearFirst))
+                    }
+                    "scrollRef" -> {
+                        val ref = call.argument<String>("ref") ?: ""
+                        val direction = call.argument<String>("direction") ?: "down"
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.scrollRef(ref, direction))
+                    }
+
                     "getScreenContext" -> {
                         if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
-                        else result.success(service.getScreenContext())
+                        else {
+                            Thread {
+                                val ctx = service.getScreenContext()
+                                runOnUiThread { result.success(ctx) }
+                            }.start()
+                        }
                     }
                     "takeScreenshot" -> {
                         if (service == null) {
@@ -179,7 +284,12 @@ class MainActivity : AudioServiceActivity() {
                     "clickNodeByText" -> {
                         val text = call.argument<String>("text") ?: ""
                         if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
-                        else result.success(service.clickNodeByText(text))
+                        else {
+                            Thread {
+                                val res = service.clickNodeByText(text)
+                                runOnUiThread { result.success(res) }
+                            }.start()
+                        }
                     }
                     "focusNodeByText" -> {
                         val text = call.argument<String>("text") ?: ""
@@ -253,20 +363,113 @@ class MainActivity : AudioServiceActivity() {
                         if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
                         else result.success(service.pressQuickSettings())
                     }
+                    "lockScreen" -> {
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.lockScreen())
+                    }
+                    "openPowerDialog" -> {
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.openPowerDialog())
+                    }
+                    "directWhatsapp" -> {
+                        val number = call.argument<String>("number") ?: ""
+                        val text = call.argument<String>("text") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.directWhatsappAndSend(number, text))
+                    }
 
-                    // ── App Launch & URL ───────────────────────────
                     "launchApp" -> {
-                        val packageName = call.argument<String>("packageName") ?: ""
+                        val packageName = call.argument<String>("packageName") ?: call.argument<String>("package") ?: ""
                         if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
                         else result.success(service.launchApp(packageName))
                     }
+                    "getAllPackages" -> {
+                        val pm = packageManager
+                        val mainIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                        val apps = pm.queryIntentActivities(mainIntent, 0)
+                        val pkgMap = mutableMapOf<String, String>()
+                        for (resolveInfo in apps) {
+                            val label = resolveInfo.loadLabel(pm).toString()
+                            val pkg = resolveInfo.activityInfo.packageName
+                            pkgMap[label] = pkg
+                        }
+                        result.success(pkgMap)
+                    }
+                    "sendMessage" -> {
+                        val number = call.argument<String>("number") ?: ""
+                        val text = call.argument<String>("text") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.directSms(number, text))
+                    }
+                    "openSetting" -> {
+                        val action = call.argument<String>("action") ?: ""
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.openSystemSettingByAction(action))
+                    }
+                    "launchAppByName" -> {
+                        // Agentica: find and launch any app by display name (not package)
+                        val name = call.argument<String>("name") ?: ""
+                        val pm = packageManager
+                        val apps = pm.getInstalledApplications(0)
+                        val match = apps.firstOrNull {
+                            pm.getApplicationLabel(it).toString().contains(name, ignoreCase = true)
+                                    || it.packageName.contains(name, ignoreCase = true)
+                        }
+                        if (match != null) {
+                            val intent = pm.getLaunchIntentForPackage(match.packageName)
+                            if (intent != null) {
+                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                startActivity(intent)
+                                result.success("Opened ${pm.getApplicationLabel(match)}")
+                            } else result.error("NO_INTENT", "Cannot launch ${match.packageName}", null)
+                        } else result.error("NOT_FOUND", "App '$name' not found", null)
+                    }
+                    "getInstalledApps" -> {
+                        // Agentica: get all launchable app names
+                        val pm = packageManager
+                        val names = pm.getInstalledApplications(0)
+                            .filter { pm.getLaunchIntentForPackage(it.packageName) != null }
+                            .map { pm.getApplicationLabel(it).toString() }
+                            .sorted()
+                        result.success(names.joinToString(", "))
+                    }
+                    "searchContacts" -> {
+                        // Agentica: search device contacts by name
+                        val name = call.argument<String>("name") ?: ""
+                        val contacts = mutableListOf<String>()
+                        val cursor = contentResolver.query(
+                            android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            arrayOf(
+                                android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                                android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER
+                            ),
+                            "${android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
+                            arrayOf("%$name%"),
+                            android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
+                        )
+                        cursor?.use { c ->
+                            while (c.moveToNext()) {
+                                val n = c.getString(0) ?: continue
+                                val num = c.getString(1) ?: continue
+                                contacts.add("$n: $num")
+                            }
+                        }
+                        result.success(
+                            if (contacts.isEmpty()) "No contacts found for '$name'"
+                            else contacts.take(5).joinToString("\n")
+                        )
+                    }
+
+                    "getRecentNotifications" -> {
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.getRecentNotifications())
+                    }
+
                     "openUrl" -> {
                         val url = call.argument<String>("url") ?: ""
                         if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
                         else result.success(service.openUrl(url))
                     }
-
-                    // ── Notifications ──────────────────────────────
                     "dismissAllNotifications" -> {
                         if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
                         else result.success(service.dismissAllNotifications())

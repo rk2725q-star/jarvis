@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'dart:convert';
 import 'diagram_service.dart';
 import '../../core/router/ai_router.dart';
 
@@ -55,12 +54,6 @@ class _DiagramScreenState extends State<DiagramScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String? dataUri;
-    if (_htmlContent != null) {
-      final base64Html = base64Encode(utf8.encode(_htmlContent!));
-      dataUri = 'data:text/html;charset=utf-8;base64,$base64Html';
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0F),
       appBar: AppBar(
@@ -71,7 +64,7 @@ class _DiagramScreenState extends State<DiagramScreen> {
           onPressed: () => Navigator.pop(context, _htmlContent != null), // Return true if successful, tells provider
         ),
         title: Text(
-          'JARVIS — \${widget.title.toUpperCase()}',
+          'JARVIS — ${widget.title.toUpperCase()}',
           style: const TextStyle(
             color: Color(0xFF00FFB4),
             fontFamily: 'monospace',
@@ -84,7 +77,7 @@ class _DiagramScreenState extends State<DiagramScreen> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Color(0xFF445566), size: 20),
             onPressed: () {
-              if (dataUri != null) {
+              if (_htmlContent != null) {
                 _webViewController?.reload();
               } else {
                 setState(() {
@@ -106,9 +99,14 @@ class _DiagramScreenState extends State<DiagramScreen> {
       ),
       body: Stack(
         children: [
-          if (dataUri != null)
+          if (_htmlContent != null)
             InAppWebView(
-              initialUrlRequest: URLRequest(url: WebUri(dataUri)),
+              initialData: InAppWebViewInitialData(
+                data: _htmlContent!,
+                mimeType: 'text/html',
+                encoding: 'utf-8',
+                baseUrl: WebUri('about:blank'),
+              ),
               onWebViewCreated: (controller) {
                 _webViewController = controller;
               },
@@ -126,7 +124,7 @@ class _DiagramScreenState extends State<DiagramScreen> {
             ),
 
           // Loading overlay or Error State
-          if (_isGenerating || (!_isLoaded && dataUri != null))
+          if (_isGenerating || (!_isLoaded && _htmlContent != null))
             Container(
               color: const Color(0xFF0A0A0F),
               child: Center(

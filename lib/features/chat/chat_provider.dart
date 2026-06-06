@@ -1,7 +1,5 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,9 +10,19 @@ import 'package:jarvis_ai/models/session.dart';
 import 'package:jarvis_ai/services/session_service.dart';
 import 'package:jarvis_ai/services/tts_service.dart';
 import 'package:jarvis_ai/services/notification_service.dart';
+import 'package:jarvis_ai/services/netless_context_manager.dart';
+import 'package:jarvis_ai/services/netless_service.dart';
 import 'package:jarvis_ai/features/diagram/diagram_service.dart';
 import 'package:jarvis_ai/features/integrations/integrations_model.dart';
 import 'package:jarvis_ai/features/integrations/integrations_provider.dart';
+import 'package:jarvis_ai/services/aggregator_service.dart';
+import 'package:jarvis_ai/data/models/search_result_model.dart';
+import 'package:jarvis_ai/services/skill_service.dart';
+import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
+import 'package:jarvis_ai/features/codesign/services/codesign_service.dart';
+import 'package:jarvis_ai/features/codesign/models/codesign_models.dart';
+
 
 class ChatProvider extends ChangeNotifier {
   final AIRouter router;
@@ -22,6 +30,7 @@ class ChatProvider extends ChangeNotifier {
   final TtsService ttsService;
   final IntegrationsProvider integrationsProvider;
   final FileProcessor _fileProcessor = FileProcessor();
+  final AggregatorService _aggregator = AggregatorService();
   ChatProvider({
     required this.router,
     required this.sessionService,
@@ -44,6 +53,54 @@ class ChatProvider extends ChangeNotifier {
   bool _webSearchEnabled = true;
 
   String? _pendingNotificationReply;
+
+  // ── Live Intelligence Tracking (shown in UI during generation) ──
+  List<String> _activeDnaModels = [];
+  List<String> _activeContextualSkills = [];
+
+  List<String> get activeDnaModels => List.unmodifiable(_activeDnaModels);
+  List<String> get activeContextualSkills => List.unmodifiable(_activeContextualSkills);
+  int get totalActiveSkillCount => _activeDnaModels.length + _activeContextualSkills.length;
+
+  /// Compute which skills are active for a given query — mirrors ai_router logic
+  void _computeActiveSkills(String query) {
+    final allSkills = router.skillService.skills.where((s) => s.isActive).toList();
+    _activeDnaModels = allSkills
+        .where((s) => s.id.startsWith('jarvis-dna-'))
+        .map((s) => s.description.split('—').first.trim())
+        .toList();
+
+    // Score contextual skills
+    final scored = allSkills
+        .where((s) => !s.id.startsWith('jarvis-dna-'))
+        .map((s) {
+          final queryWords = query.toLowerCase()
+              .split(RegExp(r'[^a-zA-Z0-9]'))
+              .where((w) => w.length > 2)
+              .toSet();
+          if (queryWords.isEmpty) return MapEntry(s, 0.0);
+          final kw = s.triggerKeywords.map((k) => k.toLowerCase()).toSet();
+          final hits = queryWords.intersection(kw).length;
+          final score = hits / queryWords.length;
+          return MapEntry(s, score);
+        })
+        .where((e) => e.value > 0)
+        .toList();
+    scored.sort((a, b) => b.value.compareTo(a.value));
+    _activeContextualSkills = scored.take(12)
+        .map((e) => e.key.name)
+        .toList();
+    notifyListeners();
+  }
+
+  void _clearActiveSkills() {
+    _activeDnaModels = [];
+    _activeContextualSkills = [];
+    notifyListeners();
+  }
+
+  // Netless Smart Context Manager
+  final NetlessContextManager netlessContext = NetlessContextManager();
 
   // Getters
   String? get currentSessionId => _currentSessionId;
@@ -71,6 +128,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> init() async {
+    await _aggregator.initialize();
     await loadSessions();
     if (_sessions.isEmpty) {
       await createNewSession();
@@ -125,6 +183,16 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> renameSession(String sessionId, String newTitle) async {
+    final idx = _sessions.indexWhere((s) => s.id == sessionId);
+    if (idx != -1) {
+      final updated = _sessions[idx].copyWith(title: newTitle);
+      await sessionService.updateSession(updated);
+      _sessions[idx] = updated;
+      notifyListeners();
+    }
+  }
+
   Future<void> pickAndAttachFiles() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -164,6 +232,183 @@ class ChatProvider extends ChangeNotifier {
     _currentSuggestions = [];
     notifyListeners();
 
+    // ── Intercept Skill Creation Command ────────────────────────────────────
+    if (text.trim().startsWith('/skill')) {
+      final userMsg = Message(
+        id: _uuid.v4(),
+        content: text.trim(),
+        isUser: true,
+        timestamp: DateTime.now(),
+        sessionId: _currentSessionId!,
+      );
+      _messages.add(userMsg);
+      await sessionService.addMessage(userMsg);
+      _setAnalysisStatus("building skill...");
+      notifyListeners();
+
+      final skillDescription = text.trim().substring(6).trim();
+      if (skillDescription.isEmpty) {
+        final errorMsg = Message(
+          id: _uuid.v4(),
+          content: "❌ **Error: Skill description cannot be empty.**\n\nUsage: `/skill [description of what the skill should do]`\nE.g.: `/skill Translate any programming queries to python scripts`",
+          isUser: false,
+          timestamp: DateTime.now(),
+          sessionId: _currentSessionId!,
+        );
+        _messages.add(errorMsg);
+        await sessionService.addMessage(errorMsg);
+        _setAnalysisStatus("thinking...", active: false);
+        notifyListeners();
+        return;
+      }
+
+      final SkillService service = router.skillService;
+      try {
+        final creatorPrompt = "The user wants to build a custom skill for their AI assistant. "
+            "Skill description: '$skillDescription'.\n\n"
+            "Analyze the description and generate a structured JSON object for this skill. "
+            "Ensure the system instructions are highly specific, professional, and explain how to handle the inputs and format responses. "
+            "Extract 5-10 trigger keywords that identify when the skill should be used.\n\n"
+            "Return ONLY a valid JSON object matching this schema, no markdown blocks, no other text:\n"
+            "{\n"
+            "  \"name\": \"Short descriptive name\",\n"
+            "  \"description\": \"One sentence description of functionality\",\n"
+            "  \"systemInstruction\": \"Instructions telling the AI how to behave when this skill is invoked\",\n"
+            "  \"triggerKeywords\": [\"keyword1\", \"keyword2\", ...]\n"
+            "}";
+
+        final response = await router.generate(
+          creatorPrompt,
+          systemPrompt: "You are the JARVIS Autonomous Skill Builder. Output valid JSON matching the schema only.",
+        );
+
+        final cleanJson = response.replaceFirst('```json', '').replaceFirst('```', '').trim();
+        final Map<String, dynamic> parsed = jsonDecode(cleanJson);
+
+        final skillName = parsed['name']?.toString() ?? 'Custom Skill';
+        final skillDesc = parsed['description']?.toString() ?? skillDescription;
+        final skillInstruction = parsed['systemInstruction']?.toString() ?? 'Adopt the user\'s requested behavior.';
+        final List<String> keywords = List<String>.from(parsed['triggerKeywords'] ?? []);
+
+        final createdSkill = await service.createSkill(
+          name: skillName,
+          description: skillDesc,
+          systemInstruction: skillInstruction,
+          triggerKeywords: keywords,
+        );
+
+        final successContent = "🎨 **Dynamic Skill Built Successfully!**\n\n"
+            "JARVIS has autonomously generated and compiled this capability:\n\n"
+            "• **Skill Name:** ${createdSkill.name}\n"
+            "• **Description:** ${createdSkill.description}\n"
+            "• **Trigger Keywords:** `${createdSkill.triggerKeywords.join(', ')}`\n\n"
+            "⚙️ **System Prompt Directive:**\n"
+            "> ${createdSkill.systemInstruction}\n\n"
+            "--- \n"
+            "🔄 *This skill is now **active** across all conversation sessions. JARVIS will automatically invoke it whenever your message matches the trigger context!*";
+
+        final successMsg = Message(
+          id: _uuid.v4(),
+          content: successContent,
+          isUser: false,
+          timestamp: DateTime.now(),
+          sessionId: _currentSessionId!,
+        );
+        _messages.add(successMsg);
+        await sessionService.addMessage(successMsg);
+      } catch (e) {
+        final fallbackName = skillDescription.length > 20 ? "${skillDescription.substring(0, 20)}..." : skillDescription;
+        final createdSkill = await service.createSkill(
+          name: fallbackName,
+          description: "User-defined skill: $skillDescription",
+          systemInstruction: "You are playing a custom role. Behavior required: $skillDescription.",
+          triggerKeywords: skillDescription.toLowerCase().split(' ').where((w) => w.length > 4).toList(),
+        );
+
+        final successContent = "🎨 **Dynamic Skill Created (Local Fallback)**\n\n"
+            "• **Skill Name:** ${createdSkill.name}\n"
+            "• **Description:** ${createdSkill.description}\n\n"
+            "🔄 *This skill has been added and is active. JARVIS will run it when triggered!*";
+
+        final successMsg = Message(
+          id: _uuid.v4(),
+          content: successContent,
+          isUser: false,
+          timestamp: DateTime.now(),
+          sessionId: _currentSessionId!,
+        );
+        _messages.add(successMsg);
+        await sessionService.addMessage(successMsg);
+      } finally {
+        _setAnalysisStatus("thinking...", active: false);
+        notifyListeners();
+      }
+      return;
+    }
+
+    // ── Intercept Roadmap Commands ──────────────────────────────────────────
+    final cleanInput = text.trim().toLowerCase();
+    final isRoadmapRequest = cleanInput == '/roadmap' ||
+        cleanInput == 'roadmap' ||
+        cleanInput.contains('roadmap') ||
+        cleanInput.contains('road map') ||
+        RegExp(r'\broad\s*map\b', caseSensitive: false).hasMatch(cleanInput);
+    if (isRoadmapRequest) {
+      final userMsg = Message(
+        id: _uuid.v4(),
+        content: text.trim(),
+        isUser: true,
+        timestamp: DateTime.now(),
+        sessionId: _currentSessionId!,
+      );
+      _messages.add(userMsg);
+      await sessionService.addMessage(userMsg);
+      notifyListeners();
+
+      // 1. Add Textual Milestones Message
+      final textContent = '# Strategic Roadmap Toward Robust, Human-Like AI Capabilities\n\n'
+          'Here are the key milestones of the 10-year phased research plan:\n\n'
+          '| Milestone | Phase & Focus | Target / Evaluation Metric |\n'
+          '|-----------|---------------|----------------------------|\n'
+          '| **M1.1: Adversarial Common-Sense** | Phase 1 (Years 1-3) | Physical/social reasoning score <30% |\n'
+          '| **M1.2: Causal World Models** | Phase 1 (Years 1-3) | Intervention prediction accuracy |\n'
+          '| **M2.1: Neuro-Symbolic Planning** | Phase 2 (Years 3-6) | Plan success rate over 50+ steps |\n'
+          '| **M2.3: Theory-of-Mind Modules** | Phase 2 (Years 3-6) | False-belief task performance |\n'
+          '| **M3.4: Provable Safety Boundaries** | Phase 3 (Years 6-9) | Formal verification coverage |\n'
+          '| **M4.2: Collaborative Deferral** | Phase 4 (Years 9-12) | Joint human-AI task performance |\n\n'
+          '---\n\n'
+          '**Want to see the full interactive dashboard?**\n\n'
+          'You can:\n'
+          '- Open the **AI Roadmap Dashboard** from the navigation drawer\n'
+          '- Or type `/roadmap` to view the interactive card in chat\n\n'
+          'This lets you explore live simulators for causal counterfactuals, Theory of Mind false-beliefs, neuro-symbolic QA, provable safety scripting, and human-AI cooperative deferral.\n\n'
+          'Would you like me to show the dashboard? 🚀';
+
+      final aiTextMsg = Message(
+        id: _uuid.v4(),
+        content: textContent,
+        isUser: false,
+        timestamp: DateTime.now(),
+        sessionId: _currentSessionId!,
+      );
+      _messages.add(aiTextMsg);
+      await sessionService.addMessage(aiTextMsg);
+      notifyListeners();
+
+      // 2. Add Interactive Card Message
+      final aiCardMsg = Message(
+        id: _uuid.v4(),
+        content: '<!--JARVIS_ROADMAP_CARD-->',
+        isUser: false,
+        timestamp: DateTime.now(),
+        sessionId: _currentSessionId!,
+      );
+      _messages.add(aiCardMsg);
+      await sessionService.addMessage(aiCardMsg);
+      notifyListeners();
+      return;
+    }
+
     String combinedText = text.trim();
 
     // ── @ Integration routing ─────────────────────────────────────────────────
@@ -184,31 +429,72 @@ class ChatProvider extends ChangeNotifier {
     // ── Creative Modes Interception ──────────────────────────────────────────
     bool isImagiya = false;
     bool isCodesign = false;
-    String imagiyaUrl = '';
     String imagiyaPrompt = '';
+    String finalImagePrompt = '';
+    String codesignAgentType = 'landing';
     
     if (combinedText.startsWith('[IMAGIYA]')) {
       isImagiya = true;
       final parts = combinedText.substring(9).split('|');
       final qualityStyle = parts.isNotEmpty ? parts[0].trim() : 'hd realistic';
       final qualityParts = qualityStyle.split(' ');
-      final quality = qualityParts.isNotEmpty ? qualityParts[0] : 'hd';
       final style = qualityParts.length > 1 ? qualityParts.skip(1).join(' ') : 'realistic';
       imagiyaPrompt = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
-      final fullPrompt = '$imagiyaPrompt, $style style';
-      final width = quality == 'uhd' ? 1920 : (quality == 'hd' ? 1280 : 768);
-      final height = quality == 'uhd' ? 1080 : (quality == 'hd' ? 720 : 512);
-      imagiyaUrl = 'https://image.pollinations.ai/prompt/${Uri.encodeComponent(fullPrompt)}?nologo=true&enhance=${quality != 'standard' ? 'true' : 'false'}&width=$width&height=$height';
+      finalImagePrompt = '$imagiyaPrompt, $style style, highly detailed, sharp text, legible typography';
     } else if (combinedText.startsWith('[CODESIGN]')) {
       isCodesign = true;
       final parts = combinedText.substring(10).split('|');
-      final agentType = parts.isNotEmpty ? parts[0].trim() : 'landing';
+      codesignAgentType = parts.isNotEmpty ? parts[0].trim() : 'landing';
       final designQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
-      imagiyaPrompt = designQuery.isNotEmpty ? designQuery : agentType;
-      // CoDesign generates HTML via text.pollinations.ai — stored in imagiyaUrl as special marker
-      imagiyaUrl = '[CODESIGN_PENDING]|$agentType|$designQuery';
-      resolvedProvider = 'codesign';
+      imagiyaPrompt = designQuery.isNotEmpty ? designQuery : codesignAgentType;
+      finalImagePrompt = 'Modern $codesignAgentType UI UX design, $imagiyaPrompt, clean minimal interface, sharp readable text labels, dribbble behance quality, high fidelity wireframe, professional web design, no blur';
+    } else {
+      // Auto-detect design queries
+      final queryLower = combinedText.toLowerCase();
+      final designKeywords = [
+        'design website', 'design a website', 'design website for',
+        'design landing page', 'design landing-page',
+        'design web page', 'design web-page',
+        'design mobile ui', 'design mobile app', 'design mobile layout',
+        'design dashboard', 'design admin dashboard',
+        'design pricing page', 'design pricing-page',
+        'create landing page', 'create dashboard', 'create pricing page',
+        'design a mobile ui', 'design a dashboard', 'design a landing page'
+      ];
+      bool matchesKeyword = false;
+      for (final kw in designKeywords) {
+        if (queryLower.contains(kw)) {
+          matchesKeyword = true;
+          break;
+        }
+      }
+      
+      // Also check for general "design an app" or "create a website" context
+      if (!matchesKeyword) {
+        if ((queryLower.contains('design') || queryLower.contains('create')) && 
+            (queryLower.contains('website') || queryLower.contains('landing page') || queryLower.contains('dashboard') || queryLower.contains('mobile ui') || queryLower.contains('pricing page') || queryLower.contains('app ui'))) {
+          matchesKeyword = true;
+        }
+      }
+
+      if (matchesKeyword) {
+        isCodesign = true;
+        if (queryLower.contains('dashboard') || queryLower.contains('admin')) {
+          codesignAgentType = 'dashboard';
+        } else if (queryLower.contains('mobile') || queryLower.contains('app ui') || queryLower.contains('phone')) {
+          codesignAgentType = 'mobile';
+        } else if (queryLower.contains('pricing')) {
+          codesignAgentType = 'pricing';
+        } else if (queryLower.contains('slides') || queryLower.contains('presentation')) {
+          codesignAgentType = 'slides';
+        } else {
+          codesignAgentType = 'landing';
+        }
+        imagiyaPrompt = text.trim();
+        finalImagePrompt = 'Modern $codesignAgentType UI UX design, $imagiyaPrompt, clean minimal interface, sharp readable text labels, dribbble behance quality, high fidelity wireframe, professional web design, no blur';
+      }
     }
+
 
     // NOTE: Autonomous keyword-based integration routing is intentionally disabled.
     // Integrations are ONLY triggered when the user explicitly uses @mention.
@@ -284,24 +570,76 @@ class ChatProvider extends ChangeNotifier {
     }
 
     // --- Inject Short-Term Chat History ---
-    final recentHistory = _messages.where((m) => !m.isStreaming).toList();
-    // Get last 6 messages to provide immediate conversational context
-    final recentMemories = recentHistory.length > 6 ? recentHistory.sublist(recentHistory.length - 6) : recentHistory;
-    
-    if (recentMemories.isNotEmpty) {
-      final historyStr = recentMemories.map((m) {
-        final str = m.content;
-        // Truncate ultra-long individual messages to 30000 chars, but this still allows large pastes to remain in short-term memory
-        final displayStr = str.length > 30000 ? '${str.substring(0, 30000)}\n\n...(TRUNCATED FOR MEMORY)...' : str;
-        return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
-      }).join('\n\n---\n\n');
-      
-      String finalHistory = historyStr;
-      // Cap entire injected short-term context to ~60000 chars to avoid model overflow for standard APIs
-      if (finalHistory.length > 60000) {
-        finalHistory = "...\n${finalHistory.substring(finalHistory.length - 60000)}";
+    final actualProvider = resolvedProvider ?? router.activeProvider?.name;
+
+    if (actualProvider == 'netless') {
+      // Use smart context manager for Netless to strictly manage 1024 token limit
+      final ref = netlessContext.parseReference(combinedText);
+      String enrichedPrompt = combinedText;
+      if (ref != null) {
+        enrichedPrompt = '${ref.role} said: "${ref.content}"\n\nUser: $combinedText';
       }
-      combinedText = "[RECENT CHAT HISTORY]\n$finalHistory\n\n[CURRENT USER QUERY]\n$combinedText";
+      combinedText = await netlessContext.prepareContext(enrichedPrompt, NetlessService());
+    } else {
+      final bool isInfinity = router.lastSelectedProvider != AIProvider.netless;
+      if (isInfinity) {
+        final recentHistory = _messages.where((m) => !m.isStreaming).toList();
+        
+        // If we have history, build a virtual 3M context window!
+        if (recentHistory.isNotEmpty) {
+          // Keep the last 12 messages fully intact (short-term context)
+          final int shortTermCount = 12;
+          final int splitIdx = recentHistory.length > shortTermCount
+              ? recentHistory.length - shortTermCount
+              : 0;
+
+          final olderHistory = recentHistory.sublist(0, splitIdx);
+          final recentHistoryPart = recentHistory.sublist(splitIdx);
+
+          // Build a highly compressed session synopsis for older messages
+          // so that the AI retains chronological context of the entire past
+          // chat session without blowing up the actual model's prompt limit.
+          final olderSummaryBuf = StringBuffer();
+          if (olderHistory.isNotEmpty) {
+            olderSummaryBuf.writeln("[INFINITY VIRTUAL 3M CONTEXT — COMPRESSED SESSION MEMORY]");
+            for (final m in olderHistory) {
+              final role = m.isUser ? "User" : "Jarvis";
+              final clean = m.content.replaceAll(RegExp(r'\s+'), ' ').trim();
+              final snippet = clean.length > 150
+                  ? '${clean.substring(0, 80)}...${clean.substring(clean.length - 60)}'
+                  : clean;
+              olderSummaryBuf.writeln('• $role: $snippet');
+            }
+            olderSummaryBuf.writeln("[END COMPRESSED SESSION MEMORY]\n");
+          }
+
+          final recentHistoryStr = recentHistoryPart.map((m) {
+            final str = m.content;
+            final displayStr = str.length > 20000 ? '${str.substring(0, 20000)}\n\n...(TRUNCATED)...' : str;
+            return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
+          }).join('\n\n---\n\n');
+
+          combinedText = "${olderSummaryBuf.toString()}[RECENT CHAT HISTORY]\n$recentHistoryStr\n\n[CURRENT USER QUERY]\n$combinedText";
+        }
+      } else {
+        final recentHistory = _messages.where((m) => !m.isStreaming).toList();
+        final recentMemories = recentHistory.length > 6 ? recentHistory.sublist(recentHistory.length - 6) : recentHistory;
+        
+        if (recentMemories.isNotEmpty) {
+          final historyStr = recentMemories.map((m) {
+            final str = m.content;
+            final displayStr = str.length > 30000 ? '${str.substring(0, 30000)}\n\n...(TRUNCATED FOR MEMORY)...' : str;
+            return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
+          }).join('\n\n---\n\n');
+          
+          String finalHistory = historyStr;
+          int maxLength = 60000;
+          if (finalHistory.length > maxLength) {
+            finalHistory = "...\n${finalHistory.substring(finalHistory.length - maxLength)}";
+          }
+          combinedText = "[RECENT CHAT HISTORY]\n$finalHistory\n\n[CURRENT USER QUERY]\n$combinedText";
+        }
+      }
     }
 
     // ── 1. Set Status ────────────────────────
@@ -351,6 +689,9 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
     }
 
+    // Compute which skills/models are active for this query (for visual display)
+    _computeActiveSkills(text.trim());
+
     // Add user message — store ORIGINAL text only (not the history-injected combinedText)
     // combinedText (with [RECENT CHAT HISTORY]) is only sent to the AI, never displayed
     String displayText = text.isEmpty ? "Analyzed attached files" : text.trim();
@@ -361,6 +702,8 @@ class ChatProvider extends ChangeNotifier {
       final agentType = parts.isNotEmpty ? parts[0].trim() : 'landing';
       final designQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
       displayText = '🎨 CoDesign · ${agentType[0].toUpperCase()}${agentType.substring(1)}: $designQuery';
+    } else if (isCodesign) {
+      displayText = '🎨 CoDesign · ${codesignAgentType[0].toUpperCase()}${codesignAgentType.substring(1)}: ${text.trim()}';
     }
 
     final userMsg = Message(
@@ -375,65 +718,115 @@ class ChatProvider extends ChangeNotifier {
     await sessionService.addMessage(userMsg);
     notifyListeners();
     
-    // Imagiya: immediate Pollinations image URL
+    // Imagiya: generate image using official providers — image only, no LLM follow-up
     if (isImagiya) {
-      final aiMsg = Message(
-        id: _uuid.v4(),
-        content: '![Generated Image]($imagiyaUrl)',
-        isUser: false,
-        timestamp: DateTime.now(),
-        sessionId: _currentSessionId!,
-        provider: 'imagiya',
-      );
-      _messages.add(aiMsg);
-      await sessionService.addMessage(aiMsg);
+      _setAnalysisStatus("generating image...", active: true);
       notifyListeners();
-      return;
+      try {
+        final activeProvider = router.lastSelectedProvider ?? AIProvider.gemini;
+        final selectedModel = router.getSelectedModel(activeProvider);
+        
+        final imageUrl = await router.generateImage(
+          finalImagePrompt,
+          modelOverride: selectedModel,
+        );
+
+        final aiMsg = Message(
+          id: _uuid.v4(),
+          content: '![Generated Image]($imageUrl)',
+          isUser: false,
+          timestamp: DateTime.now(),
+          sessionId: _currentSessionId!,
+          provider: 'imagiya',
+          model: selectedModel,
+        );
+        _messages.add(aiMsg);
+        await sessionService.addMessage(aiMsg);
+      } catch (e) {
+        final errorMsg = Message(
+          id: _uuid.v4(),
+          content: '❌ Image generation failed: $e',
+          isUser: false,
+          timestamp: DateTime.now(),
+          sessionId: _currentSessionId!,
+          provider: 'imagiya',
+        );
+        _messages.add(errorMsg);
+        await sessionService.addMessage(errorMsg);
+      } finally {
+        _setAnalysisStatus("thinking...", active: false);
+        notifyListeners();
+      }
+      return; // ← Image only, done.
     }
 
-    // CoDesign: generate actual HTML/CSS/JS via text.pollinations.ai
+    // CoDesign: generate interactive HTML layout using LLM directly (open-codesign architecture)
     if (isCodesign) {
-      // Parse the pending marker
-      final pendingParts = imagiyaUrl.substring('[CODESIGN_PENDING]|'.length).split('|');
-      final agentType = pendingParts.isNotEmpty ? pendingParts[0].trim() : 'landing';
-      final designQuery = pendingParts.length > 1 ? pendingParts.skip(1).join('|').trim() : '';
-
-      // Show generating status
-      _setAnalysisStatus('✨ Designing $agentType UI...');
-
-      // Placeholder message while generating
-      final placeholderMsg = Message(
-        id: _uuid.v4(),
-        content: '[CODESIGN_GENERATING]',
-        isUser: false,
-        timestamp: DateTime.now(),
-        sessionId: _currentSessionId!,
-        provider: 'codesign',
-      );
-      _messages.add(placeholderMsg);
+      _setAnalysisStatus("generating interactive design...", active: true);
       notifyListeners();
+      try {
+        final CodesignArtifactType targetType = switch (codesignAgentType.toLowerCase()) {
+          'landing' || 'landingpage' => CodesignArtifactType.landingPage,
+          'dashboard' => CodesignArtifactType.dashboard,
+          'slides' || 'presentation' || 'slidesdeck' => CodesignArtifactType.slidesDeck,
+          'mobile' || 'mobileui' || 'app' => CodesignArtifactType.mobileUI,
+          'pricing' || 'pricingpage' => CodesignArtifactType.pricingPage,
+          _ => CodesignArtifactType.landingPage,
+        };
 
-      // Generate HTML code
-      final htmlCode = await _generateCodesignHtml(agentType, designQuery);
+        final request = CodesignRequest(
+          prompt: imagiyaPrompt.isEmpty ? text : imagiyaPrompt,
+          type: targetType,
+        );
 
-      // Replace placeholder with final result
-      final idx = _messages.indexWhere((m) => m.id == placeholderMsg.id);
-      if (idx != -1) {
-        final finalMsg = Message(
-          id: placeholderMsg.id,
-          content: '[CODESIGN_HTML]$htmlCode',
+        final codesignService = CodesignService(router: router);
+        final artifact = await codesignService.generate(request);
+
+        // Save layout as a physical .html file in the workspace designs directory
+        Directory designsDir = Directory('c:/Users/manit/Downloads/wfy/designs');
+        try {
+          if (!await designsDir.exists()) {
+            await designsDir.create(recursive: true);
+          }
+        } catch (_) {
+          final appDir = await getApplicationDocumentsDirectory();
+          designsDir = Directory('${appDir.path}/designs');
+          if (!await designsDir.exists()) {
+            await designsDir.create(recursive: true);
+          }
+        }
+
+        final fileName = 'design_${DateTime.now().millisecondsSinceEpoch}.html';
+        final file = File('${designsDir.path}/$fileName');
+        await file.writeAsString(artifact.htmlContent);
+
+        final aiMsg = Message(
+          id: _uuid.v4(),
+          content: '[CODESIGN_HTML]${artifact.htmlContent}',
+          isUser: false,
+          timestamp: DateTime.now(),
+          sessionId: _currentSessionId!,
+          provider: 'codesign',
+          model: router.activeModel ?? 'CoDesign',
+        );
+        _messages.add(aiMsg);
+        await sessionService.addMessage(aiMsg);
+      } catch (e) {
+        final errorMsg = Message(
+          id: _uuid.v4(),
+          content: '❌ CoDesign interactive layout generation failed: $e',
           isUser: false,
           timestamp: DateTime.now(),
           sessionId: _currentSessionId!,
           provider: 'codesign',
         );
-        _messages[idx] = finalMsg;
-        await sessionService.addMessage(finalMsg);
+        _messages.add(errorMsg);
+        await sessionService.addMessage(errorMsg);
+      } finally {
+        _setAnalysisStatus("thinking...", active: false);
+        notifyListeners();
       }
-
-      _setAnalysisStatus('', active: false);
-      notifyListeners();
-      return;
+      return; // ← Done.
     }
 
     if (userMsg.provider != null && userMsg.provider!.isNotEmpty) {
@@ -441,6 +834,49 @@ class ChatProvider extends ChangeNotifier {
       _setAnalysisStatus("thinking...", active: false);
       notifyListeners();
       return;
+    }
+
+    // ── ARIA Real-Time Search (for ALL providers) ────────────────────────────
+    // Runs BEFORE the AI with a hard 3s timeout so it's always fast.
+    // Results are injected INTO the prompt so every provider (Gemini, Ollama,
+    // OpenRouter, etc.) has live DuckDuckGo context when generating a response.
+    Future<List<AriaSearchResult>> ariaFuture = Future.value([]);
+    if (_webSearchEnabled && !isImagiya && !isCodesign) {
+      final query = text.trim();
+      if (query.isNotEmpty) {
+        _setAnalysisStatus('🔍 Searching web...');
+        try {
+          // 3 second fast fetch — keeps the app responsive
+          final results = await _aggregator
+              .searchUserQuery(query, limit: 6)
+              .timeout(const Duration(seconds: 3), onTimeout: () => []);
+
+          if (results.isNotEmpty) {
+            // Build context block injected into the LLM prompt
+            final contextBuf = StringBuffer(
+              '\n\n[REAL-TIME WEB CONTEXT — DuckDuckGo — Query: "$query"]\n',
+            );
+            for (final r in results) {
+              contextBuf.writeln('• ${r.title}');
+              if (r.summary != null && r.summary!.isNotEmpty) {
+                contextBuf.writeln('  ${r.summary}');
+              }
+              final date = r.publishedAt != null
+                  ? r.publishedAt!.toLocal().toString().substring(0, 10)
+                  : 'Recent';
+              contextBuf.writeln(
+                '  Source: ${r.provenance.sourceName} | Date: $date | URL: ${r.url}',
+              );
+            }
+            contextBuf.writeln('[END REAL-TIME CONTEXT]\n');
+            // Inject before the user's message so AI sees it first
+            combinedText = '${contextBuf.toString()}$combinedText';
+            // Keep ariaFuture with results for the footer
+            ariaFuture = Future.value(results);
+          }
+        } catch (_) {}
+        _setAnalysisStatus('thinking...');
+      }
     }
 
     // Router and models are now ready to stream for chat.
@@ -470,10 +906,13 @@ class ChatProvider extends ChangeNotifier {
         final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
         if (idx != -1) {
           final displayContent = _stripTags(buffer.toString());
+          final bool isInfinity = router.lastSelectedProvider != AIProvider.netless;
           _messages[idx] = aiMsg.copyWith(
             content: displayContent,
-            provider: router.activeProvider?.name,
-            model: router.activeModel,
+            provider: isInfinity ? 'INFINITY' : router.activeProvider?.name,
+            model: isInfinity
+                ? '3M Context (${router.activeModel ?? "Brain"})'
+                : router.activeModel,
             isStreaming: true,
           );
           notifyListeners();
@@ -491,13 +930,31 @@ class ChatProvider extends ChangeNotifier {
       }
     } finally {
       _setAnalysisStatus("thinking...", active: false);
+      _clearActiveSkills();
       notifyListeners();
     }
 
-    // Mark as done (Rule 3: SILENT TAG BEHAVIOR - strip tags before display/storage)
+    // Mark as done — strip tags, finalize message
     final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
     if (idx != -1) {
-      final cleanText = _stripTags(buffer.toString());
+      String cleanText = _stripTags(buffer.toString());
+
+      // ── Append ARIA search sources as footer (results arrive in background) ──
+      try {
+        final ariaResults = await ariaFuture;
+        if (ariaResults.isNotEmpty) {
+          final srcBuf = StringBuffer('\n\n---\n🔍 **Real-Time Sources (DuckDuckGo)**\n');
+          for (final r in ariaResults.take(5)) {
+            final date = r.publishedAt != null
+                ? r.publishedAt!.toLocal().toString().substring(0, 10)
+                : 'Recent';
+            srcBuf.writeln('- **${r.title}** — ${r.provenance.sourceName} · $date');
+            if (r.url.isNotEmpty) srcBuf.writeln('  🔗 ${r.url}');
+          }
+          cleanText = '$cleanText${srcBuf.toString()}';
+        }
+      } catch (_) {}
+
       final finalMsg = _messages[idx].copyWith(
         content: cleanText,
         isStreaming: false,
@@ -505,6 +962,10 @@ class ChatProvider extends ChangeNotifier {
       );
       _messages[idx] = finalMsg;
       await sessionService.addMessage(finalMsg);
+
+      if (actualProvider == 'netless') {
+        netlessContext.addAssistantResponse(cleanText);
+      }
       notifyListeners();
 
       if (_isTTSEnabled) {
@@ -804,6 +1265,10 @@ class ChatProvider extends ChangeNotifier {
 
   int _estimateTokenCount(String text) => (text.length / 4).ceil();
 
+
+
+
+
   void _generateSuggestions(String lastAiResponse) {
     final r = lastAiResponse.toLowerCase();
     final List<String> suggestions = [];
@@ -947,6 +1412,12 @@ class ChatProvider extends ChangeNotifier {
 
   String _stripTags(String text) {
     return text
+        // Strip any bare <WEB_SEARCH ...> or <tool_code> remnants, preserving the contents within <tool_code>...</tool_code>
+        .replaceAll(RegExp(r'<tool_code\b[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'</tool_code>', caseSensitive: false), '')
+        // Strip injected REAL-TIME WEB CONTEXT block (should not appear in output)
+        .replaceAll(RegExp(r'\[REAL-TIME WEB CONTEXT[^\]]*\][\s\S]*?\[END REAL-TIME CONTEXT\]', caseSensitive: false), '')
+        // Existing tag strips
         .replaceAll(RegExp(r'<think>[\s\S]*?(?:</think>|$)', caseSensitive: false), '')
         .replaceAll(RegExp(r'<SCHEDULE_REMINDER[^>]*>'), '')
         .replaceAll(RegExp(r'<CANCEL_REMINDER[^>]*>'), '')
@@ -963,140 +1434,7 @@ class ChatProvider extends ChangeNotifier {
         .trim();
   }
 
-  /// Generate real interactive HTML/CSS/JS using Pollinations text API
-  /// Powered by open-codesign craft directives for professional-grade output
-  Future<String> _generateCodesignHtml(String agentType, String userQuery) async {
-    const agentContextMap = {
-      'landing': 'a full SaaS landing page with hero, features grid, testimonials, pricing teaser, and footer CTA. Use bold modern typography, glassmorphism cards, and gradient accents.',
-      'dashboard': 'an admin analytics dashboard with KPI cards, live chart (SVG), sidebar navigation, activity feed, and a header with a real-time clock. Include LIVE pulse badges.',
-      'mobile': 'a mobile app screen (375×812 viewport) with bottom tab bar, header, main content cards, and proper iOS safe-area respect. Use a device frame wrapper.',
-      'component': 'a comprehensive UI component library page showing buttons (primary/secondary/ghost/danger), form inputs, checkboxes, toggles, badges, cards, modals, and tooltips.',
-      'ecommerce': 'an e-commerce product listing page with filter sidebar, product cards with hover effects, cart badge counter, and a product detail modal.',
-      'portfolio': 'a creative portfolio website with a bold hero, project grid with hover reveals, skills section, and a contact form with validation.',
-      'saas': 'a SaaS pricing page with three pricing tiers, feature comparison table, FAQ accordion, and a highlighted recommended plan.',
-      'auth': 'a login/signup auth screen with tab switching, social auth buttons, form validation, and a glassmorphism card on a gradient background.',
-      'blog': 'a blog/article page with a reading progress bar, author card, rich typography, code highlight blocks, and a related articles section.',
-      'social': 'a social media feed UI with story row, post cards (like/comment/share interactions), trending sidebar, and a new post composer.',
-    };
 
-    final agentContext = agentContextMap[agentType] ?? 'a modern web UI with clean design, interactive elements, and professional polish.';
-    final brief = userQuery.isNotEmpty ? userQuery : agentType;
-
-    final systemPrompt = '''You are an expert UI/UX designer and frontend developer. Generate a single, complete, self-contained HTML file with embedded CSS and JavaScript.
-
-DESIGN PHILOSOPHY (from open-codesign craft directives):
-- ARTIFACT TYPE: ${agentType.toUpperCase()} — $agentContext
-- Use oklch() color system with 9±3 design tokens declared as CSS variables at the top
-- Two font families: display font (via Google Fonts @import) + workhorse sans
-- Full-bleed sections: set html,body background to match dominant bg color
-- DARK THEME: warm accents, subtle gradient/glow above fold, borders at oklch(L C h/0.15)
-- DENSITY: Rich, editorial level. Minimum 4 substantive blocks per page
-
-INTERACTIVE DEPTH (MANDATORY — every artifact must have):
-1. ≥3 functional state changes (tab switch, accordion, modal, toggle, filter)
-2. Animated view transitions (opacity + translateY, 200ms ease-out)
-3. Every button does something — zero dead buttons
-4. Hover + press feedback: transform:scale(0.97) on :active, translateY(-2px) on hover
-5. Focus rings: 2px offset ring in accent color
-6. CRAFT TOUCHES (≥3): loading skeleton, tooltip with delay, copy-to-clipboard, dismissible toast, scroll-linked header, time-aware elements, animated empty state
-
-ANTI-SLOP RULES — NEVER:
-- Use lorem ipsum, "John Doe", "Acme Corp", round numbers (100%, \$10k)
-- Use hotlinked images from unsplash/picsum/placeholder.com — use CSS gradients/SVG instead
-- Use emoji as logos or section icons
-- Center-align body paragraphs
-- Use pure black (#000) for text — use near-black with slight hue cast
-- Use Inter/Roboto/Arial — pick distinctive fonts
-
-ANIMATION BUDGET: Only 4 named CSS keyframes: fadeUp, breathe, pulse-ring, spin. Apply with staggered delays.
-
-USER BRIEF: "$brief"
-
-Output ONLY the complete HTML document. No markdown fences, no explanations. Start with <!DOCTYPE html>.''';
-
-    try {
-      final encodedPrompt = Uri.encodeComponent(brief);
-      final encodedSystem = Uri.encodeComponent(systemPrompt);
-      final url = 'https://text.pollinations.ai/$encodedPrompt?model=openai&system=$encodedSystem&seed=${DateTime.now().millisecondsSinceEpoch % 9999}';
-      
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {'Accept': 'text/html,text/plain,*/*'},
-      ).timeout(const Duration(seconds: 90));
-
-      if (response.statusCode == 200) {
-        String body = utf8.decode(response.bodyBytes, allowMalformed: true);
-        // Extract just the HTML if wrapped in markdown fences
-        final htmlMatch = RegExp(r'```html?\s*([\s\S]+?)\s*```', caseSensitive: false).firstMatch(body);
-        if (htmlMatch != null) {
-          body = htmlMatch.group(1)!;
-        }
-        // Ensure it starts with a proper HTML tag
-        if (body.contains('<!DOCTYPE') || body.contains('<html')) {
-          return body.trim();
-        }
-        // If the response is HTML content without doctype, wrap it
-        if (body.contains('<div') || body.contains('<section') || body.contains('<style')) {
-          return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>CoDesign · JARVIS</title></head><body>$body</body></html>';
-        }
-        return _getFallbackHtml(agentType, brief);
-      }
-      return _getFallbackHtml(agentType, brief);
-    } catch (e) {
-      debugPrint('CoDesign generation error: $e');
-      return _getFallbackHtml(agentType, brief);
-    }
-  }
-
-  /// Fallback HTML when generation fails — still looks great
-  String _getFallbackHtml(String agentType, String query) {
-    return '''<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CoDesign · $agentType</title>
-<style>
-  :root {
-    --bg: oklch(12% 0.02 260);
-    --surface: oklch(18% 0.025 260);
-    --border: oklch(30% 0.03 260 / 0.4);
-    --text: oklch(92% 0.01 260);
-    --muted: oklch(65% 0.015 260);
-    --accent: oklch(72% 0.2 200);
-    --accentL: oklch(72% 0.2 200 / 0.15);
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
-  .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; }
-  .badge { display: inline-flex; align-items: center; gap: 8px; background: var(--accentL); border: 1px solid var(--accent); border-radius: 999px; padding: 6px 16px; font-size: 12px; color: var(--accent); font-weight: 600; letter-spacing: 0.05em; margin-bottom: 2rem; }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
-  .title { font-size: clamp(2.5rem, 8vw, 5rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; background: linear-gradient(135deg, var(--text), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-  .sub { font-size: 1.1rem; color: var(--muted); max-width: 500px; line-height: 1.7; margin-bottom: 2.5rem; }
-  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: oklch(12% 0.02 260); border: none; border-radius: 12px; padding: 14px 28px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.15s ease; }
-  .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--accentL); }
-  .btn:active { transform: scale(0.97); }
-  .msg { margin-top: 3rem; padding: 16px 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; font-size: 13px; color: var(--muted); }
-  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
-  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-  .hero > * { animation: fadeUp 0.6s ease both; }
-  .hero > *:nth-child(2) { animation-delay: 0.1s; }
-  .hero > *:nth-child(3) { animation-delay: 0.2s; }
-  .hero > *:nth-child(4) { animation-delay: 0.3s; }
-  .hero > *:nth-child(5) { animation-delay: 0.4s; }
-</style>
-</head>
-<body>
-<div class="hero">
-  <div class="badge"><span class="dot"></span> CODESIGN · JARVIS</div>
-  <h1 class="title">${agentType[0].toUpperCase()}${agentType.substring(1)} Design</h1>
-  <p class="sub">Generating your $agentType UI for: <em>"$query"</em><br>Retry for a fresh AI-generated design.</p>
-  <button class="btn" onclick="window.location.reload()">🔄 Regenerate Design</button>
-  <div class="msg">💡 Tip: Add more details to your prompt for a more specific design result.</div>
-</div>
-</body>
-</html>''';
-  }
 
   @override
   void dispose() {

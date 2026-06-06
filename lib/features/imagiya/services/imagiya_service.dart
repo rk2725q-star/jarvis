@@ -1,53 +1,50 @@
 import 'dart:async';
-import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import '../../../core/api/api_client.dart';
+import '../../../core/router/ai_router.dart';
 import '../models/image_models.dart';
 
 class ImagiyaService {
-  final ApiClient _client;
+  final AIRouter _router;
   static const _uuid = Uuid();
 
-  ImagiyaService({ApiClient? client})
-      : _client = client ?? ApiClient.instance;
+  ImagiyaService({required AIRouter router})
+      : _router = router;
 
   /// Stream-based generation — emits status updates
   Stream<GeneratedImage> generate(ImagiyaPrompt prompt) async* {
     final id = _uuid.v4();
-    final url = prompt.toPollinationsUri().toString();
 
     // Emit generating state immediately
     yield GeneratedImage(
       id: id,
-      imageUrl: url,
+      imageUrl: '',
       sourcePrompt: prompt,
       createdAt: DateTime.now(),
       status: ImageStatus.generating,
     );
 
     try {
-      // Pollinations: just hitting the URL triggers generation
-      // First request may take 3-8s for cold start
-      final cancelToken = CancelToken();
-      final bytes = await _client.fetchImageBytes(url, cancelToken: cancelToken);
-
-      if (bytes.isEmpty) throw ApiException('Empty image returned from Imagiya');
+      final imageUrl = await _router.generateImage(
+        prompt.text,
+        modelOverride: prompt.model,
+      );
 
       yield GeneratedImage(
         id: id,
-        imageUrl: url,
+        imageUrl: imageUrl,
         sourcePrompt: prompt,
         createdAt: DateTime.now(),
         status: ImageStatus.success,
       );
-    } on ApiException catch (e) {
+    } catch (e) {
       yield GeneratedImage(
         id: id,
-        imageUrl: url,
+        imageUrl: '',
         sourcePrompt: prompt,
         createdAt: DateTime.now(),
         status: ImageStatus.error,
-        errorMessage: e.isCancelled ? 'Cancelled' : e.message,
+        errorMessage: e.toString(),
       );
     }
   }
@@ -58,22 +55,21 @@ class ImagiyaService {
     int count = 4,
     ImageResolution resolution = ImageResolution.hd,
   }) async {
-    return List.generate(count, (i) {
-      final prompt = ImagiyaPrompt(
-        text: promptText,
-        resolution: resolution,
-        seed: (DateTime.now().millisecondsSinceEpoch + i).toString(),
-      );
-      return prompt.toPollinationsUri().toString();
-    });
+    final urls = <String>[];
+    for (int i = 0; i < count; i++) {
+      try {
+        final url = await _router.generateImage(promptText);
+        urls.add(url);
+      } catch (e) {
+        debugPrint('[ImagiyaService] Variation gen failed: $e');
+      }
+    }
+    return urls;
   }
 
-  /// Available free models on Pollinations
+  /// Available free models
   static const availableModels = [
-    'flux',          // Best quality (default)
-    'flux-realism',  // Photorealistic
-    'flux-anime',    // Anime style
-    'flux-3d',       // 3D render style
-    'turbo',         // Fastest generation
+    'minimax-m3',
+    'imagen-3.0-generate-002',
   ];
 }

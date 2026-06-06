@@ -12,6 +12,7 @@ import 'package:jarvis_ai/core/memory/memory_service.dart';
 import 'package:jarvis_ai/core/security/secure_storage_service.dart';
 import 'package:jarvis_ai/core/api/anthropic_client.dart';
 import 'package:jarvis_ai/core/file_processor/file_processor.dart';
+import 'package:jarvis_ai/services/skill_service.dart';
 
 enum AIProvider {
   llamaCpp,
@@ -81,6 +82,7 @@ class AIRouter extends ChangeNotifier {
   final FileProcessor _fileProcessor;
   final OllamaCloudService _ollamaService;
   final GoogleDocsService _googleDocs;
+  final SkillService _skillService;
 
   AIRouter({
     required SecureStorageService secureStorage,
@@ -88,14 +90,18 @@ class AIRouter extends ChangeNotifier {
     required FileProcessor fileProcessor,
     required OllamaCloudService ollamaService,
     required GoogleDocsService googleDocs,
+    required SkillService skillService,
   }) : _secureStorage = secureStorage,
        _memory = memory,
        _fileProcessor = fileProcessor,
        _ollamaService = ollamaService,
-       _googleDocs = googleDocs;
+       _googleDocs = googleDocs,
+       _skillService = skillService;
 
   MemoryService get memory => _memory;
   GoogleDocsService? get googleDocs => _googleDocs;
+  SkillService get skillService => _skillService;
+  AIProvider? get lastSelectedProvider => _lastSelectedProvider;
 
   AIProvider? _activeProvider;
   String? _activeModel;
@@ -365,6 +371,7 @@ RULE 3: SILENT TAG BEHAVIOR
 - TAG FORMATS:
   <CANCEL_REMINDER time="YYYY-MM-DD HH:MM">
   <SCHEDULE_REMINDER time="YYYY-MM-DD HH:MM" message="notification text here">
+  <DRAW_DIAGRAM prompt="detailed description of flowchart or process steps">
 
 RULE 4: NO UNSOLICITED ANDROID TIPS
 - NEVER give Android settings tutorials unless user SPECIFICALLY asks for it.
@@ -397,10 +404,13 @@ RULE 6: ROUTINE UPDATE PROACTIVENESS
 RULE 7: TOOLS & EXECUTION (TAGS)
 - Tags are SILENT COMMAND POSITIVE ACTIONS. JARVIS's brain PLANS the skip/update and executes via tool:
   <SKIP_ROUTINE type="breakfast"> (Cancels for TODAY only. Use when user ate early or says "not today")
-  <WEB_SEARCH query="..."> (Use to fetch real-time news, holidays, or any user question. JARVIS MUST follow results.)
   <CANCEL_REMINDER time="YYYY-MM-DD HH:MM"> (Permanent delete)
   <UPDATE_ROUTINE type="..." weekday="..." time="HH:mm"> (Permanent reschedule)
   <SCHEDULE_REMINDER time="..." message="..."> (Create new)
+  <DRAW_DIAGRAM prompt="..."> (Compile premium flowchart diagram for user)
+
+- IMPORTANT: Real-time web search results are PRE-INJECTED into your context under [REAL-TIME WEB CONTEXT] before you respond.
+  DO NOT emit <WEB_SEARCH> or <tool_code> tags. Just answer using the provided context directly.
 
 - weekday attributes:
   - Precise: 1 (Mon) to 7 (Sun)
@@ -415,7 +425,7 @@ RULE 8: ADAPTIVE PLANNING & MEMORY
 - Proactively confirm skips: "I see you're done! I've already cancelled your 9:30 AM reminder. Enjoy your college day!"
 
 RULE 9: HOLIDAY & FESTIVAL AWARENESS
-- JARVIS MUST proactively check if today is a Public Holiday or Festival in Tamil Nadu/India using <WEB_SEARCH query="...">.
+- If [REAL-TIME WEB CONTEXT] contains today's holiday/festival info, use it directly.
 - If today is a Holiday/Festival:
   1. Treat "College/Mon-Sat" routines as NULLIFIED for today.
   2. Switch to "Holiday/Sunday" routine (e.g., 10 AM breakfast, 8 AM wake-up) automatically.
@@ -442,8 +452,13 @@ RULE 12: GOOGLE DOCS (docx)
     - <CREATE_ACADEMIC_REPORT topic="topic" title="title"> : **MANDATORY** for long research or academic papers (16-22 pages). 
       * JARVIS will perform an exhaustive 22-chapter deep research and generate the full document automatically.
       * This includes real Page Breaks between chapters and high-quality formatting.
-    - <WEB_SEARCH query="search_query"> : Use for live facts and external data.
+    - Real-time data: Use the [REAL-TIME WEB CONTEXT] already injected — never emit WEB_SEARCH tags.
 - Use these whenever the user mentions "Google Docs", "docx", "my documents", or asks to "save this to a doc".
+
+RULE 18: DIAGRAM & FLOWCHART DRAWING
+- When the user asks you to "draw a diagram", "create a flowchart", "generate a system architecture", "show a process flow", or similar visual step-by-step processes, you MUST confirm naturally and append a tag at the very end of your response:
+  <DRAW_DIAGRAM prompt="detailed description of the diagram steps, nodes, and icons to render">
+- Do not draw raw ASCII or text flowcharts unless explicitly requested. Instead, let the HTML rendering engine do it by outputting the `<DRAW_DIAGRAM>` tag.
 
 ═══════════════════════════════════════════
    JARVIS ADVANCED REASONING PROTOCOL
@@ -1075,6 +1090,8 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     int? maxTokens,
     bool isVoiceMode = false,
     String integrationCapabilities = '',
+    AIProvider? providerOverride,
+    String? modelOverride,
   }) async* {
     _activeProvider = null;
 
@@ -1161,8 +1178,14 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       promptPair = (system: '$baseSystemPrompt\n$systemPrompt', user: prompt);
     }
 
-    // For voice mode, prioritize absolute speed: Nvidia ONLY.
-    final chain = isVoiceMode ? [AIProvider.nvidia] : _fallbackChain;
+    // Build fallback/routing chain
+    final List<AIProvider> chain = [];
+    if (providerOverride != null) {
+      chain.add(providerOverride);
+    }
+    
+    final fallbackChain = isVoiceMode ? [AIProvider.nvidia] : _fallbackChain;
+    chain.addAll(fallbackChain.where((p) => !chain.contains(p)));
 
     if (chain.isEmpty) {
       _isGenerating = false;
@@ -1194,6 +1217,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           currentUserPrompt,
           systemPrompt: promptPair.system,
           maxTokens: maxTokensVal,
+          modelOverride: modelOverride,
         );
         if (stream == null) {
           errorLog.add('${_providerName(provider)}: Null or Unavailable');
@@ -1205,7 +1229,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         }
 
         _activeProvider = provider;
-        _activeModel = _selectedModels[provider];
+        _activeModel = modelOverride ?? _selectedModels[provider];
         notifyListeners();
 
         bool hasStarted = false;
@@ -1311,6 +1335,8 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     String userInput, {
     String? systemPrompt,
     String? imageBase64,
+    AIProvider? providerOverride,
+    String? modelOverride,
   }) async {
     final maxTokens = imageBase64 != null ? 128 : _getMaxTokens(userInput);
 
@@ -1324,7 +1350,11 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       promptPair = (system: '$base\n$systemPrompt', user: userInput);
     }
 
-    final chain = _fallbackChain;
+    final List<AIProvider> chain = [];
+    if (providerOverride != null) {
+      chain.add(providerOverride);
+    }
+    chain.addAll(_fallbackChain.where((p) => !chain.contains(p)));
 
     for (final provider in chain) {
       try {
@@ -1335,6 +1365,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           systemPrompt: promptPair.system,
           maxTokens: maxTokens,
           imageBase64: imageBase64,
+          modelOverride: modelOverride,
         );
 
         // If the model literally says it can't "see", treat it as a failure and try the next one
@@ -1397,13 +1428,61 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     }
   }
 
-  /// Generate a one-shot response with a possible system prompt override.
-  /// This is used by VibeCode to specify exact JSON structures.
+  /// Generate image using active AI provider's official API
+  Future<String> generateImage(String prompt, {String? providerOverride, String? modelOverride}) async {
+    AIProvider active;
+    
+    // 1. Detect provider based on model override first
+    if (modelOverride == 'minimax-m3') {
+      active = AIProvider.ollamaCloud;
+    } else if (modelOverride == 'imagen-3.0-generate-002') {
+      active = AIProvider.gemini;
+    } else if (providerOverride != null) {
+      active = AIProvider.values.firstWhere((p) => p.name == providerOverride, orElse: () => AIProvider.gemini);
+    } else {
+      active = _lastSelectedProvider ?? AIProvider.gemini;
+    }
+
+    // 2. Resolve fallback if resolved provider does not support image generation natively
+    if (active != AIProvider.gemini && active != AIProvider.ollamaCloud) {
+      if (modelOverride == 'minimax-m3') {
+        active = AIProvider.ollamaCloud;
+      } else if (modelOverride == 'imagen-3.0-generate-002') {
+        active = AIProvider.gemini;
+      } else {
+        final geminiKey = await _secureStorage.getApiKey('gemini');
+        if (geminiKey != null && geminiKey.isNotEmpty) {
+          active = AIProvider.gemini;
+        } else if (_ollamaService.apiKey.isNotEmpty) {
+          active = AIProvider.ollamaCloud;
+        } else {
+          throw Exception('No official image generation endpoints configured. Please enter API keys for Gemini (Imagen 3) or Ollama Cloud (Minimax M3) in Settings.');
+        }
+      }
+    }
+
+    if (active == AIProvider.gemini) {
+      final key = await _secureStorage.getApiKey('gemini');
+      if (key == null || key.isEmpty) {
+        throw Exception('Gemini API key is missing. Please configure it in Settings.');
+      }
+      final client = GeminiApiClient(
+        apiKey: key,
+        model: modelOverride ?? _selectedModels[AIProvider.gemini] ?? 'imagen-3.0-generate-002',
+      );
+      return await client.generateImage(prompt);
+    } else {
+      final targetModel = modelOverride ?? _selectedModels[AIProvider.ollamaCloud] ?? 'minimax-m3';
+      return await _ollamaService.generateImage(prompt, model: targetModel);
+    }
+  }
+
   Future<String> generateDirectResponse({
     required String prompt,
     String? systemOverride,
     String? imageBase64,
     AIProvider? providerOverride,
+    String? modelOverride,
   }) async {
     final systemPrompt = systemOverride ?? _buildAdaptivePrompt(prompt).system;
 
@@ -1436,6 +1515,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
             systemPrompt: systemPrompt,
             imageBase64: imageBase64,
             maxTokens: maxTokens, // CRITICAL: Pass the tokens!
+            modelOverride: modelOverride,
           );
           if (response != null && response.trim().isNotEmpty) return response;
         } catch (e) {
@@ -1455,6 +1535,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     String? systemPrompt,
     int? maxTokens,
     String? imageBase64,
+    String? modelOverride,
   }) async {
     switch (provider) {
       case AIProvider.zeera:
@@ -1477,7 +1558,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       case AIProvider.gemini:
         final key = await _secureStorage.getApiKey('gemini');
         if (key == null || key.isEmpty) return null;
-        var model = _selectedModels[AIProvider.gemini];
+        var model = modelOverride ?? _selectedModels[AIProvider.gemini];
         if (model == null) {
           final models = await GeminiApiClient(apiKey: key).fetchModels();
           // For vision tasks prefer flash (supports images)
@@ -1506,7 +1587,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
             OllamaChatMessage(role: 'user', content: prompt),
           ];
 
-          var model = _selectedModels[AIProvider.ollama];
+          var model = modelOverride ?? _selectedModels[AIProvider.ollama];
           if (imageBase64 != null &&
               model != null &&
               !model.contains('llava') &&
@@ -1541,7 +1622,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
             OllamaChatMessage(role: 'user', content: prompt),
           ];
 
-          var model = _selectedModels[AIProvider.ollamaCloud];
+          var model = modelOverride ?? _selectedModels[AIProvider.ollamaCloud];
           if (imageBase64 != null &&
               model != null &&
               !model.contains('llava') &&
@@ -1566,7 +1647,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       case AIProvider.nvidia:
         final key = await _secureStorage.getApiKey('nvidia');
         if (key == null || key.trim().isEmpty) return null;
-        var model = _selectedModels[AIProvider.nvidia];
+        var model = modelOverride ?? _selectedModels[AIProvider.nvidia];
 
         // Dynamic fetch if no model is selected or forced null
         if (model == null || model.isEmpty) {
@@ -1597,7 +1678,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       case AIProvider.openRouter:
         final key = await _secureStorage.getApiKey('openRouter');
         if (key == null || key.trim().isEmpty) return null;
-        var model = _selectedModels[AIProvider.openRouter];
+        var model = modelOverride ?? _selectedModels[AIProvider.openRouter];
 
         // Dynamic fetch if no model is selected
         if (model == null || model.isEmpty) {
@@ -1635,7 +1716,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           '[AIRouter] Attempting Anthropic key="${trimmedKey.substring(0, 10)}..."',
         );
         var model =
-            _selectedModels[AIProvider.anthropic] ??
+            modelOverride ?? _selectedModels[AIProvider.anthropic] ??
             'claude-3-5-sonnet-20241022';
         try {
           return await AnthropicApiClient(
@@ -1669,6 +1750,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     String prompt, {
     String? systemPrompt,
     int? maxTokens,
+    String? modelOverride,
   }) async {
     switch (provider) {
       case AIProvider.llamaCpp:
@@ -1690,7 +1772,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       case AIProvider.gemini:
         final key = await _secureStorage.getApiKey('gemini');
         if (key == null || key.isEmpty) return null;
-        var model = _selectedModels[AIProvider.gemini];
+        var model = modelOverride ?? _selectedModels[AIProvider.gemini];
         if (model == null || model.isEmpty) {
           model =
               'gemini-1.5-flash'; // High-speed default for zero thinking time
@@ -1722,7 +1804,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         return _ollamaService.chatStream(
           messages: messages,
           useCloudOverride: false,
-          model: _selectedModels[AIProvider.ollama],
+          model: modelOverride ?? _selectedModels[AIProvider.ollama],
         );
 
       case AIProvider.ollamaCloud:
@@ -1752,7 +1834,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         return _ollamaService.chatStream(
           messages: messages,
           useCloudOverride: true,
-          model: _selectedModels[AIProvider.ollamaCloud],
+          model: modelOverride ?? _selectedModels[AIProvider.ollamaCloud],
         );
 
       case AIProvider.nvidia:
@@ -1762,7 +1844,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           debugPrint('[NVIDIA Stream] No API key - skipping');
           return null;
         }
-        var model = _selectedModels[AIProvider.nvidia];
+        var model = modelOverride ?? _selectedModels[AIProvider.nvidia];
         // Only auto-fetch if user has NOT selected a model
         if (model == null || model.isEmpty) {
           try {
@@ -1795,7 +1877,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       case AIProvider.openRouter:
         final key = await _secureStorage.getApiKey('openRouter');
         if (key == null || key.trim().isEmpty) return null;
-        var model = _selectedModels[AIProvider.openRouter];
+        var model = modelOverride ?? _selectedModels[AIProvider.openRouter];
         // Dynamic fetch if no model is selected
         if (model == null || model.isEmpty) {
           final models = await OpenRouterClient(
@@ -1808,7 +1890,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         if (model.isEmpty) return null;
         return OpenRouterClient(
           apiKey: key,
-          model: _selectedModels[AIProvider.openRouter] ?? 'auto',
+          model: model,
         ).generateStream(
           prompt,
           systemPrompt: systemPrompt,
@@ -1828,7 +1910,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         return AnthropicApiClient(
           apiKey: trimmedKey,
           model:
-              _selectedModels[AIProvider.anthropic] ??
+              modelOverride ?? _selectedModels[AIProvider.anthropic] ??
               'claude-3-5-sonnet-20241022',
         ).generateStream(
           prompt,

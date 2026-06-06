@@ -130,6 +130,39 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
   Color get _primary => Color(widget.integration.gradientColors[0]);
   Color get _secondary => Color(widget.integration.gradientColors[1]);
 
+  // ── Smart Auto-Adapt: Desktop vs Mobile based on site type ────────────────
+  bool _isDesktopMode = false;
+  bool _hasManuallySwitchedMode = false;
+
+  /// Sites that work better in desktop mode (complex web apps, productivity tools)
+  static const _desktopSites = [
+    'docs.google.com', 'sheets.google.com', 'slides.google.com',
+    'mail.google.com', 'drive.google.com', 'notion.so', 'figma.com',
+    'github.com', 'gitlab.com', 'codesandbox.io', 'codepen.io',
+    'stackoverflow.com', 'trello.com', 'airtable.com', 'canva.com',
+    'whatsapp.web.whatsapp.com', 'web.whatsapp.com', 'outlook.com',
+    'office.com', 'microsoft.com/en-us/microsoft-365', 'word.cloud.microsoft', 'office.live.com',
+    'jira.atlassian.com', 'slack.com', 'discord.com', 'linear.app',
+    'vercel.com', 'netlify.com', 'heroku.com', 'railway.app',
+  ];
+
+  /// Sites that work better in mobile mode
+  static const _mobileSites = [
+    'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
+    'facebook.com', 'm.facebook.com', 'reddit.com', 'pinterest.com',
+    'amazon.in', 'flipkart.com', 'myntra.com', 'meesho.com',
+    'youtube.com', 'youtu.be', 'spotify.com', 'swiggy.com', 'zomato.com',
+    'phonepe.com', 'paytm.com', 'gpay.app', 'udemy.com',
+  ];
+
+  bool _autoDetectDesktopMode(String url) {
+    final lower = url.toLowerCase();
+    if (_mobileSites.any((d) => lower.contains(d))) return false;
+    if (_desktopSites.any((d) => lower.contains(d))) return true;
+    // Default: mobile mode for most sites
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -158,6 +191,8 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
     );
 
     _addNewTab(widget.integration.url, widget.integration.name);
+    // Auto-detect mode for the initial URL
+    _isDesktopMode = _autoDetectDesktopMode(widget.integration.url);
   }
 
   void _addNewTab(String url, String title) {
@@ -222,14 +257,19 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
             ? _contentBlockers
             : [],
 
-        // ── PC Support / Desktop Mode ─────────────────────────────────────
-        preferredContentMode: UserPreferredContentMode.DESKTOP,
+        // ── PC Support / Desktop Mode — dynamically set based on auto-detect ──
+        preferredContentMode: _isDesktopMode
+            ? UserPreferredContentMode.DESKTOP
+            : UserPreferredContentMode.MOBILE,
 
-        // ── UA: Windows Chrome — allows PC sites like MS Word, WhatsApp Web ──
-        userAgent:
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-            'AppleWebKit/537.36 (KHTML, like Gecko) '
-            'Chrome/124.0.0.0 Safari/537.36',
+        // ── UA: dynamically adapts to site type ──────────────────────────────
+        userAgent: _isDesktopMode
+            ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+              'AppleWebKit/537.36 (KHTML, like Gecko) '
+              'Chrome/124.0.0.0 Safari/537.36'
+            : 'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+              'AppleWebKit/537.36 (KHTML, like Gecko) '
+              'Chrome/124.0.6367.82 Mobile Safari/537.36',
 
         // ── Long-press context menu for image save ────────────────────────
         disableContextMenu: false,
@@ -273,7 +313,23 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
         tab.canGoBack = await c.canGoBack();
         tab.canGoForward = await c.canGoForward();
         tab.title = await c.getTitle() ?? tab.url;
-        if (_currentTab == tab && mounted) setState(() {});
+        // Auto-adapt mode based on the newly loaded URL
+        if (_currentTab == tab && mounted && !_hasManuallySwitchedMode) {
+          final shouldBeDesktop = _autoDetectDesktopMode(tab.url);
+          if (shouldBeDesktop != _isDesktopMode) {
+            setState(() => _isDesktopMode = shouldBeDesktop);
+            // Apply the new UA without reloading
+            final newUA = shouldBeDesktop
+                ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+                : 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36';
+            await c.setSettings(settings: InAppWebViewSettings(
+              userAgent: newUA,
+              preferredContentMode: shouldBeDesktop ? UserPreferredContentMode.DESKTOP : UserPreferredContentMode.MOBILE,
+            ));
+            await c.evaluateJavascript(source: "Object.defineProperty(navigator, 'userAgent', {get: function(){ return '$newUA'; }});");
+          }
+          setState(() {});
+        }
       },
 
       onCreateWindow: (c, req) async {
@@ -785,6 +841,62 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
           ),
 
           const SizedBox(width: 8),
+
+          // Desktop / Mobile mode toggle
+          GestureDetector(
+            onTap: () async {
+              setState(() {
+                _isDesktopMode = !_isDesktopMode;
+                _hasManuallySwitchedMode = true;
+              });
+              final newUA = _isDesktopMode
+                  ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+                  : 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36';
+              await _currentTab.controller?.setSettings(settings: InAppWebViewSettings(
+                userAgent: newUA,
+                preferredContentMode: _isDesktopMode ? UserPreferredContentMode.DESKTOP : UserPreferredContentMode.MOBILE,
+              ));
+              await _currentTab.controller?.evaluateJavascript(
+                source: "Object.defineProperty(navigator, 'userAgent', {get: function(){ return '$newUA'; }});",
+              );
+              _currentTab.controller?.reload();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isDesktopMode
+                    ? _primary.withAlpha(38)
+                    : Colors.white.withAlpha(10),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _isDesktopMode
+                      ? _primary.withAlpha(100)
+                      : Colors.white.withAlpha(20),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isDesktopMode ? Icons.computer : Icons.smartphone,
+                    size: 12,
+                    color: _isDesktopMode ? _primary : Colors.white38,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    _isDesktopMode ? 'PC' : 'Mobile',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: _isDesktopMode ? _primary : Colors.white38,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 4),
 
           // Reload / Stop
           _TopBarBtn(

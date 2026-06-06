@@ -84,7 +84,7 @@ class OllamaCloudService {
   String _apiKey = '';
   String _cloudBaseUrl = kIsWeb
       ? Uri.base.resolve('/api/ollama').toString().replaceAll(RegExp(r'/$'), '')
-      : 'https://api.ollama.com';
+      : 'https://ollama.com';
   String _localUrl = 'http://127.0.0.1:11434';
   bool _useCloud = true;
   String _selectedModel = 'gpt-oss:120b';
@@ -107,11 +107,18 @@ class OllamaCloudService {
     final prefs = await SharedPreferences.getInstance();
     _apiKey = await _secureStorage.getApiKey('ollamaCloud') ?? '';
 
-    final savedCloudUrl =
+    var savedCloudUrl =
         await _secureStorage.getBaseUrl('ollamaCloud') ??
-        'https://api.ollama.com';
+        'https://ollama.com';
+    
+    // Dynamic migration: if they had the old api.ollama.com default, migrate it to ollama.com
+    if (savedCloudUrl == 'https://api.ollama.com' || savedCloudUrl == 'https://api.ollama.com/') {
+      savedCloudUrl = 'https://ollama.com';
+      await _secureStorage.saveBaseUrl('ollamaCloud', 'https://ollama.com');
+    }
+
     if (kIsWeb &&
-        (savedCloudUrl == 'https://api.ollama.com' ||
+        (savedCloudUrl == 'https://ollama.com' ||
             savedCloudUrl.isEmpty ||
             savedCloudUrl == '/api/ollama')) {
       _cloudBaseUrl = Uri.base
@@ -142,9 +149,13 @@ class OllamaCloudService {
       await _secureStorage.saveApiKey('ollamaCloud', apiKey);
     }
     if (baseUrl != null) {
-      _cloudBaseUrl = baseUrl.trim().isEmpty
-          ? 'https://api.ollama.com'
+      var url = baseUrl.trim().isEmpty
+          ? 'https://ollama.com'
           : baseUrl.trim();
+      if (url == 'https://api.ollama.com' || url == 'https://api.ollama.com/') {
+        url = 'https://ollama.com';
+      }
+      _cloudBaseUrl = url;
       await _secureStorage.saveBaseUrl('ollamaCloud', _cloudBaseUrl);
     }
     if (localUrl != null) {
@@ -281,21 +292,8 @@ class OllamaCloudService {
     final allMessages = <Map<String, dynamic>>[];
     final goCloud = useCloudOverride ?? _useCloud;
 
-    if (systemPrompt != null) {
-      allMessages.add({'role': 'system', 'content': systemPrompt});
-    }
-
-    // Handle Image Support for Ollama Vision Models (llava, moondream, etc.)
-    for (var m in messages) {
-      final msgJson = m.toJson();
-      if (imageBase64 != null && m.role == 'user') {
-        msgJson['images'] = [imageBase64];
-      }
-      allMessages.add(msgJson);
-    }
-
     // --- Auto-detect OpenAI-compatible models on Ollama Cloud ---
-    // Models like kimi-k2.6, deepseek-v4-flash/pro need /v1/chat/completions
+    // Models like kimi-k2.6, deepseek-v4-flash/pro, minimax-m3 need /v1/chat/completions
     final bool useOpenAiEndpoint =
         goCloud &&
         (targetModel.contains('kimi') ||
@@ -304,7 +302,44 @@ class OllamaCloudService {
             targetModel.contains('qwen') ||
             targetModel.contains('command') ||
             targetModel.contains('mistral') ||
-            targetModel.contains('mixtral'));
+            targetModel.contains('mixtral') ||
+            targetModel.contains('minimax') ||
+            targetModel.contains('m3'));
+
+    if (systemPrompt != null) {
+      allMessages.add({'role': 'system', 'content': systemPrompt});
+    }
+
+    if (useOpenAiEndpoint) {
+      for (int i = 0; i < messages.length; i++) {
+        final m = messages[i];
+        if (imageBase64 != null && m.role == 'user' && i == messages.length - 1) {
+          allMessages.add({
+            'role': 'user',
+            'content': [
+              {'type': 'text', 'text': m.content},
+              {
+                'type': 'image_url',
+                'image_url': {
+                  'url': 'data:image/jpeg;base64,$imageBase64',
+                }
+              }
+            ]
+          });
+        } else {
+          allMessages.add(m.toJson());
+        }
+      }
+    } else {
+      // Handle Image Support for Ollama Vision Models (llava, moondream, etc.)
+      for (var m in messages) {
+        final msgJson = m.toJson();
+        if (imageBase64 != null && m.role == 'user') {
+          msgJson['images'] = [imageBase64];
+        }
+        allMessages.add(msgJson);
+      }
+    }
 
     final http.Response res;
 
@@ -398,17 +433,14 @@ class OllamaCloudService {
     String? model,
     String? systemPrompt,
     bool? useCloudOverride,
+    String? imageBase64,
   }) async* {
     final targetModel = model ?? _selectedModel;
     final allMessages = <Map<String, dynamic>>[];
     final goCloud = useCloudOverride ?? _useCloud;
 
-    if (systemPrompt != null) {
-      allMessages.add({'role': 'system', 'content': systemPrompt});
-    }
-    allMessages.addAll(messages.map((m) => m.toJson()));
-
     // --- Auto-detect OpenAI-compatible models on Ollama Cloud ---
+    // Models like kimi-k2.6, deepseek-v4-flash/pro, minimax-m3 need /v1/chat/completions
     final bool useOpenAiEndpoint =
         goCloud &&
         (targetModel.contains('kimi') ||
@@ -417,7 +449,43 @@ class OllamaCloudService {
             targetModel.contains('qwen') ||
             targetModel.contains('command') ||
             targetModel.contains('mistral') ||
-            targetModel.contains('mixtral'));
+            targetModel.contains('mixtral') ||
+            targetModel.contains('minimax') ||
+            targetModel.contains('m3'));
+
+    if (systemPrompt != null) {
+      allMessages.add({'role': 'system', 'content': systemPrompt});
+    }
+
+    if (useOpenAiEndpoint) {
+      for (int i = 0; i < messages.length; i++) {
+        final m = messages[i];
+        if (imageBase64 != null && m.role == 'user' && i == messages.length - 1) {
+          allMessages.add({
+            'role': 'user',
+            'content': [
+              {'type': 'text', 'text': m.content},
+              {
+                'type': 'image_url',
+                'image_url': {
+                  'url': 'data:image/jpeg;base64,$imageBase64',
+                }
+              }
+            ]
+          });
+        } else {
+          allMessages.add(m.toJson());
+        }
+      }
+    } else {
+      for (var m in messages) {
+        final msgJson = m.toJson();
+        if (imageBase64 != null && m.role == 'user') {
+          msgJson['images'] = [imageBase64];
+        }
+        allMessages.add(msgJson);
+      }
+    }
 
     final String endpoint;
     if (goCloud) {
@@ -533,6 +601,50 @@ class OllamaCloudService {
       model: model,
     );
     return res.content;
+  }
+
+  Future<String> generateImage(String prompt, {String? model}) async {
+    if (_apiKey.isEmpty) {
+      throw Exception('Ollama Cloud API Key is required for image generation.');
+    }
+
+    final targetModel = model ?? _selectedModel;
+    final body = jsonEncode({
+      'model': targetModel.contains('minimax') || targetModel.contains('m3') ? 'minimax-m3' : targetModel,
+      'prompt': prompt,
+      'n': 1,
+      'size': '1024x1024',
+      'response_format': 'b64_json',
+    });
+
+    final res = await _client.post(
+      Uri.parse('$_cloudBaseUrl/v1/images/generations'),
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: body,
+    ).timeout(const Duration(seconds: 90));
+
+    if (res.statusCode != 200) {
+      throw Exception('Ollama Cloud Image Gen error ${res.statusCode}: ${res.body}');
+    }
+
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final images = (data['data'] as List?)?.cast<Map>() ?? [];
+    if (images.isEmpty) throw Exception('Image generation returned no data');
+
+    final b64 = images.first['b64_json'] as String?;
+    if (b64 != null) {
+      return 'data:image/png;base64,$b64';
+    }
+
+    final url = images.first['url'] as String?;
+    if (url != null) {
+      return url;
+    }
+
+    throw Exception('No base64 or URL found in response');
   }
 
   // ── Test connection ───────────────────────

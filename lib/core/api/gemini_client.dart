@@ -154,4 +154,38 @@ class GeminiApiClient {
       client.close();
     }
   }
+
+  Future<String> generateImage(String prompt) async {
+    final url = '$_baseUrl/models/imagen-3.0-generate-002:predict?key=$apiKey';
+    final body = jsonEncode({
+      'instances': [
+        {'prompt': prompt}
+      ],
+      'parameters': {
+        'sampleCount': 1,
+        'aspectRatio': '1:1',
+      }
+    });
+
+    final res = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: body,
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception('Gemini Imagen error ${res.statusCode}: ${res.body}');
+    }
+
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final predictions = (data['predictions'] as List?)?.cast<Map>() ?? [];
+    if (predictions.isEmpty) throw Exception('Gemini Imagen returned no predictions');
+    
+    final b64 = predictions.first['bytesBase64Encoded'] as String?;
+    if (b64 == null) throw Exception('Gemini Imagen returned no base64 bytes');
+    
+    return 'data:image/png;base64,$b64';
+  }
 }
