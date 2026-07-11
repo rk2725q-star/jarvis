@@ -22,8 +22,7 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:jarvis_ai/features/codesign/services/codesign_service.dart';
 import 'package:jarvis_ai/features/codesign/models/codesign_models.dart';
-
-
+import 'package:jarvis_ai/features/mcp/mcp_client.dart';
 class ChatProvider extends ChangeNotifier {
   final AIRouter router;
   final SessionService sessionService;
@@ -53,6 +52,15 @@ class ChatProvider extends ChangeNotifier {
   bool _webSearchEnabled = true;
 
   String? _pendingNotificationReply;
+
+  // MCP Integration
+  List<McpServer> connectedMcpServers = [];
+
+  Future<void> connectMcpServer(String url, {String? token}) async {
+    final server = await McpServer.connect(url, token: token);
+    connectedMcpServers.add(server);
+    notifyListeners();
+  }
 
   // ── Live Intelligence Tracking (shown in UI during generation) ──
   List<String> _activeDnaModels = [];
@@ -895,27 +903,76 @@ class ChatProvider extends ChangeNotifier {
     final buffer = StringBuffer();
 
     try {
-      await for (final chunk in router.generateStream(
-        combinedText,
-        // CRITICAL FIX: Only pass integration capabilities when user explicitly
-        // @mentioned an integration. Passing capabilitySystemPrompt to ALL messages
-        // was causing JARVIS to autonomously open integrations without user request.
-        integrationCapabilities: atIntegrationCapability ?? '',
-      )) {
-        buffer.write(chunk);
-        final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
-        if (idx != -1) {
-          final displayContent = _stripTags(buffer.toString());
-          final bool isInfinity = router.lastSelectedProvider != AIProvider.netless;
-          _messages[idx] = aiMsg.copyWith(
-            content: displayContent,
-            provider: isInfinity ? 'INFINITY' : router.activeProvider?.name,
-            model: isInfinity
-                ? '3M Context (${router.activeModel ?? "Brain"})'
-                : router.activeModel,
-            isStreaming: true,
+      final mcpTools = connectedMcpServers.expand((s) => s.tools).toList();
+      bool useToolLoop = mcpTools.isNotEmpty && !isImagiya && !isCodesign && resolvedProvider == null;
+      
+      if (useToolLoop) {
+        final toolsMap = mcpTools.map((t) => t.toGeminiSchema()).toList();
+        bool isToolCalling = true;
+        int toolLoopCount = 0;
+        
+        while (isToolCalling && toolLoopCount < 5) {
+          final resp = await router.generateWithTools(
+            combinedText,
+            tools: toolsMap,
           );
-          notifyListeners();
+          
+          if (resp.toolCall != null) {
+            final toolCall = resp.toolCall!;
+            _setAnalysisStatus('Running ${toolCall.name}...');
+            
+            try {
+              final server = connectedMcpServers.firstWhere(
+                (s) => s.tools.any((t) => t.name == toolCall.name)
+              );
+              final result = await server.callTool(toolCall.name, toolCall.arguments);
+              combinedText += '\n\n[Tool Result for ${toolCall.name}]:\n${jsonEncode(result)}\n\nPlease continue responding based on this result.';
+            } catch (e) {
+              combinedText += '\n\n[Tool Error for ${toolCall.name}]:\n$e\n\nPlease continue responding based on this result.';
+            }
+            toolLoopCount++;
+          } else {
+            isToolCalling = false;
+            // Simulate streaming the final text so the UI animates properly
+            final text = resp.text ?? "⚠️ No response generated.";
+            final chunkSize = text.length > 500 ? 20 : 5;
+            for (int i = 0; i < text.length; i += chunkSize) {
+              final end = (i + chunkSize < text.length) ? i + chunkSize : text.length;
+              buffer.write(text.substring(i, end));
+              final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
+              if (idx != -1) {
+                _messages[idx] = aiMsg.copyWith(
+                  content: _stripTags(buffer.toString()),
+                  provider: 'MCP Agent',
+                  model: router.activeModel ?? 'Tool Caller',
+                  isStreaming: true,
+                );
+                notifyListeners();
+              }
+              await Future.delayed(const Duration(milliseconds: 20));
+            }
+          }
+        }
+      } else {
+        await for (final chunk in router.generateStream(
+          combinedText,
+          integrationCapabilities: atIntegrationCapability ?? '',
+        )) {
+          buffer.write(chunk);
+          final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
+          if (idx != -1) {
+            final displayContent = _stripTags(buffer.toString());
+            final bool isInfinity = router.lastSelectedProvider != AIProvider.netless;
+            _messages[idx] = aiMsg.copyWith(
+              content: displayContent,
+              provider: isInfinity ? 'INFINITY' : router.activeProvider?.name,
+              model: isInfinity
+                  ? '3M Context (${router.activeModel ?? "Brain"})'
+                  : router.activeModel,
+              isStreaming: true,
+            );
+            notifyListeners();
+          }
         }
       }
     } catch (e) {

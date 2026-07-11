@@ -386,6 +386,115 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
   }
 
+  void _showAddMcpDialog(ChatProvider provider) {
+    final mcpUrlController = TextEditingController(text: 'https://mcp.pixelcut.ai/mcp');
+    bool isLoading = false;
+    String? error;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text(
+            'Connect Remote MCP',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter the URL of the remote Model Context Protocol server.',
+                style: TextStyle(color: Color(0xFFB0B0C8), fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: mcpUrlController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'MCP Server URL',
+                  labelStyle: const TextStyle(color: JarvisColors.textMuted),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: JarvisColors.accentPrimary),
+                  ),
+                ),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  error!,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                ),
+              ]
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF7070A0))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: JarvisColors.accentPrimary,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      setDialogState(() {
+                        isLoading = true;
+                        error = null;
+                      });
+                      try {
+                        await provider.connectMcpServer(mcpUrlController.text.trim());
+                        if (mounted) Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('MCP Server connected successfully!'),
+                            backgroundColor: JarvisColors.accentPrimary,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      } catch (e) {
+                        setDialogState(() {
+                          isLoading = false;
+                          error = e.toString();
+                        });
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const Text('Connect', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMainView(ChatProvider provider, VoidCallback onToolsClick) {
     return Column(
       key: const ValueKey('main'),
@@ -635,45 +744,21 @@ class _ChatInputBarState extends State<ChatInputBar>
               ListTile(
                 onTap: () {
                   Navigator.pop(context);
-                  _controller.text = "@arena Generate an image of: ";
-                  _focusNode.requestFocus();
+                  _showAddMcpDialog(provider);
                 },
                 leading: const Icon(
-                  Icons.image_rounded,
-                  color: Colors.purpleAccent,
-                ),
-                title: const Text(
-                  "Image Generator",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                subtitle: const Text(
-                  "Powered autonomously by Arena.ai",
-                  style: TextStyle(color: JarvisColors.textMuted, fontSize: 12),
-                ),
-              ),
-              const Divider(height: 1, color: JarvisColors.border),
-              ListTile(
-                onTap: () {
-                  Navigator.pop(context);
-                  _controller.text = "@arena Generate a video of: ";
-                  _focusNode.requestFocus();
-                },
-                leading: const Icon(
-                  Icons.movie_creation_rounded,
+                  Icons.electrical_services_rounded,
                   color: Colors.blueAccent,
                 ),
                 title: const Text(
-                  "Video Generator",
+                  "Connect Remote MCP",
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 subtitle: const Text(
-                  "Powered autonomously by Arena.ai",
+                  "Add external tools via Model Context Protocol",
                   style: TextStyle(color: JarvisColors.textMuted, fontSize: 12),
                 ),
               ),

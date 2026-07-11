@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:jarvis_ai/core/router/ai_response.dart';
 
 /// Gemini AI provider — supports text, streaming AND vision (image) inputs
 class GeminiApiClient {
@@ -53,6 +54,7 @@ class GeminiApiClient {
     String? systemPrompt,
     int? maxTokens,
     String? imageBase64,
+    List<Map<String, dynamic>>? tools,
   }) {
     return {
       'contents': [
@@ -65,6 +67,8 @@ class GeminiApiClient {
         'systemInstruction': {
           'parts': [{'text': systemPrompt}]
         },
+      if (tools != null && tools.isNotEmpty)
+        'tools': [{'functionDeclarations': tools}],
       'generationConfig': {
         'temperature': 0.4, // Lower for agentic precision
         'maxOutputTokens': maxTokens ?? 8192, // Default 8192 — was erroneously 256
@@ -78,11 +82,22 @@ class GeminiApiClient {
     int? maxTokens,
     String? imageBase64,
   }) async {
+    final resp = await generateWithTools(prompt, systemPrompt: systemPrompt, maxTokens: maxTokens, imageBase64: imageBase64);
+    return resp.text;
+  }
+
+  Future<AIResponse> generateWithTools(String prompt, {
+    String? systemPrompt,
+    int? maxTokens,
+    String? imageBase64,
+    List<Map<String, dynamic>>? tools,
+  }) async {
     final body = jsonEncode(_buildBody(
       prompt: prompt,
       systemPrompt: systemPrompt,
       maxTokens: maxTokens,
       imageBase64: imageBase64,
+      tools: tools,
     ));
 
     final modelPath = model.startsWith('models/') ? model : 'models/$model';
@@ -102,9 +117,28 @@ class GeminiApiClient {
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final candidates = (data['candidates'] as List?)?.cast<Map>() ?? [];
     if (candidates.isEmpty) throw Exception('Gemini returned no candidates');
-    final text = candidates.first['content']?['parts']?[0]?['text'] as String?;
-    if (text == null) throw Exception('Gemini returned no text');
-    return text;
+    
+    final candidate = candidates.first;
+    final parts = candidate['content']?['parts'] as List? ?? [];
+    
+    if (parts.isEmpty) throw Exception('Gemini returned no parts');
+
+    // Check for tool call
+    final functionCall = parts.firstWhere((p) => p['functionCall'] != null, orElse: () => null)?['functionCall'];
+    if (functionCall != null) {
+      return AIResponse(
+        toolCall: ToolCall(
+          id: DateTime.now().millisecondsSinceEpoch.toString(), // Gemini doesn't use call IDs natively
+          name: functionCall['name'],
+          arguments: functionCall['args'] ?? {},
+        ),
+      );
+    }
+
+    final text = parts.firstWhere((p) => p['text'] != null, orElse: () => null)?['text'] as String?;
+    if (text == null) throw Exception('Gemini returned no text and no tool calls');
+    
+    return AIResponse(text: text);
   }
 
   // ── Streaming generate (used by chat UI) ─────────────────────────────────
