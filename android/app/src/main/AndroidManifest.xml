@@ -22,6 +22,7 @@
 
     <!-- Wake Lock for agent loop -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
     <!-- Storage for screenshots -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
