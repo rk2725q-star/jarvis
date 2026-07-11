@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:jarvis_ai/core/router/ai_router.dart';
 import 'package:jarvis_ai/services/tts_service.dart';
+import 'package:jarvis_ai/services/skill_service.dart';
 import 'agentica_engine.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -86,8 +87,9 @@ class _AgenticaScreenState extends State<AgenticaScreen>
 
     // Engine setup
     final router = context.read<AIRouter>();
+    final skillService = context.read<SkillService>();
     _ttsService = context.read<TtsService>();
-    _engine = AgenticaEngine(router: router);
+    _engine = AgenticaEngine(router: router, skillService: skillService);
     _queueManager = AgenticaQueueManager(engine: _engine);
 
     // CRITICAL FIX: Stream with batching — no setState per event

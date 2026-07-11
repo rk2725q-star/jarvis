@@ -211,9 +211,11 @@ class JarvisAccessibilityService : AccessibilityService() {
     private fun collectNodesFast(
         node: AccessibilityNodeInfo?,
         sb: StringBuilder,
-        startIndex: Int
+        startIndex: Int,
+        maxNodes: Int = 150,
+        parentIsWeb: Boolean = false
     ): Int {
-        if (node == null) return startIndex
+        if (node == null || startIndex >= maxNodes) return startIndex
         var index = startIndex
 
         // Ultra-fast filter: visible AND (actionable OR has text)
@@ -221,37 +223,62 @@ class JarvisAccessibilityService : AccessibilityService() {
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
         val visible = bounds.width() > 0 && bounds.height() > 0
+        
+        val isWeb = parentIsWeb || node.className?.contains("WebView") == true || node.className?.contains("webkit") == true
 
-        if (isVisible && visible && 
-            (node.isClickable || node.isEditable || node.isScrollable || node.isCheckable ||
-             !node.text.isNullOrEmpty() || !node.contentDescription.isNullOrEmpty())) {
+        if (isVisible && visible) {
+            val isActionable = node.isClickable || node.isEditable || node.isScrollable || node.isCheckable
+            val text = node.text?.toString()?.trim() ?: ""
+            val desc = node.contentDescription?.toString()?.trim() ?: ""
+            val hasValidText = text.isNotEmpty() || desc.isNotEmpty()
             
-            val ref = "@e$index"
-            try {
-                refCache[ref] = AccessibilityNodeInfo.obtain(node)
-                index++
-            } catch (_: Exception) {}
+            var shouldInclude = isActionable || hasValidText
+            
+            // Web Content Aggressive Filter
+            if (isWeb && !isActionable) {
+                // Drop non-actionable paragraph text. Only keep short labels/headings.
+                if (text.length > 50 || desc.length > 50) {
+                    shouldInclude = false
+                }
+            } else if (!isActionable) {
+                // For native apps, skip tiny non-actionable boilerplate text (e.g., "|", "-", " ")
+                if (text.length < 3 && desc.length < 3) {
+                    shouldInclude = false
+                }
+            }
 
-            val text = node.text?.toString() ?: ""
-            val desc = node.contentDescription?.toString() ?: ""
-            val pkg = node.packageName?.toString() ?: "sys"
-            val cls = node.className?.toString()?.substringAfterLast('.') ?: ""
-            
-            // Compact format: @e1[pkg/cls]"text"{actions}
-            sb.append("$ref[$pkg/$cls]")
-            if (text.isNotEmpty()) sb.append("\"$text\"")
-            if (desc.isNotEmpty() && desc != text) sb.append("($desc)")
-            sb.append("{")
-            if (node.isClickable) sb.append("c")
-            if (node.isEditable) sb.append("e")
-            if (node.isScrollable) sb.append("s")
-            if (node.isCheckable) sb.append("ch")
-            sb.append("}\n")
+            if (shouldInclude) {
+                val ref = "@e$index"
+                try {
+                    refCache[ref] = AccessibilityNodeInfo.obtain(node)
+                    index++
+                } catch (_: Exception) {}
+
+                val pkg = node.packageName?.toString() ?: "sys"
+                val cls = node.className?.toString()?.substringAfterLast('.') ?: ""
+                
+                sb.append("$ref[$pkg/$cls]")
+                if (text.isNotEmpty()) {
+                    val trunc = if (text.length > 40) text.substring(0, 37) + "..." else text
+                    sb.append("\"$trunc\"")
+                }
+                if (desc.isNotEmpty() && desc != text) {
+                    val trunc = if (desc.length > 40) desc.substring(0, 37) + "..." else desc
+                    sb.append("($trunc)")
+                }
+                sb.append("{")
+                if (node.isClickable) sb.append("c")
+                if (node.isEditable) sb.append("e")
+                if (node.isScrollable) sb.append("s")
+                if (node.isCheckable) sb.append("ch")
+                sb.append("}\n")
+            }
         }
 
         for (i in 0 until node.childCount) {
             val child = node.getChild(i)
-            index = collectNodesFast(child, sb, index)
+            index = collectNodesFast(child, sb, index, maxNodes, isWeb)
+            if (index >= maxNodes) break
         }
         return index
     }

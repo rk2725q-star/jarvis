@@ -4,6 +4,7 @@ class JarvisSkill {
   final String description;
   final String systemInstruction;
   final List<String> triggerKeywords;
+  final List<String>? executableSteps;
   final DateTime createdAt;
   bool isActive;
 
@@ -13,6 +14,7 @@ class JarvisSkill {
     required this.description,
     required this.systemInstruction,
     required this.triggerKeywords,
+    this.executableSteps,
     required this.createdAt,
     this.isActive = true,
   });
@@ -23,6 +25,7 @@ class JarvisSkill {
         'description': description,
         'systemInstruction': systemInstruction,
         'triggerKeywords': triggerKeywords,
+        'executableSteps': executableSteps,
         'createdAt': createdAt.toIso8601String(),
         'isActive': isActive,
       };
@@ -33,6 +36,7 @@ class JarvisSkill {
         description: json['description'] as String,
         systemInstruction: json['systemInstruction'] as String,
         triggerKeywords: List<String>.from(json['triggerKeywords'] as List),
+        executableSteps: json['executableSteps'] != null ? List<String>.from(json['executableSteps'] as List) : null,
         createdAt: DateTime.parse(json['createdAt'] as String),
         isActive: json['isActive'] as bool? ?? true,
       );

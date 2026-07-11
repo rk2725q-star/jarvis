@@ -51,6 +51,7 @@ class SkillService extends ChangeNotifier {
     required String description,
     required String systemInstruction,
     required List<String> triggerKeywords,
+    List<String>? executableSteps,
   }) async {
     final skill = JarvisSkill(
       id: _uuid.v4(),
@@ -58,6 +59,7 @@ class SkillService extends ChangeNotifier {
       description: description,
       systemInstruction: systemInstruction,
       triggerKeywords: triggerKeywords,
+      executableSteps: executableSteps,
       createdAt: DateTime.now(),
     );
 

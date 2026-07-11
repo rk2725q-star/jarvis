@@ -15,6 +15,8 @@ import 'dart:math' show max;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:jarvis_ai/core/router/ai_router.dart';
+import 'package:jarvis_ai/services/skill_service.dart';
+import 'package:jarvis_ai/models/jarvis_skill.dart';
 import 'agentica_memory.dart';
 
 // ─── Binary Tool Tokens (OpenClaw-style, 1-byte identifiers) ───────────
@@ -42,7 +44,7 @@ const _ch = MethodChannel('jarvis.ai.os/accessibility');
 
 // ─── Speed-First Constants ─────────────────────────────────────────────
 class _Speed {
-  static const int maxTurns = 12;           // Down from 20
+  static const int maxTurns = 20;           // Increased for web browsing tasks
   static const int maxContextChars = 1800;  // Down from 6000
 }
 
@@ -51,7 +53,7 @@ enum AgenticaTaskStatus { queued, running, succeeded, failed, timedOut, cancelle
 
 class AgenticaTask {
   final String id;
-  final String prompt;
+  String prompt;
   final DateTime createdAt;
   AgenticaTaskStatus status;
   String? result;
@@ -154,6 +156,7 @@ class AgenticaEvent {
 // ═══════════════════════════════════════════════════════════════════════
 class AgenticaEngine extends ChangeNotifier {
   final AIRouter router;
+  final SkillService skillService;
 
   // ── State ───────────────────────────────────────────────────────────
   bool _isRunning = false;
@@ -188,7 +191,7 @@ class AgenticaEngine extends ChangeNotifier {
   AgenticaTask? get currentTask => _currentTask;
   String get currentStatus => _currentStatus;
 
-  AgenticaEngine({required this.router});
+  AgenticaEngine({required this.router, required this.skillService});
 
   Timer? _schedulerTimer;
 
@@ -300,6 +303,24 @@ class AgenticaEngine extends ChangeNotifier {
     }
 
     // ─────────────────────────────────────────────────────────────────
+    //  TIER 1.5: STRUCTURED SKILL FAST PATH — Local Scripts
+    // ─────────────────────────────────────────────────────────────────
+    final matchedSkill = _matchSkill(task.prompt);
+    if (matchedSkill != null) {
+      _emit(AgenticaEvent.log('🧠 Skill Triggered: ${matchedSkill.name}'));
+      if (matchedSkill.executableSteps != null && matchedSkill.executableSteps!.isNotEmpty) {
+         // Fast path via executable steps (skips LLM)
+         taskStopwatch.stop();
+         task.latencyMs = taskStopwatch.elapsedMilliseconds;
+         final scriptResult = await _executeScriptSequence(matchedSkill.executableSteps!, task);
+         return _completeTask(task, scriptResult, taskStopwatch.elapsedMilliseconds);
+      } else {
+         // It's a prompt-based skill. Inject its instruction into the LLM context.
+         task.prompt = "[SKILL INSTRUCTION: ${matchedSkill.systemInstruction}]\n\nTask: ${task.prompt}";
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     //  TIER 2: INTENT-BASED FAST PATH — Zero LLM, single native call
     //  Call, message, open app — <300ms
     // ─────────────────────────────────────────────────────────────────
@@ -387,6 +408,71 @@ class AgenticaEngine extends ChangeNotifier {
       _emit(AgenticaEvent.log('✓ ${step.name}'));
     }
     return 'Completed from cache';
+  }
+
+  Future<String> _executeScriptSequence(List<String> steps, AgenticaTask task) async {
+    for (final stepString in steps) {
+      if (_shouldStop) break;
+      final step = _parseStep(stepString);
+      await _executeTool(step);
+      _executedTools.add(step.name);
+      _emit(AgenticaEvent.log('✓ Script: ${step.name}'));
+    }
+    return 'Completed via script';
+  }
+
+  AgenticaToolCall _parseStep(String stepString) {
+    // Basic parser for script steps e.g. "OPEN whatsapp", "CLICK"
+    final parts = stepString.trim().split(' ');
+    final action = parts[0].toLowerCase(); // AgenticaToolCall name is usually lowercase like 'open_app', 'click_ref'
+    
+    // We try to map fast-path tokens to AgenticaToolCall names if needed, 
+    // or assume the user specifies exact tool names like "open_app whatsapp"
+    String name = action;
+    if (action == 'open') name = 'open_app';
+    if (action == 'click') name = 'click_ref';
+    if (action == 'type') name = 'type_ref';
+    
+    final params = <String, String>{};
+    if (parts.length > 1) {
+       final arg = stepString.substring(parts[0].length).trim();
+       // Assume single argument for now, based on action type
+       if (name == 'open_app') params['package'] = arg;
+       if (name == 'click_ref') params['ref'] = arg;
+       if (name == 'type_ref') params['text'] = arg;
+    }
+    
+    return AgenticaToolCall(name: name, params: params);
+  }
+
+  JarvisSkill? _matchSkill(String prompt) {
+    final allSkills = skillService.skills.where((s) => s.isActive).toList();
+    
+    final queryWords = prompt.toLowerCase()
+        .split(RegExp(r'[^a-zA-Z0-9]'))
+        .where((w) => w.length > 2)
+        .toSet();
+        
+    if (queryWords.isEmpty) return null;
+    
+    var bestScore = 0.0;
+    JarvisSkill? bestSkill;
+    
+    for (final s in allSkills) {
+      if (s.id.startsWith('jarvis-dna-')) continue; // Skip DNA rules
+      final kw = s.triggerKeywords.map((k) => k.toLowerCase()).toSet();
+      final hits = queryWords.intersection(kw).length;
+      final score = hits / queryWords.length;
+      if (score > bestScore) {
+        bestScore = score;
+        bestSkill = s;
+      }
+    }
+    
+    if (bestScore > 0.3) {
+       return bestSkill;
+    }
+    return null;
   }
 
   // ═════════════════════════════════════════════════════════════════════
