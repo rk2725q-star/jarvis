@@ -12,7 +12,17 @@
       "ping on whatsapp"
     ],
     "createdAt": "2026-07-11T21:19:54.966187",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app whatsapp",
+      "click_text Search",
+      "type_ref {\"text\": \"amma\", \"clearFirst\": true}",
+      "wait 1000",
+      "click_text amma",
+      "wait 1000",
+      "type_ref {\"text\": \"hello\", \"clearFirst\": true}",
+      "click_text Send"
+    ]
   },
   {
     "id": "agentica-os-security-audit",
@@ -27,7 +37,20 @@
       "malware check"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app settings",
+      "scroll_down",
+      "click_text Security & privacy",
+      "wait 1000",
+      "click_text App security",
+      "wait 1000",
+      "click_text Scan",
+      "wait 5000",
+      "press_back",
+      "click_text Privacy",
+      "click_text Permission manager"
+    ]
   },
   {
     "id": "agentica-os-clear-cache",
@@ -41,7 +64,18 @@
       "clear data"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app settings",
+      "click_text Apps",
+      "click_text See all apps",
+      "wait 1000",
+      "click_text Chrome",
+      "wait 1000",
+      "click_text Storage & cache",
+      "wait 1000",
+      "click_text Clear cache"
+    ]
   },
   {
     "id": "agentica-os-battery-diagnosis",
@@ -55,7 +89,16 @@
       "battery stats"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app settings",
+      "scroll_down",
+      "click_text Battery",
+      "wait 1000",
+      "click_text Battery usage",
+      "wait 1000",
+      "scroll_down"
+    ]
   },
   {
     "id": "agentica-os-email-triage",
@@ -69,7 +112,13 @@
       "summarize inbox"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app gmail",
+      "wait 1000",
+      "scroll_down",
+      "scroll_down"
+    ]
   },
   {
     "id": "agentica-os-calendar-event",
@@ -83,7 +132,17 @@
       "set appointment"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app calendar",
+      "wait 1000",
+      "click_text Create",
+      "wait 500",
+      "click_text Event",
+      "wait 1000",
+      "type_ref {\"text\": \"Meeting\", \"clearFirst\": true}",
+      "click_text Save"
+    ]
   },
   {
     "id": "agentica-os-alarm-timer",
@@ -97,7 +156,15 @@
       "set countdown"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app clock",
+      "wait 1000",
+      "click_text Timer",
+      "wait 500",
+      "type_ref {\"text\": \"1000\", \"clearFirst\": true}",
+      "click_text Start"
+    ]
   },
   {
     "id": "agentica-os-chrome-researcher",
@@ -112,7 +179,17 @@
       "find out"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app chrome",
+      "wait 1000",
+      "click_text Search or type URL",
+      "type_ref {\"text\": \"Agentica AI\", \"clearFirst\": true}",
+      "wait 1000",
+      "tap {\"x\": 900, \"y\": 2000}",
+      "wait 2000",
+      "scroll_down"
+    ]
   },
   {
     "id": "agentica-os-youtube-dj",
@@ -127,7 +204,17 @@
       "listen to"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app youtube",
+      "wait 1000",
+      "click_text Search",
+      "type_ref {\"text\": \"lofi girl\", \"clearFirst\": true}",
+      "wait 1000",
+      "click_text lofi girl",
+      "wait 2000",
+      "click_text Lofi Girl"
+    ]
   },
   {
     "id": "agentica-os-developer-options",
@@ -141,7 +228,17 @@
       "dev settings"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app settings",
+      "scroll_down",
+      "scroll_down",
+      "click_text System",
+      "wait 1000",
+      "click_text Developer options",
+      "wait 1000",
+      "scroll_down"
+    ]
   },
   {
     "id": "agentica-os-network-analyzer",
@@ -155,7 +252,15 @@
       "internet connection"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app settings",
+      "click_text Network & internet",
+      "wait 1000",
+      "click_text Internet",
+      "wait 2000",
+      "click_text Settings"
+    ]
   },
   {
     "id": "agentica-os-contact-manager",
@@ -169,7 +274,17 @@
       "phonebook"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app contacts",
+      "wait 1000",
+      "click_text Create new contact",
+      "wait 1000",
+      "type_ref {\"text\": \"Agent\", \"clearFirst\": true}",
+      "click_text Phone",
+      "type_ref {\"text\": \"1234567890\", \"clearFirst\": true}",
+      "click_text Save"
+    ]
   },
   {
     "id": "agentica-os-do-not-disturb",
@@ -183,7 +298,16 @@
       "focus mode"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app settings",
+      "scroll_down",
+      "click_text Sound & vibration",
+      "wait 1000",
+      "click_text Do Not Disturb",
+      "wait 1000",
+      "click_text Turn on now"
+    ]
   },
   {
     "id": "agentica-os-uber-booker",
@@ -197,7 +321,16 @@
       "uber to"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app uber",
+      "wait 3000",
+      "click_text Where to?",
+      "wait 1000",
+      "type_ref {\"text\": \"Airport\", \"clearFirst\": true}",
+      "wait 2000",
+      "click_text Airport"
+    ]
   },
   {
     "id": "agentica-os-maps-navigator",
@@ -211,7 +344,20 @@
       "find route"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app maps",
+      "wait 3000",
+      "click_text Search here",
+      "wait 1000",
+      "type_ref {\"text\": \"Coffee shop\", \"clearFirst\": true}",
+      "wait 2000",
+      "click_text Coffee shop",
+      "wait 2000",
+      "click_text Directions",
+      "wait 1000",
+      "click_text Start"
+    ]
   },
   {
     "id": "agentica-os-playstore-installer",
@@ -224,7 +370,18 @@
       "get app"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app play store",
+      "wait 2000",
+      "click_text Search apps & games",
+      "wait 1000",
+      "type_ref {\"text\": \"whatsapp\", \"clearFirst\": true}",
+      "wait 2000",
+      "click_text whatsapp",
+      "wait 1000",
+      "click_text Install"
+    ]
   },
   {
     "id": "agentica-os-bluetooth-pairer",
@@ -237,7 +394,15 @@
       "bluetooth settings"
     ],
     "createdAt": "2026-07-11T21:19:54.968189",
-    "isActive": true
+    "isActive": true,
+    "executableSteps": [
+      "open_app settings",
+      "click_text Connected devices",
+      "wait 1000",
+      "click_text Pair new device",
+      "wait 2000",
+      "scroll_down"
+    ]
   },
   {
     "id": "jarvis-dna-claude-sonnet-4-6",

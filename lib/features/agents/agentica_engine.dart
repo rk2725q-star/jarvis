@@ -431,10 +431,8 @@ class AgenticaEngine extends ChangeNotifier {
   AgenticaToolCall _parseStep(String stepString) {
     // Basic parser for script steps e.g. "OPEN whatsapp", "CLICK"
     final parts = stepString.trim().split(' ');
-    final action = parts[0].toLowerCase(); // AgenticaToolCall name is usually lowercase like 'open_app', 'click_ref'
+    final action = parts[0].toLowerCase();
     
-    // We try to map fast-path tokens to AgenticaToolCall names if needed, 
-    // or assume the user specifies exact tool names like "open_app whatsapp"
     String name = action;
     if (action == 'open') name = 'open_app';
     if (action == 'click') name = 'click_ref';
@@ -443,12 +441,24 @@ class AgenticaEngine extends ChangeNotifier {
     final params = <String, String>{};
     if (parts.length > 1) {
        final arg = stepString.substring(parts[0].length).trim();
-       // Assume single argument for now, based on action type
-       if (name == 'open_app') params['package'] = arg;
-       if (name == 'click_ref') params['ref'] = arg;
-       if (name == 'type_ref') params['text'] = arg;
+       
+       if (arg.startsWith('{') && arg.endsWith('}')) {
+         try {
+           final map = jsonDecode(arg) as Map;
+           params.addAll(map.map((k, v) => MapEntry(k.toString(), v.toString())));
+         } catch (_) {}
+       } else {
+         if (name == 'open_app') {
+            params['name'] = arg;
+            params['app'] = arg;
+         }
+         if (name == 'click_ref') params['ref'] = arg;
+         if (name == 'type_ref') params['text'] = arg;
+         if (name == 'click_text' || name == 'find_by_text') params['text'] = arg;
+         if (name == 'wait') params['ms'] = arg;
+         if (name == 'direct_call' || name == 'send_message') params['number'] = arg;
+       }
     }
-    
     return AgenticaToolCall(name: name, params: params);
   }
 
