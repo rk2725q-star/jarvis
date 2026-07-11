@@ -49,4 +49,12 @@ class SecureStorageService {
     }
     return keys;
   }
+
+  Future<void> saveMcpToken(String serverId, String token) async {
+    await _storage.write(key: 'mcp_token_$serverId', value: token.trim());
+  }
+
+  Future<String?> getMcpToken(String serverId) async {
+    return await _storage.read(key: 'mcp_token_$serverId');
+  }
 }

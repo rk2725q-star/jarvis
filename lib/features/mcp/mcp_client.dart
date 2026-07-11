@@ -73,7 +73,6 @@ class McpServer {
     return {
       'id': id,
       'url': url,
-      'authToken': authToken,
       'sessionId': sessionId,
       'tools': tools.map((t) => t.toJson()).toList(),
     };
@@ -145,8 +144,8 @@ class McpServer {
   }
 
   /// Fetches tools from the remote MCP server via JSON-RPC
-  static Future<McpServer> connect(String url, {String? token}) async {
-    final server = McpServer(id: const Uuid().v4(), url: url, authToken: token);
+  static Future<McpServer> connect(String url, {String? token, String? id}) async {
+    final server = McpServer(id: id ?? const Uuid().v4(), url: url, authToken: token);
 
     // 1. Initialize Handshake
     await server._post({

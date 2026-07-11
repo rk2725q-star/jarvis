@@ -23,6 +23,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:jarvis_ai/features/codesign/services/codesign_service.dart';
 import 'package:jarvis_ai/features/codesign/models/codesign_models.dart';
 import 'package:jarvis_ai/features/mcp/mcp_client.dart';
+import 'package:jarvis_ai/core/security/secure_storage_service.dart';
 class ChatProvider extends ChangeNotifier {
   final AIRouter router;
   final SessionService sessionService;
@@ -57,6 +58,7 @@ class ChatProvider extends ChangeNotifier {
 
   // MCP Integration
   List<McpServer> connectedMcpServers = [];
+  final _secureStorage = SecureStorageService();
 
   Future<void> initMcpServers() async {
     final prefs = await SharedPreferences.getInstance();
@@ -69,7 +71,8 @@ class ChatProvider extends ChangeNotifier {
         // Re-handshake in the background
         for (final server in servers) {
           try {
-            final connected = await McpServer.connect(server.url, token: server.authToken);
+            final token = await _secureStorage.getMcpToken(server.id);
+            final connected = await McpServer.connect(server.url, token: token, id: server.id);
             connectedMcpServers.add(connected);
           } catch (e) {
             debugPrint('Failed to re-connect to MCP: ${server.url} - $e');
@@ -90,6 +93,9 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> connectMcpServer(String url, {String? token}) async {
     final server = await McpServer.connect(url, token: token);
+    if (token != null && token.isNotEmpty) {
+      await _secureStorage.saveMcpToken(server.id, token);
+    }
     connectedMcpServers.add(server);
     await _saveMcpServers();
     notifyListeners();
