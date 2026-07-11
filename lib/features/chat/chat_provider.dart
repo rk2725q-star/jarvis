@@ -934,7 +934,7 @@ class ChatProvider extends ChangeNotifier {
           } else {
             isToolCalling = false;
             // Simulate streaming the final text so the UI animates properly
-            final text = resp.text ?? "⚠️ No response generated.";
+            final text = resp.text.isEmpty ? "⚠️ No response generated." : resp.text;
             final chunkSize = text.length > 500 ? 20 : 5;
             for (int i = 0; i < text.length; i += chunkSize) {
               final end = (i + chunkSize < text.length) ? i + chunkSize : text.length;

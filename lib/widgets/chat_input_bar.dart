@@ -461,10 +461,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                         isLoading = true;
                         error = null;
                       });
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(ctx);
                       try {
                         await provider.connectMcpServer(mcpUrlController.text.trim());
-                        if (mounted) Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        navigator.pop();
+                        scaffoldMessenger.showSnackBar(
                           SnackBar(
                             content: const Text('MCP Server connected successfully!'),
                             backgroundColor: JarvisColors.accentPrimary,
