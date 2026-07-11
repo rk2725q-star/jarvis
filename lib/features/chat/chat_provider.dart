@@ -938,26 +938,32 @@ class ChatProvider extends ChangeNotifier {
     bool hasTools = mcpTools.isNotEmpty && !isImagiya && !isCodesign && resolvedProvider == null;
     
     if (hasTools) {
-      final toolsJson = jsonEncode(mcpTools.map((t) => t.toGeminiSchema()).toList());
+      final toolsCompressed = mcpTools.map((t) {
+        final schemaStr = jsonEncode(t.toGeminiSchema()['parameters'] ?? {});
+        return '- name: "${t.name}"\n  description: "${t.description}"\n  args: $schemaStr';
+      }).join('\n\n');
+      
       final toolPrompt = '''
 \n\n[MCP TOOLS AVAILABLE]
 You have access to the following external tools:
-$toolsJson
+$toolsCompressed
 
 To use a tool, you MUST output exactly:
 <TOOL_CALL name="tool_name">{"arg":"value"}</TOOL_CALL>
-Wait for the system to provide the result before continuing. Do NOT output anything else if you call a tool.
+Wait for the system to provide the result before continuing. Do NOT output anything else inside the tool block.
 [END MCP TOOLS]
 ''';
       combinedText = '$toolPrompt$combinedText';
     }
 
     final buffer = StringBuffer();
+    var currentAiMsg = aiMsg;
 
     try {
       bool isToolCalling = true;
       int toolLoopCount = 0;
       String currentPrompt = combinedText;
+      final RegExp toolCallRegex = RegExp(r'<TOOL_CALL\s+name="([^"]+)">([\s\S]*?)</TOOL_CALL>');
 
       while (isToolCalling && toolLoopCount < 5) {
         isToolCalling = false; // Assume no tools unless we find a tag
@@ -970,17 +976,18 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
           buffer.write(chunk);
           final currentText = buffer.toString();
           
-          // Check for Tool Call tag
-          if (hasTools && currentText.contains('<TOOL_CALL name="') && currentText.contains('</TOOL_CALL>')) {
+          // Check for Tool Call tag (Robust regex match ignoring wrappers)
+          if (hasTools && toolCallRegex.hasMatch(currentText)) {
             isToolCalling = true;
             break; // Stop streaming immediately to handle the tool call
           }
 
-          final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
+          final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
           if (idx != -1) {
-            final displayContent = _stripTags(currentText);
+            // Strip tags purely for UI cleanliness while streaming
+            final displayContent = _stripTags(currentText.replaceAll(RegExp(r'<TOOL_CALL[\s\S]*?(?:</TOOL_CALL>|$)'), ''));
             final bool isInfinity = router.lastSelectedProvider != AIProvider.netless;
-            _messages[idx] = aiMsg.copyWith(
+            _messages[idx] = currentAiMsg.copyWith(
               content: displayContent,
               provider: isInfinity ? 'INFINITY' : router.activeProvider?.name,
               model: isInfinity
@@ -994,16 +1001,23 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
 
         if (isToolCalling) {
           final fullResponse = buffer.toString();
-          final startIdx = fullResponse.indexOf('<TOOL_CALL name="');
-          final endTag = '</TOOL_CALL>';
-          final endIdx = fullResponse.indexOf(endTag, startIdx);
+          final match = toolCallRegex.firstMatch(fullResponse);
           
-          if (startIdx != -1 && endIdx != -1) {
-            final tagStr = fullResponse.substring(startIdx, endIdx + endTag.length);
-            final nameStart = tagStr.indexOf('name="') + 6;
-            final nameEnd = tagStr.indexOf('">', nameStart);
-            final toolName = tagStr.substring(nameStart, nameEnd);
-            final argStr = tagStr.substring(nameEnd + 2, tagStr.length - endTag.length);
+          if (match != null) {
+            final toolName = match.group(1) ?? '';
+            final argStr = match.group(2) ?? '';
+            
+            // Retain any prose generated BEFORE the tool call
+            final prose = fullResponse.substring(0, match.start).replaceAll(RegExp(r'```(?:xml)?\s*$'), '').trim();
+            
+            if (prose.isNotEmpty) {
+               final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
+               if (idx != -1) {
+                 _messages[idx] = currentAiMsg.copyWith(content: _stripTags(prose), isStreaming: false);
+               }
+            } else {
+               _messages.removeWhere((m) => m.id == currentAiMsg.id);
+            }
             
             _setAnalysisStatus('Running $toolName...');
             
@@ -1016,7 +1030,7 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
               final result = await server.callTool(toolName, args);
               toolResultStr = jsonEncode(result);
             } catch (e) {
-              toolResultStr = 'Error: $e';
+              toolResultStr = 'Error: $e. If this was a JSON parse error, please verify your argument formatting and try again.';
             }
 
             // Append context natively as a Message for history integrity
@@ -1029,16 +1043,32 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
             );
             _messages.add(toolResultMsg);
             
-            // Re-prompt LLM
-            currentPrompt = "Tool $toolName returned:\n$toolResultStr\n\nPlease continue responding based on this result.";
+            // Re-prompt LLM, incrementally growing context
+            String proseContext = prose.isNotEmpty ? "You thought: $prose\n" : "";
+            currentPrompt += "\n\n$proseContext[SYSTEM: Tool $toolName Returned]\n$toolResultStr\n\nPlease continue responding based on this result.";
+            
             toolLoopCount++;
             
             // Re-create AI message block for the next iteration
-            _messages.removeWhere((m) => m.id == aiMsg.id);
-            _messages.add(aiMsg.copyWith(content: '', isStreaming: true));
+            currentAiMsg = Message(
+              id: _uuid.v4(),
+              content: '',
+              isUser: false,
+              timestamp: DateTime.now(),
+              sessionId: _currentSessionId!,
+              isStreaming: true,
+            );
+            _messages.add(currentAiMsg);
             notifyListeners();
           } else {
-            isToolCalling = false; // Malformed tag, just exit loop
+            isToolCalling = false; // Malformed tag edge case, just exit loop
+          }
+        } else {
+          // If loop is ending normally, mark final message as not streaming
+          final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
+          if (idx != -1) {
+            _messages[idx] = currentAiMsg.copyWith(isStreaming: false);
+            notifyListeners();
           }
         }
       }
