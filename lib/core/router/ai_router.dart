@@ -1394,44 +1394,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     );
   }
 
-  /// Non-streaming generator that supports tool calling.
-  /// Currently only implemented for Gemini.
-  Future<AIResponse> generateWithTools(
-    String userInput, {
-    String? systemPrompt,
-    List<Map<String, dynamic>>? tools,
-  }) async {
-    final maxTokens = _getMaxTokens(userInput);
-    var promptPair = _buildAdaptivePrompt(userInput, isVoiceMode: false);
-    if (systemPrompt != null) {
-      promptPair = (system: '$baseSystemPrompt\n$systemPrompt', user: userInput);
-    }
 
-    // Since only Gemini supports normalized tools for now, route strictly to Gemini.
-    final key = await _secureStorage.getApiKey('gemini');
-    if (key == null || key.isEmpty) {
-      return AIResponse(text: "⚠️ Gemini is required for MCP Tool calling, but no API key is configured.");
-    }
-    
-    var model = _selectedModels[AIProvider.gemini];
-    if (model == null) {
-      final models = await GeminiApiClient(apiKey: key).fetchModels();
-      model = _pickBestModel(models, hint: 'flash');
-    }
-    
-    try {
-      _setStatus('Consulting Gemini (Tool Caller)...');
-      return await GeminiApiClient(apiKey: key, model: model).generateWithTools(
-        promptPair.user,
-        systemPrompt: promptPair.system,
-        maxTokens: maxTokens,
-        tools: tools,
-      );
-    } catch (e) {
-      debugPrint('[AIRouter] Tool Calling failed: $e');
-      return AIResponse(text: "⚠️ Tool calling failed: $e");
-    }
-  }
 
   /// Professional file analysis pipeline: extract -> chunk -> analyze -> merge
   Future<String> analyzeFile(String filePath) async {

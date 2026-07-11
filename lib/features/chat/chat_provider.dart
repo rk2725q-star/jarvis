@@ -35,7 +35,9 @@ class ChatProvider extends ChangeNotifier {
     required this.sessionService,
     required this.ttsService,
     required this.integrationsProvider,
-  });
+  }) {
+    initMcpServers();
+  }
 
   final _uuid = const Uuid();
   String? _currentSessionId;
@@ -56,9 +58,40 @@ class ChatProvider extends ChangeNotifier {
   // MCP Integration
   List<McpServer> connectedMcpServers = [];
 
+  Future<void> initMcpServers() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dataStr = prefs.getString('mcp_servers');
+    if (dataStr != null && dataStr.isNotEmpty) {
+      try {
+        final List<dynamic> list = jsonDecode(dataStr);
+        final servers = list.map((json) => McpServer.fromJson(json)).toList();
+        
+        // Re-handshake in the background
+        for (final server in servers) {
+          try {
+            final connected = await McpServer.connect(server.url, token: server.authToken);
+            connectedMcpServers.add(connected);
+          } catch (e) {
+            debugPrint('Failed to re-connect to MCP: ${server.url} - $e');
+          }
+        }
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Failed to load MCP servers: $e');
+      }
+    }
+  }
+
+  Future<void> _saveMcpServers() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = connectedMcpServers.map((s) => s.toJson()).toList();
+    await prefs.setString('mcp_servers', jsonEncode(data));
+  }
+
   Future<void> connectMcpServer(String url, {String? token}) async {
     final server = await McpServer.connect(url, token: token);
     connectedMcpServers.add(server);
+    await _saveMcpServers();
     notifyListeners();
   }
 
@@ -900,68 +933,52 @@ class ChatProvider extends ChangeNotifier {
     _messages.add(aiMsg);
     notifyListeners();
 
+    // --- Agentic Tool Injection Setup ---
+    final mcpTools = connectedMcpServers.expand((s) => s.tools).toList();
+    bool hasTools = mcpTools.isNotEmpty && !isImagiya && !isCodesign && resolvedProvider == null;
+    
+    if (hasTools) {
+      final toolsJson = jsonEncode(mcpTools.map((t) => t.toGeminiSchema()).toList());
+      final toolPrompt = '''
+\n\n[MCP TOOLS AVAILABLE]
+You have access to the following external tools:
+$toolsJson
+
+To use a tool, you MUST output exactly:
+<TOOL_CALL name="tool_name">{"arg":"value"}</TOOL_CALL>
+Wait for the system to provide the result before continuing. Do NOT output anything else if you call a tool.
+[END MCP TOOLS]
+''';
+      combinedText = '$toolPrompt$combinedText';
+    }
+
     final buffer = StringBuffer();
 
     try {
-      final mcpTools = connectedMcpServers.expand((s) => s.tools).toList();
-      bool useToolLoop = mcpTools.isNotEmpty && !isImagiya && !isCodesign && resolvedProvider == null;
-      
-      if (useToolLoop) {
-        final toolsMap = mcpTools.map((t) => t.toGeminiSchema()).toList();
-        bool isToolCalling = true;
-        int toolLoopCount = 0;
+      bool isToolCalling = true;
+      int toolLoopCount = 0;
+      String currentPrompt = combinedText;
+
+      while (isToolCalling && toolLoopCount < 5) {
+        isToolCalling = false; // Assume no tools unless we find a tag
+        buffer.clear();
         
-        while (isToolCalling && toolLoopCount < 5) {
-          final resp = await router.generateWithTools(
-            combinedText,
-            tools: toolsMap,
-          );
-          
-          if (resp.toolCall != null) {
-            final toolCall = resp.toolCall!;
-            _setAnalysisStatus('Running ${toolCall.name}...');
-            
-            try {
-              final server = connectedMcpServers.firstWhere(
-                (s) => s.tools.any((t) => t.name == toolCall.name)
-              );
-              final result = await server.callTool(toolCall.name, toolCall.arguments);
-              combinedText += '\n\n[Tool Result for ${toolCall.name}]:\n${jsonEncode(result)}\n\nPlease continue responding based on this result.';
-            } catch (e) {
-              combinedText += '\n\n[Tool Error for ${toolCall.name}]:\n$e\n\nPlease continue responding based on this result.';
-            }
-            toolLoopCount++;
-          } else {
-            isToolCalling = false;
-            // Simulate streaming the final text so the UI animates properly
-            final text = resp.text.isEmpty ? "⚠️ No response generated." : resp.text;
-            final chunkSize = text.length > 500 ? 20 : 5;
-            for (int i = 0; i < text.length; i += chunkSize) {
-              final end = (i + chunkSize < text.length) ? i + chunkSize : text.length;
-              buffer.write(text.substring(i, end));
-              final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
-              if (idx != -1) {
-                _messages[idx] = aiMsg.copyWith(
-                  content: _stripTags(buffer.toString()),
-                  provider: 'MCP Agent',
-                  model: router.activeModel ?? 'Tool Caller',
-                  isStreaming: true,
-                );
-                notifyListeners();
-              }
-              await Future.delayed(const Duration(milliseconds: 20));
-            }
-          }
-        }
-      } else {
         await for (final chunk in router.generateStream(
-          combinedText,
+          currentPrompt,
           integrationCapabilities: atIntegrationCapability ?? '',
         )) {
           buffer.write(chunk);
+          final currentText = buffer.toString();
+          
+          // Check for Tool Call tag
+          if (hasTools && currentText.contains('<TOOL_CALL name="') && currentText.contains('</TOOL_CALL>')) {
+            isToolCalling = true;
+            break; // Stop streaming immediately to handle the tool call
+          }
+
           final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
           if (idx != -1) {
-            final displayContent = _stripTags(buffer.toString());
+            final displayContent = _stripTags(currentText);
             final bool isInfinity = router.lastSelectedProvider != AIProvider.netless;
             _messages[idx] = aiMsg.copyWith(
               content: displayContent,
@@ -972,6 +989,56 @@ class ChatProvider extends ChangeNotifier {
               isStreaming: true,
             );
             notifyListeners();
+          }
+        }
+
+        if (isToolCalling) {
+          final fullResponse = buffer.toString();
+          final startIdx = fullResponse.indexOf('<TOOL_CALL name="');
+          final endTag = '</TOOL_CALL>';
+          final endIdx = fullResponse.indexOf(endTag, startIdx);
+          
+          if (startIdx != -1 && endIdx != -1) {
+            final tagStr = fullResponse.substring(startIdx, endIdx + endTag.length);
+            final nameStart = tagStr.indexOf('name="') + 6;
+            final nameEnd = tagStr.indexOf('">', nameStart);
+            final toolName = tagStr.substring(nameStart, nameEnd);
+            final argStr = tagStr.substring(nameEnd + 2, tagStr.length - endTag.length);
+            
+            _setAnalysisStatus('Running $toolName...');
+            
+            String toolResultStr;
+            try {
+              final args = jsonDecode(argStr);
+              final server = connectedMcpServers.firstWhere(
+                (s) => s.tools.any((t) => t.name == toolName)
+              );
+              final result = await server.callTool(toolName, args);
+              toolResultStr = jsonEncode(result);
+            } catch (e) {
+              toolResultStr = 'Error: $e';
+            }
+
+            // Append context natively as a Message for history integrity
+            final toolResultMsg = Message(
+              id: _uuid.v4(),
+              content: '[SYSTEM: Tool $toolName Returned]\n$toolResultStr',
+              isUser: true, // Treated as user input context
+              timestamp: DateTime.now(),
+              sessionId: _currentSessionId!,
+            );
+            _messages.add(toolResultMsg);
+            
+            // Re-prompt LLM
+            currentPrompt = "Tool $toolName returned:\n$toolResultStr\n\nPlease continue responding based on this result.";
+            toolLoopCount++;
+            
+            // Re-create AI message block for the next iteration
+            _messages.removeWhere((m) => m.id == aiMsg.id);
+            _messages.add(aiMsg.copyWith(content: '', isStreaming: true));
+            notifyListeners();
+          } else {
+            isToolCalling = false; // Malformed tag, just exit loop
           }
         }
       }
