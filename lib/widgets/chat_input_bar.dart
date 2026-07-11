@@ -388,6 +388,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   void _showAddMcpDialog(ChatProvider provider) {
     final mcpUrlController = TextEditingController(text: 'https://mcp.pixelcut.ai/mcp');
+    final mcpTokenController = TextEditingController();
     bool isLoading = false;
     String? error;
 
@@ -413,12 +414,67 @@ class _ChatInputBarState extends State<ChatInputBar>
                 'Enter the URL of the remote Model Context Protocol server.',
                 style: TextStyle(color: Color(0xFFB0B0C8), fontSize: 14),
               ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ActionChip(
+                    label: const Text('Pixelcut', style: TextStyle(fontSize: 12, color: Colors.white)),
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: BorderSide.none,
+                    onPressed: () => mcpUrlController.text = 'https://mcp.pixelcut.ai/mcp',
+                  ),
+                  ActionChip(
+                    label: const Text('Vercel', style: TextStyle(fontSize: 12, color: Colors.white)),
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: BorderSide.none,
+                    onPressed: () => mcpUrlController.text = 'https://mcp.vercel.com/',
+                  ),
+                  ActionChip(
+                    label: const Text('Canva', style: TextStyle(fontSize: 12, color: Colors.white)),
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: BorderSide.none,
+                    onPressed: () => mcpUrlController.text = 'https://mcp.canva.com/mcp',
+                  ),
+                  ActionChip(
+                    label: const Text('Copilot', style: TextStyle(fontSize: 12, color: Colors.white)),
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: BorderSide.none,
+                    onPressed: () => mcpUrlController.text = 'https://api.githubcopilot.com/mcp/x/all',
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               TextField(
                 controller: mcpUrlController,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'MCP Server URL',
+                  labelStyle: const TextStyle(color: JarvisColors.textMuted),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: JarvisColors.accentPrimary),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: mcpTokenController,
+                style: const TextStyle(color: Colors.white),
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Auth Token / API Key (Optional)',
                   labelStyle: const TextStyle(color: JarvisColors.textMuted),
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.05),
@@ -464,7 +520,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                       final scaffoldMessenger = ScaffoldMessenger.of(context);
                       final navigator = Navigator.of(ctx);
                       try {
-                        await provider.connectMcpServer(mcpUrlController.text.trim());
+                        final token = mcpTokenController.text.trim().isEmpty ? null : mcpTokenController.text.trim();
+                        await provider.connectMcpServer(mcpUrlController.text.trim(), token: token);
                         navigator.pop();
                         scaffoldMessenger.showSnackBar(
                           SnackBar(
