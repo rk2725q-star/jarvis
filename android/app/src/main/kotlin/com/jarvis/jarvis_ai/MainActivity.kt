@@ -252,6 +252,12 @@ class MainActivity : AudioServiceActivity() {
                         if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
                         else result.success(service.typeIntoRef(ref, text, clearFirst))
                     }
+                    "typeFocused" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        val clearFirst = call.argument<Boolean>("clearFirst") ?: true
+                        if (service == null) result.error("NOT_CONNECTED", "Service not enabled", null)
+                        else result.success(service.typeFocused(text, clearFirst))
+                    }
                     "scrollRef" -> {
                         val ref = call.argument<String>("ref") ?: ""
                         val direction = call.argument<String>("direction") ?: "down"

@@ -373,6 +373,34 @@ class JarvisAccessibilityService : AccessibilityService() {
         }
     }
 
+    fun typeFocused(text: String, clearFirst: Boolean = false): String {
+        val root = getActiveRootNode() ?: return "Error: no active window"
+        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) 
+            ?: findEditableNode(root) 
+            ?: return "Error: no focused input field found"
+        
+        if (clearFirst) {
+            val selectAllArgs = Bundle().apply {
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, focused.text?.length ?: 0)
+            }
+            focused.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selectAllArgs)
+        }
+
+        val args = Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+        }
+        var success = focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        if (!success) {
+            val pasteRes = pasteViaClipboard(focused, text)
+            if (pasteRes.contains("clipboard")) {
+                success = true
+            }
+        }
+        focused.recycle()
+        return if (success) "Typed: \"$text\"" else "Failed to type into focused field"
+    }
+
     private fun pasteViaClipboard(node: AccessibilityNodeInfo, text: String): String {
         val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("jarvis", text))

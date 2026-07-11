@@ -929,11 +929,19 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
         case 'click_ref':
           result = await _ch.invokeMethod<String>('clickRef', {'ref': call.params['ref']});
         case 'type_ref':
-          result = await _ch.invokeMethod<String>('typeIntoRef', {
-            'ref': call.params['ref'],
-            'text': call.params['text'],
-            'clearFirst': call.params['clear'] == 'true',
-          });
+          final clearFirst = call.params['clear'] == 'true' || call.params['clearFirst'] == 'true';
+          if (call.params['ref'] == null || call.params['ref']!.isEmpty) {
+            result = await _ch.invokeMethod<String>('typeFocused', {
+              'text': call.params['text'],
+              'clearFirst': clearFirst,
+            });
+          } else {
+            result = await _ch.invokeMethod<String>('typeIntoRef', {
+              'ref': call.params['ref'],
+              'text': call.params['text'],
+              'clearFirst': clearFirst,
+            });
+          }
         case 'tap':
           result = await _ch.invokeMethod<String>('performTap', {
             'x': int.parse(call.params['x'] ?? '0'),
