@@ -417,6 +417,13 @@ class AgenticaEngine extends ChangeNotifier {
       await _executeTool(step);
       _executedTools.add(step.name);
       _emit(AgenticaEvent.log('✓ Script: ${step.name}'));
+
+      // If action mutated screen, delay and re-snapshot to avoid stale refs
+      const mutatingActions = ['open_app', 'click_ref', 'click_text', 'tap', 'scroll_down', 'scroll_up', 'press_back', 'press_home'];
+      if (mutatingActions.contains(step.name)) {
+        await Future.delayed(const Duration(milliseconds: 1000));
+        await _ch.invokeMethod<String>('takeRefSnapshot');
+      }
     }
     return 'Completed via script';
   }

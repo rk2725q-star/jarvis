@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -949,10 +950,18 @@ class ChatProvider extends ChangeNotifier {
         return '- name: "${t.name}"\n  description: "${t.description}"\n  args: $schemaStr';
       }).join('\n\n');
       
+      final nativeTools = '''
+- name: "fetch_agentica_skills"
+  description: "Downloads and installs massive Agentica skills from a given internet URL."
+  args: {"type":"object","properties":{"url":{"type":"string","description":"The URL to download the skills JSON from."}},"required":["url"]}
+''';
+      
       final toolPrompt = '''
 \n\n[MCP TOOLS AVAILABLE]
 You have access to the following external tools:
 $toolsCompressed
+
+$nativeTools
 
 To use a tool, you MUST output exactly:
 <TOOL_CALL name="tool_name">{"arg":"value"}</TOOL_CALL>
@@ -1030,11 +1039,34 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
             String toolResultStr;
             try {
               final args = jsonDecode(argStr);
-              final server = connectedMcpServers.firstWhere(
-                (s) => s.tools.any((t) => t.name == toolName)
-              );
-              final result = await server.callTool(toolName, args);
-              toolResultStr = jsonEncode(result);
+              if (toolName == 'fetch_agentica_skills') {
+                final url = args['url'] as String;
+                final resp = await http.get(Uri.parse(url));
+                if (resp.statusCode == 200) {
+                  final list = jsonDecode(resp.body) as List;
+                  int added = 0;
+                  for (final item in list) {
+                    final map = item as Map<String, dynamic>;
+                    await router.skillService.createSkill(
+                      name: map['name'] ?? 'Unknown Skill',
+                      description: map['description'] ?? '',
+                      systemInstruction: map['systemInstruction'] ?? '',
+                      triggerKeywords: (map['triggerKeywords'] as List?)?.map((e) => e.toString()).toList() ?? [],
+                      executableSteps: (map['executableSteps'] as List?)?.map((e) => e.toString()).toList(),
+                    );
+                    added++;
+                  }
+                  toolResultStr = 'Successfully downloaded and installed $added skills.';
+                } else {
+                  toolResultStr = 'Failed to fetch skills. HTTP ${resp.statusCode}';
+                }
+              } else {
+                final server = connectedMcpServers.firstWhere(
+                  (s) => s.tools.any((t) => t.name == toolName)
+                );
+                final result = await server.callTool(toolName, args);
+                toolResultStr = jsonEncode(result);
+              }
             } catch (e) {
               toolResultStr = 'Error: $e. If this was a JSON parse error, please verify your argument formatting and try again.';
             }
