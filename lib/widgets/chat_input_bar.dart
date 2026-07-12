@@ -393,181 +393,210 @@ class _ChatInputBarState extends State<ChatInputBar>
     String? error;
     bool showCustom = false;
     String? selectedPreset;
-    
-    final presets = {
-      'Pixelcut': 'https://mcp.pixelcut.ai/mcp',
-      'Vercel': 'https://mcp.vercel.com/',
-      'Canva': 'https://mcp.canva.com/mcp',
-      'Copilot': 'https://api.githubcopilot.com/mcp/x/all'
+
+    final presets = <String, Map<String, dynamic>>{
+      'Pixelcut': {'url': 'https://mcp.pixelcut.ai/mcp', 'icon': Icons.image_rounded, 'auth': false},
+      'Vercel':   {'url': 'https://mcp.vercel.com/', 'icon': Icons.cloud_rounded, 'auth': true},
+      'Canva':    {'url': 'https://mcp.canva.com/mcp', 'icon': Icons.brush_rounded, 'auth': true},
+      'Copilot':  {'url': 'https://api.githubcopilot.com/mcp/x/all', 'icon': Icons.code_rounded, 'auth': true},
     };
 
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.75),
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A2E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text(
-            'Connect Remote MCP',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF15151F),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 40, offset: const Offset(0, 20))],
             ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Select a provider to connect securely.',
-                style: TextStyle(color: Color(0xFFB0B0C8), fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: presets.keys.map((name) {
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: JarvisColors.accentPrimary.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.electrical_services_rounded, color: JarvisColors.accentPrimary, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Connect MCP Server', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Padding(
+                  padding: EdgeInsets.only(left: 52),
+                  child: Text('Choose a tool provider', style: TextStyle(color: Color(0xFF8888A0), fontSize: 13)),
+                ),
+                const SizedBox(height: 20),
+
+                // Provider grid — card style, not chips
+                ...presets.entries.map((entry) {
+                  final name = entry.key;
+                  final data = entry.value;
                   final isSelected = selectedPreset == name && !showCustom;
-                  return ActionChip(
-                    label: Text(name, style: TextStyle(fontSize: 12, color: isSelected ? Colors.black : Colors.white)),
-                    backgroundColor: isSelected ? JarvisColors.accentPrimary : Colors.white.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    side: BorderSide.none,
-                    onPressed: () {
-                      setDialogState(() {
-                        selectedPreset = name;
-                        showCustom = false;
-                        error = null;
-                      });
-                    },
-                  );
-                }).toList()..add(
-                  ActionChip(
-                    label: Text('Custom', style: TextStyle(fontSize: 12, color: showCustom ? Colors.black : Colors.white)),
-                    backgroundColor: showCustom ? JarvisColors.accentPrimary : Colors.white.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    side: BorderSide.none,
-                    onPressed: () {
-                      setDialogState(() {
-                        showCustom = true;
-                        selectedPreset = null;
-                        error = null;
-                      });
-                    },
-                  )
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (showCustom) ...[
-                TextField(
-                  controller: mcpUrlController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'MCP Server URL',
-                    labelStyle: const TextStyle(color: JarvisColors.textMuted),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: JarvisColors.accentPrimary)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: mcpTokenController,
-                  style: const TextStyle(color: Colors.white),
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: 'Auth Token / API Key (Optional)',
-                    labelStyle: const TextStyle(color: JarvisColors.textMuted),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: JarvisColors.accentPrimary)),
-                  ),
-                ),
-              ],
-              if (error != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          error!,
-                          style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => setDialogState(() { selectedPreset = name; showCustom = false; error = null; }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? JarvisColors.accentPrimary.withOpacity(0.12) : Colors.white.withOpacity(0.03),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: isSelected ? JarvisColors.accentPrimary : Colors.white.withOpacity(0.06)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(data['icon'] as IconData, color: isSelected ? JarvisColors.accentPrimary : Colors.white70, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(name, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500))),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: (data['auth'] as bool) ? Colors.orangeAccent.withOpacity(0.12) : Colors.greenAccent.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                (data['auth'] as bool) ? 'Sign-in' : 'No login',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: (data['auth'] as bool) ? Colors.orangeAccent : Colors.greenAccent),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
+                  );
+                }),
+
+                // Custom option
+                InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => setDialogState(() { showCustom = true; selectedPreset = null; error = null; }),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: showCustom ? JarvisColors.accentPrimary.withOpacity(0.12) : Colors.white.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: showCustom ? JarvisColors.accentPrimary : Colors.white.withOpacity(0.06)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.add_link_rounded, color: showCustom ? JarvisColors.accentPrimary : Colors.white70, size: 20),
+                        const SizedBox(width: 12),
+                        const Text('Custom URL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
                   ),
                 ),
-              ]
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: isLoading ? null : () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF7070A0))),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: JarvisColors.accentPrimary,
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: (isLoading || (!showCustom && selectedPreset == null))
-                  ? null
-                  : () async {
-                      setDialogState(() {
-                        isLoading = true;
-                        error = null;
-                      });
-                      final scaffoldMessenger = ScaffoldMessenger.of(context);
-                      final navigator = Navigator.of(ctx);
-                      try {
-                        final url = showCustom ? mcpUrlController.text.trim() : presets[selectedPreset]!;
-                        final token = showCustom && mcpTokenController.text.trim().isNotEmpty ? mcpTokenController.text.trim() : null;
-                        
-                        await provider.connectMcpServer(url, token: token);
-                        navigator.pop();
-                        scaffoldMessenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('MCP Server connected successfully!'),
-                            backgroundColor: JarvisColors.accentPrimary,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      } catch (e) {
-                        setDialogState(() {
-                          isLoading = false;
-                          final msg = e.toString();
-                          if (msg.contains('McpAuthError') || msg.contains('401') || msg.contains('Unauthorized')) {
-                            error = 'Couldn\'t connect — try signing in again';
-                          } else {
-                            error = 'Failed to connect. Please check the server URL or your connection.';
+
+                if (showCustom) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: mcpUrlController,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'MCP Server URL',
+                      labelStyle: const TextStyle(color: Color(0xFF8888A0), fontSize: 13),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: JarvisColors.accentPrimary)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: mcpTokenController,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Auth Token (optional)',
+                      labelStyle: const TextStyle(color: Color(0xFF8888A0), fontSize: 13),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: JarvisColors.accentPrimary)),
+                    ),
+                  ),
+                ],
+
+                if (error != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.redAccent.withOpacity(0.3))),
+                    child: Row(children: [
+                      const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13))),
+                    ]),
+                  ),
+                ],
+
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: isLoading ? null : () => Navigator.pop(ctx),
+                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                        child: const Text('Cancel', style: TextStyle(color: Color(0xFF8888A0), fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: JarvisColors.accentPrimary,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        onPressed: (isLoading || (!showCustom && selectedPreset == null)) ? null : () async {
+                          setDialogState(() { isLoading = true; error = null; });
+                          final scaffoldMessenger = ScaffoldMessenger.of(context);
+                          final navigator = Navigator.of(ctx);
+                          try {
+                            final url = showCustom ? mcpUrlController.text.trim() : presets[selectedPreset]!['url'] as String;
+                            final token = showCustom && mcpTokenController.text.trim().isNotEmpty ? mcpTokenController.text.trim() : null;
+                            await provider.connectMcpServer(url, token: token);
+                            navigator.pop();
+                            scaffoldMessenger.showSnackBar(SnackBar(
+                              content: Text('${showCustom ? "Server" : selectedPreset} connected'),
+                              backgroundColor: JarvisColors.accentPrimary,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ));
+                          } catch (e) {
+                            setDialogState(() {
+                              isLoading = false;
+                              final msg = e.toString();
+                              error = (msg.contains('McpAuthError') || msg.contains('401') || msg.contains('Unauthorized'))
+                                  ? "Couldn't sign in — try again"
+                                  : 'Connection failed — check the URL';
+                            });
                           }
-                        });
-                      }
-                    },
-              child: isLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                    )
-                  : Text(showCustom ? 'Connect' : (selectedPreset == 'Pixelcut' ? 'Connect' : 'Sign in to $selectedPreset'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        },
+                        child: isLoading
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                            : Text(showCustom ? 'Connect' : ((presets[selectedPreset]?['auth'] as bool?) == true ? 'Sign in' : 'Connect'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
