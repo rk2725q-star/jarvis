@@ -999,6 +999,34 @@ class _AIBubble extends StatelessWidget {
 Widget _buildMarkdown(BuildContext context, String content) {
   return MarkdownBody(
     data: _cleanResponse(content),
+    imageBuilder: (uri, title, alt) {
+      final src = uri.toString();
+      if (src.startsWith('data:image/')) {
+        try {
+          final b64 = src.split(',').last;
+          if (b64.length % 4 != 0) {
+            // incomplete base64 mid-stream — show lightweight placeholder, don't attempt decode
+            return const SizedBox(
+              height: 120,
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            );
+          }
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.memory(base64Decode(b64), fit: BoxFit.contain),
+          );
+        } catch (_) {
+          return const SizedBox(
+            height: 100,
+            child: Center(child: Icon(Icons.broken_image_rounded, color: Colors.white30)),
+          );
+        }
+      }
+      return Image.network(
+        src,
+        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image_rounded, color: Colors.white30),
+      );
+    },
     builders: {
       'latex': LatexElementBuilder(
         textStyle: TextStyle(color: JarvisColors.textPrimary),
