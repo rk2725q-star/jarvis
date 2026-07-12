@@ -231,7 +231,7 @@ class McpServer {
 
     // Step 1: probe server, read metadata hint
     final metaUrl = mcpUrl.endsWith('/')
-        ? "${mcpUrl}.well-known/oauth-authorization-server"
+        ? "$mcpUrl.well-known/oauth-authorization-server"
         : "$mcpUrl/.well-known/oauth-authorization-server";
     final metaResp = await http.get(Uri.parse(metaUrl));
     if (metaResp.statusCode >= 400) {

@@ -410,8 +410,9 @@ class NotificationService {
     if (type == 'lunch') return 'Madhiyam Saptiya?';
     if (type == 'evening') return 'Time for your evening tea or coffee?';
     if (type == 'dinner') return 'Night Saptiya?';
-    if (type == 'sleep')
+    if (type == 'sleep') {
       return "It's getting late, consider going to sleep soon.";
+    }
     return 'Check-in time!';
   }
 
@@ -520,8 +521,9 @@ class NotificationService {
         lower.contains('morning')) {
       if (lower.contains('evening') ||
           lower.contains('18:00') ||
-          lower.contains('6:00 pm'))
+          lower.contains('6:00 pm')) {
         return 140;
+      }
       return 110;
     }
     if (lower.contains('breakfast') || lower.contains('kalai')) return 120;

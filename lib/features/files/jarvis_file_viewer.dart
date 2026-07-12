@@ -820,13 +820,15 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
       );
     }
     if (_isImage(widget.filePath)) return _buildImageView();
-    if (_isAudio(widget.filePath))
+    if (_isAudio(widget.filePath)) {
       return _AudioViewerWidget(
         filePath: widget.filePath,
         fileName: _basename(widget.filePath),
       );
-    if (_isVideo(widget.filePath))
+    }
+    if (_isVideo(widget.filePath)) {
       return _VideoViewerWidget(filePath: widget.filePath);
+    }
     if (_isCsv(widget.filePath) && _csvRows.isNotEmpty) return _buildCsvView();
     return _buildTextView();
   }
@@ -1254,8 +1256,9 @@ INSTRUCTIONS:
                       padding: const EdgeInsets.all(16),
                       itemCount: _messages.length + (_thinking ? 1 : 0),
                       itemBuilder: (_, i) {
-                        if (i == _messages.length && _thinking)
+                        if (i == _messages.length && _thinking) {
                           return _buildThinkingBubble();
+                        }
                         final msg = _messages[i];
                         return _ChatBubble(text: msg.text, isUser: msg.isUser);
                       },

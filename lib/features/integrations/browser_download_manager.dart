@@ -278,8 +278,9 @@ class BrowserDownloadManager extends ChangeNotifier {
             : '$dirPath/${resolvedName}_$counter';
         counter++;
       }
-      if (task.savePath.isEmpty || existingTask == null)
+      if (task.savePath.isEmpty || existingTask == null) {
         task.savePath = savePath;
+      }
       notifyListeners();
 
       // Progress callback

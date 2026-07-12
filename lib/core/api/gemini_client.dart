@@ -159,8 +159,9 @@ class GeminiApiClient {
     final text =
         parts.firstWhere((p) => p['text'] != null, orElse: () => null)?['text']
             as String?;
-    if (text == null)
+    if (text == null) {
       throw Exception('Gemini returned no text and no tool calls');
+    }
 
     return AIResponse(text: text);
   }
@@ -240,8 +241,9 @@ class GeminiApiClient {
 
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final predictions = (data['predictions'] as List?)?.cast<Map>() ?? [];
-    if (predictions.isEmpty)
+    if (predictions.isEmpty) {
       throw Exception('Gemini Imagen returned no predictions');
+    }
 
     final b64 = predictions.first['bytesBase64Encoded'] as String?;
     if (b64 == null) throw Exception('Gemini Imagen returned no base64 bytes');

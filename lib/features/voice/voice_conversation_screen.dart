@@ -123,8 +123,9 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen>
         _isThinking ||
         _processingLock ||
         _isTtsActive ||
-        !mounted)
+        !mounted) {
       return;
+    }
     if (_speech.isListening && !force) return;
 
     try {
@@ -457,12 +458,13 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen>
   }
 
   Widget _buildOrbIcon(Color color) {
-    if (_isThinking)
+    if (_isThinking) {
       return SizedBox(
         width: 32,
         height: 32,
         child: CircularProgressIndicator(color: color, strokeWidth: 2.5),
       );
+    }
     if (_isSpeaking) return _buildWaveBars(color);
     return Icon(
       _isListening ? Icons.graphic_eq_rounded : Icons.mic_none_rounded,

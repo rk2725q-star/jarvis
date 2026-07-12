@@ -879,8 +879,9 @@ PREMIUM DESIGN REQUIREMENTS:
   }
 
   Future<Map<String, dynamic>> testSupabaseConnection() async {
-    if (!isSupabaseConnected)
+    if (!isSupabaseConnected) {
       return {'success': false, 'error': 'Not connected'};
+    }
     try {
       final res = await http.get(
         Uri.parse('$_supabaseUrl/rest/v1/'),

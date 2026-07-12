@@ -402,8 +402,9 @@ class GoogleDocsService {
   );
 
   void _assertAuth() {
-    if (_client == null)
+    if (_client == null) {
       throw Exception('GoogleDocsService not authenticated.');
+    }
   }
 }
 
@@ -431,8 +432,9 @@ class JarvisDocAgent {
     int maxPages = 22,
     Function(String status)? onStatus,
   }) async {
-    if (!service.isAuthenticated)
+    if (!service.isAuthenticated) {
       throw Exception('Authenticate Google Docs Service first.');
+    }
 
     // Step 1: Generate a very detailed outline
     final outlinePrompt =

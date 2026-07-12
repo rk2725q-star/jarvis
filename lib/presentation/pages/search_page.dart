@@ -75,8 +75,9 @@ class _SearchPageState extends ConsumerState<SearchPage>
   }
 
   Widget _buildBody(AriaCategory category, SearchState searchState) {
-    if (searchState.isLoading)
+    if (searchState.isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
     if (searchState.query.isNotEmpty) {
       return ListView.builder(
         padding: const EdgeInsets.all(12),

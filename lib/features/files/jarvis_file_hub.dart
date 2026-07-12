@@ -55,8 +55,9 @@ String _fileCategory(String name) {
   if (['doc', 'docx', 'txt', 'md'].contains(ext)) return 'Docs';
   if (['xls', 'xlsx', 'csv'].contains(ext)) return 'Sheets';
   if (['ppt', 'pptx'].contains(ext)) return 'Slides';
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic'].contains(ext))
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic'].contains(ext)) {
     return 'Images';
+  }
   if ([
     'dart',
     'py',
@@ -71,8 +72,9 @@ String _fileCategory(String name) {
     'c',
     'html',
     'css',
-  ].contains(ext))
+  ].contains(ext)) {
     return 'Code';
+  }
   if (['json', 'xml', 'yaml', 'yml'].contains(ext)) return 'Data';
   return 'All';
 }

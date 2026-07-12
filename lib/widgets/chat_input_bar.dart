@@ -444,7 +444,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.75),
+      barrierColor: Colors.black.withValues(alpha: 0.75),
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => Dialog(
           backgroundColor: Colors.transparent,
@@ -453,10 +453,10 @@ class _ChatInputBarState extends State<ChatInputBar>
             decoration: BoxDecoration(
               color: const Color(0xFF15151F),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.4),
+                  color: Colors.black.withValues(alpha: 0.4),
                   blurRadius: 40,
                   offset: const Offset(0, 20),
                 ),
@@ -472,7 +472,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: JarvisColors.accentPrimary.withOpacity(0.15),
+                          color: JarvisColors.accentPrimary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -523,13 +523,13 @@ class _ChatInputBarState extends State<ChatInputBar>
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? JarvisColors.accentPrimary.withOpacity(0.12)
-                                : Colors.white.withOpacity(0.03),
+                                ? JarvisColors.accentPrimary.withValues(alpha: 0.12)
+                                : Colors.white.withValues(alpha: 0.03),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: isSelected
                                   ? JarvisColors.accentPrimary
-                                  : Colors.white.withOpacity(0.06),
+                                  : Colors.white.withValues(alpha: 0.06),
                             ),
                           ),
                           child: Row(
@@ -560,8 +560,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 ),
                                 decoration: BoxDecoration(
                                   color: (data['auth'] as bool)
-                                      ? Colors.orangeAccent.withOpacity(0.12)
-                                      : Colors.greenAccent.withOpacity(0.12),
+                                      ? Colors.orangeAccent.withValues(alpha: 0.12)
+                                      : Colors.greenAccent.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
@@ -599,13 +599,13 @@ class _ChatInputBarState extends State<ChatInputBar>
                       ),
                       decoration: BoxDecoration(
                         color: showCustom
-                            ? JarvisColors.accentPrimary.withOpacity(0.12)
-                            : Colors.white.withOpacity(0.03),
+                            ? JarvisColors.accentPrimary.withValues(alpha: 0.12)
+                            : Colors.white.withValues(alpha: 0.03),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: showCustom
                               ? JarvisColors.accentPrimary
-                              : Colors.white.withOpacity(0.06),
+                              : Colors.white.withValues(alpha: 0.06),
                         ),
                       ),
                       child: Row(
@@ -642,7 +642,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                           fontSize: 13,
                         ),
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.04),
+                        fillColor: Colors.white.withValues(alpha: 0.04),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: BorderSide.none,
@@ -667,7 +667,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                           fontSize: 13,
                         ),
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.04),
+                        fillColor: Colors.white.withValues(alpha: 0.04),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: BorderSide.none,
@@ -687,10 +687,10 @@ class _ChatInputBarState extends State<ChatInputBar>
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.08),
+                        color: Colors.redAccent.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: Colors.redAccent.withOpacity(0.3),
+                          color: Colors.redAccent.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(

@@ -77,8 +77,9 @@ class MemoryService {
           ..sort((a, b) => b.importance.compareTo(a.importance));
 
     final Set<MemoryItem> contextItems = {};
-    if (langMems.isNotEmpty)
+    if (langMems.isNotEmpty) {
       contextItems.add(langMems.first); // Take the latest language choice
+    }
 
     // Always include the last 3 notification memories to prevent repetitive asking
     for (var m in notifMems.take(3)) {

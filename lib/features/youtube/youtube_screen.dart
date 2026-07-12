@@ -665,8 +665,9 @@ class _YtSvc {
     if (age.isEmpty) return true; // no data, keep it
     if (age.contains('hour') ||
         age.contains('minute') ||
-        age.contains('second'))
+        age.contains('second')) {
       return true;
+    }
     if (age.contains('day')) {
       final n =
           int.tryParse(RegExp(r'(\d+)').firstMatch(age)?.group(1) ?? '0') ?? 0;
@@ -1398,11 +1399,12 @@ class _HomeTabState extends State<_HomeTab> with AutomaticKeepAliveClientMixin {
     if (_selCat != 'All') {
       vids = await _YtSvc.search(_selCat);
     }
-    if (mounted)
+    if (mounted) {
       setState(() {
         _videos = vids;
         _loading = false;
       });
+    }
   }
 
   Future<void> _selectCat(String cat) async {
@@ -1411,11 +1413,12 @@ class _HomeTabState extends State<_HomeTab> with AutomaticKeepAliveClientMixin {
       _loading = true;
     });
     final vids = cat == 'All' ? await _YtSvc.home() : await _YtSvc.search(cat);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _videos = vids;
         _loading = false;
       });
+    }
   }
 
   @override
@@ -1600,11 +1603,12 @@ class _SearchPageState extends State<_SearchPage> {
   Future<void> _fetchSuggestions(String q) async {
     try {
       final s = await _yt.search.getQuerySuggestions(q);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _suggestions = s.take(7).toList();
           _showSuggestions = _suggestions.isNotEmpty;
         });
+      }
     } catch (_) {}
   }
 
@@ -1621,11 +1625,12 @@ class _SearchPageState extends State<_SearchPage> {
     });
     _ctrl.text = q;
     final r = await _YtSvc.search(q);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _results = r;
         _loading = false;
       });
+    }
     // Small delay so setText event doesn't re-trigger suggestions
     await Future.delayed(const Duration(milliseconds: 200));
     _suppressSuggestions = false;
@@ -1780,11 +1785,12 @@ class _ShortsTabState extends State<_ShortsTab>
   Future<void> _load() async {
     setState(() => _loading = true);
     final v = await _YtSvc.shorts();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _shorts = v;
         _loading = false;
       });
+    }
   }
 
   @override
@@ -2078,11 +2084,12 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
       channels = await _SubStore.load();
     }
 
-    if (mounted)
+    if (mounted) {
       setState(() {
         _channels = channels;
         _loadingChans = false;
       });
+    }
     // Don't auto-select a channel — let user pick
     _selChannel = null;
     _showingFeed = true;
@@ -2093,11 +2100,12 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
   Future<void> _loadSubsFeed() async {
     setState(() => _loadingFeed = true);
     final feed = await _InnertubeApi.subscriptionsFeed();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _subsFeed = feed;
         _loadingFeed = false;
       });
+    }
   }
 
   Future<void> _selectChannel(YtChannel ch) async {
@@ -2135,11 +2143,12 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
       if (mounted) setState(() => _videos.add(_uploadIter!.current));
       loaded++;
     }
-    if (mounted)
+    if (mounted) {
       setState(() {
         _loadingMore = false;
         if (isInitial) _loadingVids = false;
       });
+    }
   }
 
   Future<void> _addChannel(String query) async {
@@ -3491,10 +3500,11 @@ class _VideoPageState extends State<_VideoPage> {
 
         // Audio-only last resort
         if (_audioStreamUrl != null) {
-          if (mounted)
+          if (mounted) {
             setState(() {
               _audioOnly = true;
             });
+          }
           await _BgAudio.play(widget.video, streamUrl: _audioStreamUrl);
           if (mounted) setState(() => _loading = false);
           return;
@@ -3502,11 +3512,12 @@ class _VideoPageState extends State<_VideoPage> {
       } catch (e) {
         debugPrint('_initPlayer PASS2 attempt $attempt: $e');
         if (attempt == 2) {
-          if (mounted)
+          if (mounted) {
             setState(() {
               _loading = false;
               _error = true;
             });
+          }
         } else {
           await Future.delayed(const Duration(seconds: 3));
         }
@@ -3703,11 +3714,12 @@ class _VideoPageState extends State<_VideoPage> {
     _isAdaptive = false;
     _actualQualityLabel = null;
     WakelockPlus.disable();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _loading = true;
         _error = false;
       });
+    }
     await _initPlayer();
   }
 
@@ -4729,12 +4741,13 @@ class _YtLikedScreenState extends State<YtLikedScreen> {
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList('yt_liked') ?? [];
-    if (mounted)
+    if (mounted) {
       setState(
         () => _liked = raw
             .map((e) => YtVid.fromJson(json.decode(e) as Map<String, dynamic>))
             .toList(),
       );
+    }
   }
 
   Future<void> _remove(int index) async {
@@ -5282,10 +5295,11 @@ class _YtSettingsScreenState extends State<YtSettingsScreen> {
           onTap: () async {
             final prefs = await SharedPreferences.getInstance();
             await prefs.remove('yt_history');
-            if (context.mounted)
+            if (context.mounted) {
               ScaffoldMessenger.of(
                 context,
               ).showSnackBar(const SnackBar(content: Text('History cleared')));
+            }
           },
         ),
         ListTile(
@@ -5297,10 +5311,11 @@ class _YtSettingsScreenState extends State<YtSettingsScreen> {
           onTap: () async {
             final prefs = await SharedPreferences.getInstance();
             await prefs.remove('yt_liked');
-            if (context.mounted)
+            if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Liked videos cleared')),
               );
+            }
           },
         ),
       ],

@@ -510,11 +510,13 @@ class AgenticaEngine extends ChangeNotifier {
         }
         if (name == 'click_ref') params['ref'] = arg;
         if (name == 'type_ref') params['text'] = arg;
-        if (name == 'click_text' || name == 'find_by_text')
+        if (name == 'click_text' || name == 'find_by_text') {
           params['text'] = arg;
+        }
         if (name == 'wait') params['ms'] = arg;
-        if (name == 'direct_call' || name == 'send_message')
+        if (name == 'direct_call' || name == 'send_message') {
           params['number'] = arg;
+        }
       }
     }
     return AgenticaToolCall(name: name, params: params);

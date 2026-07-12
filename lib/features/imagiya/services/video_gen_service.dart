@@ -264,8 +264,9 @@ class VideoGenService {
         final res = await http.get(uri).timeout(const Duration(seconds: 60));
         if (res.statusCode == 200) return res.bodyBytes;
       } catch (_) {}
-      if (attempt < retries)
+      if (attempt < retries) {
         await Future.delayed(Duration(seconds: attempt * 2));
+      }
     }
     throw Exception('Fetch failed after $retries retries.');
   }

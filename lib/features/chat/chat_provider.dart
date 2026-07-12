@@ -1748,8 +1748,9 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
           final rt = _getRoutineTypeFromPurpose(m);
           if (rt != null) {
             final rTime = _getRoutineTimeFromType(rt, st);
-            if (st.difference(rTime).inHours.abs() <= 2)
+            if (st.difference(rTime).inHours.abs() <= 2) {
               await ns.skipRoutineForToday(rt);
+            }
           }
           ns.scheduleReminder(
             st.millisecondsSinceEpoch ~/ 1000,
@@ -1771,15 +1772,18 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
     final lower = purpose.toLowerCase();
     if (lower.contains('morning') ||
         lower.contains('06:00') ||
-        lower.contains('wake up'))
+        lower.contains('wake up')) {
       return 'morning';
-    if (lower.contains('breakfast') || lower.contains('9:30'))
+    }
+    if (lower.contains('breakfast') || lower.contains('9:30')) {
       return 'breakfast';
+    }
     if (lower.contains('lunch') || lower.contains('13:30')) return 'lunch';
     if (lower.contains('evening') ||
         lower.contains('tea') ||
-        lower.contains('18:00'))
+        lower.contains('18:00')) {
       return 'evening';
+    }
     if (lower.contains('dinner') || lower.contains('20:00')) return 'dinner';
     if (lower.contains('sleep') || lower.contains('22:00')) return 'sleep';
     return null;

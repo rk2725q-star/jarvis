@@ -10,8 +10,9 @@ class DiagramTrigger {
   static bool isDiagramRequest(String message) {
     final lower = message.toLowerCase().trim();
 
-    if (lower.startsWith('/diagram') || lower.startsWith('/visualize'))
+    if (lower.startsWith('/diagram') || lower.startsWith('/visualize')) {
       return true;
+    }
 
     final hasAction =
         lower.contains('draw') ||

@@ -366,12 +366,15 @@ class OllamaCloudService {
             )
             .timeout(const Duration(seconds: 120));
 
-        if (res.statusCode == 401)
+        if (res.statusCode == 401) {
           throw Exception('API key invalid or expired');
-        if (res.statusCode == 404)
+        }
+        if (res.statusCode == 404) {
           throw Exception('Model "$targetModel" not found on cloud');
-        if (res.statusCode != 200)
+        }
+        if (res.statusCode != 200) {
           throw Exception('Ollama error ${res.statusCode}: ${res.body}');
+        }
 
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final content =
