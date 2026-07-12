@@ -54,7 +54,11 @@ class _SkillsScreenState extends State<SkillsScreen> {
 
     if (name.isEmpty || desc.isEmpty || instruction.isEmpty) {
       scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('Please fill out Name, Description, and System Instruction.')),
+        const SnackBar(
+          content: Text(
+            'Please fill out Name, Description, and System Instruction.',
+          ),
+        ),
       );
       return;
     }
@@ -107,7 +111,8 @@ class _SkillsScreenState extends State<SkillsScreen> {
 
     setState(() {
       if (matched.isEmpty) {
-        _testResult = 'No active skills matched. JARVIS will use standard fallback response.';
+        _testResult =
+            'No active skills matched. JARVIS will use standard fallback response.';
         _isTestTriggered = false;
       } else {
         final buffer = StringBuffer();
@@ -145,18 +150,27 @@ class _SkillsScreenState extends State<SkillsScreen> {
                     child: ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        _buildSectionHeader('ACTIVE SKILL REGISTRY', Icons.psychology_rounded),
+                        _buildSectionHeader(
+                          'ACTIVE SKILL REGISTRY',
+                          Icons.psychology_rounded,
+                        ),
                         const SizedBox(height: 12),
                         _buildSearchBar(),
                         skills.isEmpty
                             ? _buildEmptyState()
                             : _buildSkillsList(skills, skillService),
                         const SizedBox(height: 28),
-                        _buildSectionHeader('CREATE CUSTOM SKILL', Icons.add_circle_outline_rounded),
+                        _buildSectionHeader(
+                          'CREATE CUSTOM SKILL',
+                          Icons.add_circle_outline_rounded,
+                        ),
                         const SizedBox(height: 12),
                         _buildSkillBuilderCard(context),
                         const SizedBox(height: 28),
-                        _buildSectionHeader('EXECUTION ROUTER TESTER', Icons.science_rounded),
+                        _buildSectionHeader(
+                          'EXECUTION ROUTER TESTER',
+                          Icons.science_rounded,
+                        ),
                         const SizedBox(height: 12),
                         _buildTesterCard(skills),
                         const SizedBox(height: 24),
@@ -178,7 +192,10 @@ class _SkillsScreenState extends State<SkillsScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: JarvisColors.textPrimary),
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: JarvisColors.textPrimary,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           const SizedBox(width: 8),
@@ -187,7 +204,8 @@ class _SkillsScreenState extends State<SkillsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ShaderMask(
-                  shaderCallback: (b) => JarvisColors.primaryGradient.createShader(b),
+                  shaderCallback: (b) =>
+                      JarvisColors.primaryGradient.createShader(b),
                   child: const Text(
                     'AI SKILL HUB',
                     style: TextStyle(
@@ -247,7 +265,11 @@ class _SkillsScreenState extends State<SkillsScreen> {
           SizedBox(height: 12),
           Text(
             'No custom skills created yet.',
-            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           SizedBox(height: 4),
           Text(
@@ -274,7 +296,11 @@ class _SkillsScreenState extends State<SkillsScreen> {
         decoration: const InputDecoration(
           hintText: 'Search 1,110+ skills by name or description...',
           hintStyle: TextStyle(color: JarvisColors.textMuted, fontSize: 13),
-          prefixIcon: Icon(Icons.search_rounded, color: JarvisColors.textMuted, size: 20),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: JarvisColors.textMuted,
+            size: 20,
+          ),
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
@@ -284,11 +310,11 @@ class _SkillsScreenState extends State<SkillsScreen> {
 
   Widget _buildSkillsList(List<JarvisSkill> skills, SkillService service) {
     final query = _searchController.text.trim().toLowerCase();
-    
+
     final filteredSkills = skills.where((s) {
       if (query.isEmpty) return true;
       return s.name.toLowerCase().contains(query) ||
-             s.description.toLowerCase().contains(query);
+          s.description.toLowerCase().contains(query);
     }).toList();
 
     if (filteredSkills.isEmpty) {
@@ -319,7 +345,9 @@ class _SkillsScreenState extends State<SkillsScreen> {
               color: JarvisColors.surface,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: s.isActive ? JarvisColors.accentPrimary.withValues(alpha: 0.4) : JarvisColors.border,
+                color: s.isActive
+                    ? JarvisColors.accentPrimary.withValues(alpha: 0.4)
+                    : JarvisColors.border,
                 width: 0.5,
               ),
             ),
@@ -327,16 +355,26 @@ class _SkillsScreenState extends State<SkillsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   title: Text(
                     s.name,
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       s.description,
-                      style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 11),
+                      style: const TextStyle(
+                        color: JarvisColors.textSecondary,
+                        fontSize: 11,
+                      ),
                     ),
                   ),
                   trailing: Row(
@@ -348,7 +386,11 @@ class _SkillsScreenState extends State<SkillsScreen> {
                         onChanged: (_) => service.toggleSkill(s.id),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, color: JarvisColors.error, size: 20),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: JarvisColors.error,
+                          size: 20,
+                        ),
                         onPressed: () => service.deleteSkill(s.id),
                       ),
                     ],
@@ -363,7 +405,10 @@ class _SkillsScreenState extends State<SkillsScreen> {
                       runSpacing: 4,
                       children: s.triggerKeywords.map((kw) {
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black26,
                             borderRadius: BorderRadius.circular(6),
@@ -371,7 +416,11 @@ class _SkillsScreenState extends State<SkillsScreen> {
                           ),
                           child: Text(
                             '#$kw',
-                            style: const TextStyle(color: JarvisColors.accentSecondary, fontSize: 9, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: JarvisColors.accentSecondary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         );
                       }).toList(),
@@ -389,10 +438,17 @@ class _SkillsScreenState extends State<SkillsScreen> {
                 _displayLimit += 30;
               });
             },
-            icon: const Icon(Icons.expand_more_rounded, color: JarvisColors.accentSecondary),
+            icon: const Icon(
+              Icons.expand_more_rounded,
+              color: JarvisColors.accentSecondary,
+            ),
             label: Text(
               'Show More (${filteredSkills.length - _displayLimit} remaining)',
-              style: const TextStyle(color: JarvisColors.accentSecondary, fontWeight: FontWeight.bold, fontSize: 12),
+              style: const TextStyle(
+                color: JarvisColors.accentSecondary,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -411,33 +467,70 @@ class _SkillsScreenState extends State<SkillsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTextField('Skill Name', _nameController, 'E.g., Python Compiler'),
+          _buildTextField(
+            'Skill Name',
+            _nameController,
+            'E.g., Python Compiler',
+          ),
           const SizedBox(height: 12),
-          _buildTextField('Description', _descController, 'E.g., Format program requests into executable Python scripts'),
+          _buildTextField(
+            'Description',
+            _descController,
+            'E.g., Format program requests into executable Python scripts',
+          ),
           const SizedBox(height: 12),
-          _buildTextField('System Instruction Directive', _instructionController, 'Instructions explaining exactly how the AI should reason...', maxLines: 3),
+          _buildTextField(
+            'System Instruction Directive',
+            _instructionController,
+            'Instructions explaining exactly how the AI should reason...',
+            maxLines: 3,
+          ),
           const SizedBox(height: 12),
-          _buildTextField('Trigger Keywords (comma separated)', _keywordsController, 'E.g., python, code, script, function'),
+          _buildTextField(
+            'Trigger Keywords (comma separated)',
+            _keywordsController,
+            'E.g., python, code, script, function',
+          ),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () => _createCustomSkill(context),
             style: ElevatedButton.styleFrom(
               backgroundColor: JarvisColors.accentPrimary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               minimumSize: const Size(double.infinity, 44),
             ),
-            child: const Text('Add Custom Skill', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            child: const Text(
+              'Add Custom Skill',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, String hint, {int maxLines = 1}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    String hint, {
+    int maxLines = 1,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
@@ -445,11 +538,20 @@ class _SkillsScreenState extends State<SkillsScreen> {
           style: const TextStyle(color: Colors.white, fontSize: 12),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: JarvisColors.textMuted, fontSize: 12),
+            hintStyle: const TextStyle(
+              color: JarvisColors.textMuted,
+              fontSize: 12,
+            ),
             fillColor: JarvisColors.surfaceElevated,
             filled: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
       ],
@@ -475,18 +577,30 @@ class _SkillsScreenState extends State<SkillsScreen> {
                   style: const TextStyle(color: Colors.white, fontSize: 12),
                   decoration: InputDecoration(
                     hintText: 'Type query (e.g. "I want a python script")...',
-                    hintStyle: const TextStyle(color: JarvisColors.textMuted, fontSize: 12),
+                    hintStyle: const TextStyle(
+                      color: JarvisColors.textMuted,
+                      fontSize: 12,
+                    ),
                     fillColor: JarvisColors.surfaceElevated,
                     filled: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                   onSubmitted: (_) => _runTriggerTest(skills),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.bolt_rounded, color: JarvisColors.accentSecondary),
+                icon: const Icon(
+                  Icons.bolt_rounded,
+                  color: JarvisColors.accentSecondary,
+                ),
                 onPressed: () => _runTriggerTest(skills),
               ),
             ],
@@ -498,7 +612,11 @@ class _SkillsScreenState extends State<SkillsScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFF050508),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _isTestTriggered ? JarvisColors.success.withValues(alpha: 0.5) : JarvisColors.border),
+              border: Border.all(
+                color: _isTestTriggered
+                    ? JarvisColors.success.withValues(alpha: 0.5)
+                    : JarvisColors.border,
+              ),
             ),
             child: Text(
               _testResult,

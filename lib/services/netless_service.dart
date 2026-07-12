@@ -21,7 +21,8 @@ class NetlessService extends ChangeNotifier {
   static const int _notifId = 7001;
   static const String _channelId = 'netless_download';
   static const String _channelName = 'Netless Model Download';
-  final FlutterLocalNotificationsPlugin _notif = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notif =
+      FlutterLocalNotificationsPlugin();
 
   // ── HuggingFace model URL ─────────────────────────────────────────────────
   static const String _hfModelUrl =
@@ -74,7 +75,9 @@ class NetlessService extends ChangeNotifier {
     );
     // Create progress notification channel
     final androidPlugin = _notif
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     await androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
         _channelId,
@@ -146,7 +149,9 @@ class NetlessService extends ChangeNotifier {
       // Resume partially downloaded file
       int startByte = file.existsSync() ? file.lengthSync() : 0;
       if (startByte > 0) {
-        _setStatus('Resuming download from ${(startByte / 1e6).toStringAsFixed(0)} MB…');
+        _setStatus(
+          'Resuming download from ${(startByte / 1e6).toStringAsFixed(0)} MB…',
+        );
       }
 
       final client = http.Client();
@@ -162,7 +167,9 @@ class NetlessService extends ChangeNotifier {
       int received = startByte;
       int lastNotifPercent = -1;
 
-      final sink = file.openWrite(mode: startByte > 0 ? FileMode.append : FileMode.write);
+      final sink = file.openWrite(
+        mode: startByte > 0 ? FileMode.append : FileMode.write,
+      );
 
       await for (final chunk in response.stream) {
         sink.add(chunk);
@@ -300,7 +307,8 @@ class NetlessService extends ChangeNotifier {
         temperature: 0.7,
         topK: 40,
         randomSeed: 42,
-        systemInstruction: systemPrompt ??
+        systemInstruction:
+            systemPrompt ??
             'You are JARVIS, an intelligent offline AI assistant. '
                 'Be concise, helpful, and friendly.',
       );
@@ -323,7 +331,10 @@ class NetlessService extends ChangeNotifier {
   /// Non-streaming — collects all tokens
   Future<String> generate(String prompt, {String? systemPrompt}) async {
     final buf = StringBuffer();
-    await for (final tok in generateStream(prompt, systemPrompt: systemPrompt)) {
+    await for (final tok in generateStream(
+      prompt,
+      systemPrompt: systemPrompt,
+    )) {
       buf.write(tok);
     }
     return buf.toString();

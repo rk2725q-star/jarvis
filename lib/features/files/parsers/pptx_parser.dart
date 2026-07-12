@@ -26,13 +26,14 @@ class PptxParser {
     if (_slideRels.containsKey(key)) return _slideRels[key]!;
 
     final relFile = _archive.findFile(key);
-    final rels    = <String, String>{};
+    final rels = <String, String>{};
     if (relFile != null) {
       try {
         final doc = XmlDocument.parse(
-            utf8.decode(relFile.content as List<int>));
+          utf8.decode(relFile.content as List<int>),
+        );
         for (final rel in doc.findAllElements('Relationship')) {
-          final id     = rel.getAttribute('Id')     ?? '';
+          final id = rel.getAttribute('Id') ?? '';
           final target = rel.getAttribute('Target') ?? '';
           rels[id] = target.contains('../media/')
               ? 'ppt/media/${target.split('/').last}'
@@ -46,13 +47,16 @@ class PptxParser {
 
   ParsedDocument parse(String fileName) {
     // Discover slide count
-    final slideFiles = _archive.files
-        .where((f) =>
-            f.name.startsWith('ppt/slides/slide') &&
-            f.name.endsWith('.xml') &&
-            !f.name.contains('_rels'))
-        .toList()
-      ..sort((a, b) => _slideNum(a.name).compareTo(_slideNum(b.name)));
+    final slideFiles =
+        _archive.files
+            .where(
+              (f) =>
+                  f.name.startsWith('ppt/slides/slide') &&
+                  f.name.endsWith('.xml') &&
+                  !f.name.contains('_rels'),
+            )
+            .toList()
+          ..sort((a, b) => _slideNum(a.name).compareTo(_slideNum(b.name)));
 
     if (slideFiles.isEmpty) {
       return ParsedDocument(
@@ -63,24 +67,24 @@ class PptxParser {
       );
     }
 
-    final slides  = <ParsedSlide>[];
-    int imgCount   = 0;
+    final slides = <ParsedSlide>[];
+    int imgCount = 0;
 
     for (int i = 0; i < slideFiles.length; i++) {
       final slideNum = _slideNum(slideFiles[i].name);
-      final rels     = _loadSlideRels(slideNum);
-      final slide    = _parseSlide(slideFiles[i], i + 1, rels);
+      final rels = _loadSlideRels(slideNum);
+      final slide = _parseSlide(slideFiles[i], i + 1, rels);
       imgCount += slide.blocks.where((b) => b.type == BlockType.image).length;
       slides.add(slide);
     }
 
     final title = _extractTitle() ?? fileName;
     return ParsedDocument(
-      title:      title,
-      format:     'pptx',
-      blocks:     [],
-      slides:     slides,
-      pageCount:  slides.length,
+      title: title,
+      format: 'pptx',
+      blocks: [],
+      slides: slides,
+      pageCount: slides.length,
       imageCount: imgCount,
     );
   }
@@ -91,11 +95,13 @@ class PptxParser {
   }
 
   ParsedSlide _parseSlide(
-      ArchiveFile slideFile, int index, Map<String, String> rels) {
+    ArchiveFile slideFile,
+    int index,
+    Map<String, String> rels,
+  ) {
     late XmlDocument doc;
     try {
-      doc = XmlDocument.parse(
-          utf8.decode(slideFile.content as List<int>));
+      doc = XmlDocument.parse(utf8.decode(slideFile.content as List<int>));
     } catch (_) {
       return ParsedSlide(index: index, blocks: []);
     }
@@ -113,8 +119,7 @@ class PptxParser {
           final block = _parseShape(child, index == 1);
           if (block != null) {
             // First heading = slide title
-            if (slideTitle == null &&
-                block.type == BlockType.heading1) {
+            if (slideTitle == null && block.type == BlockType.heading1) {
               slideTitle = block.plainText;
             }
             blocks.add(block);
@@ -140,18 +145,18 @@ class PptxParser {
     final notes = _extractNotes(index);
 
     return ParsedSlide(
-      index:      index,
-      title:      slideTitle,
-      blocks:     blocks,
-      notes:      notes,
+      index: index,
+      title: slideTitle,
+      blocks: blocks,
+      notes: notes,
       layoutName: _getLayoutName(doc),
     );
   }
 
   DocBlock? _parseShape(XmlElement sp, bool isFirstSlide) {
     final nvSpPr = sp.findAllElements('p:nvSpPr').firstOrNull;
-    final ph      = nvSpPr?.findAllElements('p:ph').firstOrNull;
-    final phType  = ph?.getAttribute('type') ?? '';
+    final ph = nvSpPr?.findAllElements('p:ph').firstOrNull;
+    final phType = ph?.getAttribute('type') ?? '';
 
     // Determine block type from placeholder
     BlockType blockType = BlockType.paragraph;
@@ -164,13 +169,16 @@ class PptxParser {
     final txBody = sp.findAllElements('p:txBody').firstOrNull;
     if (txBody == null) return null;
 
-    final allRuns  = <TextRun>[];
+    final allRuns = <TextRun>[];
     String? mainText;
     BlockType firstParaType = blockType;
     bool isFirst = true;
 
     for (final para in txBody.findAllElements('a:p')) {
-      final pRuns = _parseTextParagraph(para, isFirst ? blockType : BlockType.paragraph);
+      final pRuns = _parseTextParagraph(
+        para,
+        isFirst ? blockType : BlockType.paragraph,
+      );
       if (isFirst && pRuns.isNotEmpty) {
         firstParaType = _detectParaType(para, blockType);
         isFirst = false;
@@ -189,11 +197,7 @@ class PptxParser {
     mainText = allRuns.map((r) => r.text).join().trim();
     if (mainText.isEmpty) return null;
 
-    return DocBlock(
-      type:      firstParaType,
-      runs:      allRuns,
-      plainText: mainText,
-    );
+    return DocBlock(type: firstParaType, runs: allRuns, plainText: mainText);
   }
 
   BlockType _detectParaType(XmlElement para, BlockType fallback) {
@@ -210,12 +214,12 @@ class PptxParser {
     for (final elem in para.children.whereType<XmlElement>()) {
       if (elem.name.local == 'r') {
         final rPr = elem.findAllElements('a:rPr').firstOrNull;
-        final t   = elem.findAllElements('a:t').firstOrNull?.innerText ?? '';
+        final t = elem.findAllElements('a:t').firstOrNull?.innerText ?? '';
         if (t.isEmpty) continue;
 
-        bool bold   = rPr?.getAttribute('b') == '1';
+        bool bold = rPr?.getAttribute('b') == '1';
         bool italic = rPr?.getAttribute('i') == '1';
-        bool under  = rPr?.getAttribute('u') == 'sng';
+        bool under = rPr?.getAttribute('u') == 'sng';
         double? sz;
         String? color;
 
@@ -223,19 +227,21 @@ class PptxParser {
         if (szAttr != null) sz = (double.tryParse(szAttr) ?? 0) / 100;
 
         final solidFill = rPr?.findAllElements('a:solidFill').firstOrNull;
-        final srgb       = solidFill?.findAllElements('a:srgbClr').firstOrNull;
+        final srgb = solidFill?.findAllElements('a:srgbClr').firstOrNull;
         if (srgb != null) {
           color = '#${srgb.getAttribute('val') ?? ''}';
         }
 
-        runs.add(TextRun(
-          text:        t,
-          isBold:      bold || type == BlockType.heading1,
-          isItalic:    italic,
-          isUnderline: under,
-          fontSize:    sz,
-          color:       color,
-        ));
+        runs.add(
+          TextRun(
+            text: t,
+            isBold: bold || type == BlockType.heading1,
+            isItalic: italic,
+            isUnderline: under,
+            fontSize: sz,
+            color: color,
+          ),
+        );
       } else if (elem.name.local == 'm' || elem.name.local == 'oMath') {
         _parseMath(elem, runs);
       }
@@ -249,17 +255,14 @@ class PptxParser {
         .map((e) => e.innerText)
         .join();
     if (text.isNotEmpty) {
-      runs.add(TextRun(
-        text: "\$ $text \$",
-        isItalic: true,
-      ));
+      runs.add(TextRun(text: "\$ $text \$", isItalic: true));
     }
   }
 
   DocBlock? _parsePicture(XmlElement pic, Map<String, String> rels) {
-    final blip   = pic.findAllElements('a:blip').firstOrNull;
+    final blip = pic.findAllElements('a:blip').firstOrNull;
     final rEmbed = blip?.getAttribute('r:embed') ?? '';
-    final path   = rels[rEmbed];
+    final path = rels[rEmbed];
     if (path == null) return null;
 
     final imgData = _images[path];
@@ -278,10 +281,10 @@ class PptxParser {
     }
 
     return DocBlock(
-      type:        BlockType.image,
-      imageBytes:  imgData,
-      imageExt:    ext,
-      imageWidth:  w,
+      type: BlockType.image,
+      imageBytes: imgData,
+      imageExt: ext,
+      imageWidth: w,
       imageHeight: h,
     );
   }
@@ -290,7 +293,7 @@ class PptxParser {
     final tbl = frame.findAllElements('a:tbl').firstOrNull;
     if (tbl == null) return null;
 
-    final rows      = <TableRow>[];
+    final rows = <TableRow>[];
     bool isFirstRow = true;
 
     for (final tr in tbl.findAllElements('a:tr')) {
@@ -314,7 +317,10 @@ class PptxParser {
   }
 
   void _parseGroupShape(
-      XmlElement grpSp, Map<String, String> rels, List<DocBlock> blocks) {
+    XmlElement grpSp,
+    Map<String, String> rels,
+    List<DocBlock> blocks,
+  ) {
     for (final child in grpSp.childElements) {
       switch (child.name.local) {
         case 'sp':
@@ -333,12 +339,14 @@ class PptxParser {
   }
 
   String? _extractNotes(int slideNum) {
-    final notesFile =
-        _archive.findFile('ppt/notesSlides/notesSlide$slideNum.xml');
+    final notesFile = _archive.findFile(
+      'ppt/notesSlides/notesSlide$slideNum.xml',
+    );
     if (notesFile == null) return null;
     try {
       final doc = XmlDocument.parse(
-          utf8.decode(notesFile.content as List<int>));
+        utf8.decode(notesFile.content as List<int>),
+      );
       final text = doc.findAllElements('a:t').map((e) => e.innerText).join(' ');
       return text.trim().isEmpty ? null : text.trim();
     } catch (_) {
@@ -347,17 +355,14 @@ class PptxParser {
   }
 
   String? _getLayoutName(XmlDocument doc) {
-    return doc.findAllElements('p:cSld')
-        .firstOrNull
-        ?.getAttribute('name');
+    return doc.findAllElements('p:cSld').firstOrNull?.getAttribute('name');
   }
 
   String? _extractTitle() {
     final coreFile = _archive.findFile('docProps/core.xml');
     if (coreFile == null) return null;
     try {
-      final doc = XmlDocument.parse(
-          utf8.decode(coreFile.content as List<int>));
+      final doc = XmlDocument.parse(utf8.decode(coreFile.content as List<int>));
       return doc.findAllElements('dc:title').firstOrNull?.innerText;
     } catch (_) {
       return null;

@@ -14,7 +14,6 @@ import 'package:jarvis_ai/core/api/anthropic_client.dart';
 import 'package:jarvis_ai/core/file_processor/file_processor.dart';
 import 'package:jarvis_ai/services/skill_service.dart';
 
-
 enum AIProvider {
   llamaCpp,
   gemini,
@@ -1184,7 +1183,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     if (providerOverride != null) {
       chain.add(providerOverride);
     }
-    
+
     final fallbackChain = isVoiceMode ? [AIProvider.nvidia] : _fallbackChain;
     chain.addAll(fallbackChain.where((p) => !chain.contains(p)));
 
@@ -1394,8 +1393,6 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     );
   }
 
-
-
   /// Professional file analysis pipeline: extract -> chunk -> analyze -> merge
   Future<String> analyzeFile(String filePath) async {
     try {
@@ -1432,16 +1429,23 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
   }
 
   /// Generate image using active AI provider's official API
-  Future<String> generateImage(String prompt, {String? providerOverride, String? modelOverride}) async {
+  Future<String> generateImage(
+    String prompt, {
+    String? providerOverride,
+    String? modelOverride,
+  }) async {
     AIProvider active;
-    
+
     // 1. Detect provider based on model override first
     if (modelOverride == 'minimax-m3') {
       active = AIProvider.ollamaCloud;
     } else if (modelOverride == 'imagen-3.0-generate-002') {
       active = AIProvider.gemini;
     } else if (providerOverride != null) {
-      active = AIProvider.values.firstWhere((p) => p.name == providerOverride, orElse: () => AIProvider.gemini);
+      active = AIProvider.values.firstWhere(
+        (p) => p.name == providerOverride,
+        orElse: () => AIProvider.gemini,
+      );
     } else {
       active = _lastSelectedProvider ?? AIProvider.gemini;
     }
@@ -1459,7 +1463,9 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         } else if (_ollamaService.apiKey.isNotEmpty) {
           active = AIProvider.ollamaCloud;
         } else {
-          throw Exception('No official image generation endpoints configured. Please enter API keys for Gemini (Imagen 3) or Ollama Cloud (Minimax M3) in Settings.');
+          throw Exception(
+            'No official image generation endpoints configured. Please enter API keys for Gemini (Imagen 3) or Ollama Cloud (Minimax M3) in Settings.',
+          );
         }
       }
     }
@@ -1467,15 +1473,23 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
     if (active == AIProvider.gemini) {
       final key = await _secureStorage.getApiKey('gemini');
       if (key == null || key.isEmpty) {
-        throw Exception('Gemini API key is missing. Please configure it in Settings.');
+        throw Exception(
+          'Gemini API key is missing. Please configure it in Settings.',
+        );
       }
       final client = GeminiApiClient(
         apiKey: key,
-        model: modelOverride ?? _selectedModels[AIProvider.gemini] ?? 'imagen-3.0-generate-002',
+        model:
+            modelOverride ??
+            _selectedModels[AIProvider.gemini] ??
+            'imagen-3.0-generate-002',
       );
       return await client.generateImage(prompt);
     } else {
-      final targetModel = modelOverride ?? _selectedModels[AIProvider.ollamaCloud] ?? 'minimax-m3';
+      final targetModel =
+          modelOverride ??
+          _selectedModels[AIProvider.ollamaCloud] ??
+          'minimax-m3';
       return await _ollamaService.generateImage(prompt, model: targetModel);
     }
   }
@@ -1719,7 +1733,8 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           '[AIRouter] Attempting Anthropic key="${trimmedKey.substring(0, 10)}..."',
         );
         var model =
-            modelOverride ?? _selectedModels[AIProvider.anthropic] ??
+            modelOverride ??
+            _selectedModels[AIProvider.anthropic] ??
             'claude-3-5-sonnet-20241022';
         try {
           return await AnthropicApiClient(
@@ -1891,10 +1906,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           if (model.isEmpty && models.isNotEmpty) model = models.first;
         }
         if (model.isEmpty) return null;
-        return OpenRouterClient(
-          apiKey: key,
-          model: model,
-        ).generateStream(
+        return OpenRouterClient(apiKey: key, model: model).generateStream(
           prompt,
           systemPrompt: systemPrompt,
           maxTokens: maxTokens ?? _getMaxTokens(prompt),
@@ -1913,7 +1925,8 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
         return AnthropicApiClient(
           apiKey: trimmedKey,
           model:
-              modelOverride ?? _selectedModels[AIProvider.anthropic] ??
+              modelOverride ??
+              _selectedModels[AIProvider.anthropic] ??
               'claude-3-5-sonnet-20241022',
         ).generateStream(
           prompt,

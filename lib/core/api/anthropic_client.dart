@@ -32,7 +32,7 @@ class AnthropicApiClient {
     } catch (e) {
       debugPrint('[Anthropic] Failed to fetch models: $e');
     }
-    
+
     // Fallback if API fails or isn't supported yet
     return [
       'claude-sonnet-4-5',
@@ -46,10 +46,16 @@ class AnthropicApiClient {
     ];
   }
 
-  Stream<String> generateStream(String prompt, {String? systemPrompt, int maxTokens = 16000}) async* {
+  Stream<String> generateStream(
+    String prompt, {
+    String? systemPrompt,
+    int maxTokens = 16000,
+  }) async* {
     final client = http.Client();
     try {
-      debugPrint('[Anthropic] key (prefix)="${apiKey.substring(0, 10)}..." model=$model (Stream)');
+      debugPrint(
+        '[Anthropic] key (prefix)="${apiKey.substring(0, 10)}..." model=$model (Stream)',
+      );
       final request = http.Request('POST', Uri.parse('$baseUrl/messages'));
       request.headers.addAll({
         'x-api-key': apiKey,
@@ -61,7 +67,7 @@ class AnthropicApiClient {
         'max_tokens': maxTokens,
         'system': systemPrompt ?? 'You are a helpful AI assistant.',
         'messages': [
-          {'role': 'user', 'content': prompt}
+          {'role': 'user', 'content': prompt},
         ],
         'stream': true,
       });
@@ -70,7 +76,9 @@ class AnthropicApiClient {
 
       if (streamedResponse.statusCode != 200) {
         final body = await streamedResponse.stream.bytesToString();
-        throw Exception('Anthropic API Error: ${streamedResponse.statusCode} $body');
+        throw Exception(
+          'Anthropic API Error: ${streamedResponse.statusCode} $body',
+        );
       }
 
       final stream = streamedResponse.stream
@@ -95,8 +103,14 @@ class AnthropicApiClient {
     }
   }
 
-  Future<String> generate(String prompt, {String? systemPrompt, int maxTokens = 16000}) async {
-    debugPrint('[Anthropic] key (prefix)="${apiKey.substring(0, 10)}..." model=$model (Static)');
+  Future<String> generate(
+    String prompt, {
+    String? systemPrompt,
+    int maxTokens = 16000,
+  }) async {
+    debugPrint(
+      '[Anthropic] key (prefix)="${apiKey.substring(0, 10)}..." model=$model (Static)',
+    );
     final response = await http.post(
       Uri.parse('$baseUrl/messages'),
       headers: {
@@ -109,13 +123,15 @@ class AnthropicApiClient {
         'max_tokens': maxTokens,
         'system': systemPrompt ?? 'You are a helpful AI assistant.',
         'messages': [
-          {'role': 'user', 'content': prompt}
+          {'role': 'user', 'content': prompt},
         ],
       }),
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Anthropic API Error: ${response.statusCode} ${response.body}');
+      throw Exception(
+        'Anthropic API Error: ${response.statusCode} ${response.body}',
+      );
     }
 
     final json = jsonDecode(response.body);

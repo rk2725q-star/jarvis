@@ -5,14 +5,14 @@ import '../../core/router/ai_router.dart';
 class DiagramService {
   Future<String> generateDiagram(AIRouter router, String userRequest) async {
     final systemPrompt = _buildPrompt(userRequest);
-    
+
     String response = await router.generate(
       userRequest,
       systemPrompt: systemPrompt,
       providerOverride: AIProvider.ollamaCloud,
       modelOverride: 'minimax-m3',
     );
-    
+
     // Extract JSON block using robust substring matching
     String jsonText = response;
     if (response.contains('```json')) {
@@ -20,7 +20,7 @@ class DiagramService {
     } else if (response.contains('```')) {
       jsonText = response.split('```').last.split('```').first.trim();
     }
-    
+
     // Strip comments and isolate the JSON object bounds
     String cleanJsonText = _stripJsonComments(jsonText).trim();
     final firstBrace = cleanJsonText.indexOf('{');
@@ -28,13 +28,15 @@ class DiagramService {
     if (firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace) {
       cleanJsonText = cleanJsonText.substring(firstBrace, lastBrace + 1);
     }
-    
+
     try {
       final Map<String, dynamic> parsed = jsonDecode(cleanJsonText);
       final title = parsed['title']?.toString() ?? 'Process Flowchart';
-      final description = parsed['description']?.toString() ?? 'Visual representation of the process';
+      final description =
+          parsed['description']?.toString() ??
+          'Visual representation of the process';
       final List<dynamic> nodesRaw = parsed['nodes'] ?? [];
-      
+
       final List<Map<String, String>> nodes = [];
       for (final n in nodesRaw) {
         if (n is Map) {
@@ -46,10 +48,12 @@ class DiagramService {
           });
         }
       }
-      
+
       return compileHtmlDiagram(title, description, nodes);
     } catch (e) {
-      debugPrint("Diagram JSON parsing failed: $e. Falling back to default generation.");
+      debugPrint(
+        "Diagram JSON parsing failed: $e. Falling back to default generation.",
+      );
       debugPrint("Attempted clean JSON: $cleanJsonText");
       // Fallback: If JSON fails, treat response as raw HTML/plain string
       if (response.contains('<!DOCTYPE html>') || response.contains('<html>')) {
@@ -63,7 +67,11 @@ class DiagramService {
     }
   }
 
-  String compileHtmlFallback({required String title, required String description, required String content}) {
+  String compileHtmlFallback({
+    required String title,
+    required String description,
+    required String content,
+  }) {
     final cleanContent = content.replaceAll('\n', '<br>');
     return '''
 <!DOCTYPE html>
@@ -137,9 +145,13 @@ class DiagramService {
     ''';
   }
 
-  String compileHtmlDiagram(String title, String description, List<Map<String, String>> nodes) {
+  String compileHtmlDiagram(
+    String title,
+    String description,
+    List<Map<String, String>> nodes,
+  ) {
     final sb = StringBuffer();
-    
+
     sb.writeln('''
 <!DOCTYPE html>
 <html lang="en">
@@ -378,7 +390,7 @@ class DiagramService {
       final nodeTitle = node['title'] ?? 'Step ${i + 1}';
       final nodeDesc = node['description'] ?? '';
       final delay = (0.1 * (i + 1)).toStringAsFixed(2);
-      
+
       // Add connector if not the first card
       if (i > 0) {
         final prevColor = nodes[i - 1]['color'] ?? '#7C5CFC';
@@ -386,7 +398,7 @@ class DiagramService {
     <div class="connector" style="--prev-color: $prevColor; --next-color: $color; animation-delay: ${delay}s;"></div>
 ''');
       }
-      
+
       sb.writeln('''
     <div class="card" onclick="toggleCard(this)" style="--accent-color: $color; --accent-glow: $glow; --accent-bg: ${color}1C; --accent-border: ${color}33; animation-delay: ${delay}s;">
       <div class="card-step" style="position: absolute; right: 16px; top: 12px; font-size: 9px; font-weight: 800; color: $color; opacity: 0.8; font-family: monospace; letter-spacing: 1.5px;">STAGE 0${i + 1}</div>
@@ -418,7 +430,7 @@ class DiagramService {
 </body>
 </html>
 ''');
-    
+
     return sb.toString();
   }
 
@@ -435,7 +447,8 @@ class DiagramService {
           line = line.substring(0, commentIdx);
         } else {
           // If URL protocol exists, strip only if // is elsewhere
-          if (!line.contains('://') || line.lastIndexOf('//') > line.indexOf('://') + 1) {
+          if (!line.contains('://') ||
+              line.lastIndexOf('//') > line.indexOf('://') + 1) {
             line = line.substring(0, commentIdx);
           }
         }

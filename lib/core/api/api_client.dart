@@ -8,13 +8,16 @@ class ApiClient {
   final _storage = const FlutterSecureStorage();
 
   ApiClient._() {
-    _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 60),
-      sendTimeout: const Duration(seconds: 30),
-    ))
-      ..interceptors.add(LogInterceptor(responseBody: false))
-      ..interceptors.add(_RetryInterceptor(retries: 3));
+    _dio =
+        Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 30),
+              receiveTimeout: const Duration(seconds: 60),
+              sendTimeout: const Duration(seconds: 30),
+            ),
+          )
+          ..interceptors.add(LogInterceptor(responseBody: false))
+          ..interceptors.add(_RetryInterceptor(retries: 3));
   }
 
   static ApiClient get instance => _instance ??= ApiClient._();
@@ -68,10 +71,17 @@ class ApiClient {
       _storage.read(key: 'api_key_$provider');
 
   ApiException _mapError(DioException e) => switch (e.type) {
-    DioExceptionType.connectionTimeout => ApiException('Connection timeout. Check internet.'),
-    DioExceptionType.receiveTimeout    => ApiException('Server took too long. Try again.'),
-    DioExceptionType.cancel            => ApiException('Request cancelled.', isCancelled: true),
-    _                                  => ApiException(e.message ?? 'Unknown error'),
+    DioExceptionType.connectionTimeout => ApiException(
+      'Connection timeout. Check internet.',
+    ),
+    DioExceptionType.receiveTimeout => ApiException(
+      'Server took too long. Try again.',
+    ),
+    DioExceptionType.cancel => ApiException(
+      'Request cancelled.',
+      isCancelled: true,
+    ),
+    _ => ApiException(e.message ?? 'Unknown error'),
   };
 }
 
@@ -79,7 +89,8 @@ class ApiException implements Exception {
   final String message;
   final bool isCancelled;
   const ApiException(this.message, {this.isCancelled = false});
-  @override String toString() => message;
+  @override
+  String toString() => message;
 }
 
 class _RetryInterceptor extends Interceptor {
@@ -104,7 +115,7 @@ class _RetryInterceptor extends Interceptor {
   }
 
   bool _isRetryable(DioException e) =>
-    e.type == DioExceptionType.connectionTimeout ||
-    e.type == DioExceptionType.receiveTimeout ||
-    (e.response?.statusCode ?? 0) >= 500;
+      e.type == DioExceptionType.connectionTimeout ||
+      e.type == DioExceptionType.receiveTimeout ||
+      (e.response?.statusCode ?? 0) >= 500;
 }

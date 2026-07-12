@@ -13,7 +13,14 @@ class AssignmentScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: JarvisColors.bg,
       appBar: AppBar(
-        title: const Text('ASSIGNMENT HUB', style: TextStyle(letterSpacing: 2, fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'ASSIGNMENT HUB',
+          style: TextStyle(
+            letterSpacing: 2,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -25,11 +32,21 @@ class AssignmentScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.school_outlined, size: 80, color: Colors.white10),
+                  const Icon(
+                    Icons.school_outlined,
+                    size: 80,
+                    color: Colors.white10,
+                  ),
                   const SizedBox(height: 16),
-                  const Text('No assignments yet.', style: TextStyle(color: Colors.white24)),
+                  const Text(
+                    'No assignments yet.',
+                    style: TextStyle(color: Colors.white24),
+                  ),
                   const SizedBox(height: 4),
-                  const Text('Ask JARVIS to "Add an assignment"', style: TextStyle(color: Colors.white10, fontSize: 10)),
+                  const Text(
+                    'Ask JARVIS to "Add an assignment"',
+                    style: TextStyle(color: Colors.white10, fontSize: 10),
+                  ),
                 ],
               ),
             );
@@ -40,7 +57,10 @@ class AssignmentScreen extends StatelessWidget {
             itemCount: provider.assignments.length,
             itemBuilder: (context, i) {
               final a = provider.assignments[i];
-              return _AssignmentCard(assignment: a).animate().fadeIn(delay: Duration(milliseconds: i * 100)).slideX(begin: 0.1, end: 0);
+              return _AssignmentCard(assignment: a)
+                  .animate()
+                  .fadeIn(delay: Duration(milliseconds: i * 100))
+                  .slideX(begin: 0.1, end: 0);
             },
           );
         },
@@ -62,23 +82,39 @@ class AssignmentScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: JarvisColors.surfaceElevated,
-        title: const Text('New Assignment', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'New Assignment',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: tController, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Title')),
-            TextField(controller: dController, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Description')),
+            TextField(
+              controller: tController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            TextField(
+              controller: dController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(labelText: 'Description'),
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
-              context.read<AssignmentProvider>().addAssignment(Assignment(
-                title: tController.text,
-                description: dController.text,
-                dueDate: DateTime.now().add(const Duration(days: 7)),
-              ));
+              context.read<AssignmentProvider>().addAssignment(
+                Assignment(
+                  title: tController.text,
+                  description: dController.text,
+                  dueDate: DateTime.now().add(const Duration(days: 7)),
+                ),
+              );
               Navigator.pop(ctx);
             },
             child: const Text('Build'),
@@ -119,7 +155,11 @@ class _AssignmentCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   assignment.title,
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               Checkbox(
@@ -132,14 +172,22 @@ class _AssignmentCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             assignment.description,
-            style: const TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 13,
+              height: 1.5,
+            ),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 20),
           Row(
             children: [
-              const Icon(Icons.calendar_today_rounded, size: 12, color: JarvisColors.accentPrimary),
+              const Icon(
+                Icons.calendar_today_rounded,
+                size: 12,
+                color: JarvisColors.accentPrimary,
+              ),
               const SizedBox(width: 8),
               Text(
                 'Due in 7 days', // Should be calculated
@@ -150,15 +198,27 @@ class _AssignmentCard extends StatelessWidget {
                 TextButton.icon(
                   onPressed: () => provider.exportToGoogleDoc(assignment),
                   icon: const Icon(Icons.cloud_upload_outlined, size: 14),
-                  label: const Text('Save to GDocs', style: TextStyle(fontSize: 10)),
-                  style: TextButton.styleFrom(foregroundColor: JarvisColors.accentPrimary),
+                  label: const Text(
+                    'Save to GDocs',
+                    style: TextStyle(fontSize: 10),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: JarvisColors.accentPrimary,
+                  ),
                 )
               else
                 const Row(
                   children: [
-                    Icon(Icons.check_circle_rounded, size: 12, color: Colors.greenAccent),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 12,
+                      color: Colors.greenAccent,
+                    ),
                     SizedBox(width: 4),
-                    Text('Synced', style: TextStyle(color: Colors.greenAccent, fontSize: 10)),
+                    Text(
+                      'Synced',
+                      style: TextStyle(color: Colors.greenAccent, fontSize: 10),
+                    ),
                   ],
                 ),
             ],

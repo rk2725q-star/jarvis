@@ -216,6 +216,6 @@ class BrowserAdBlockRules {
     "quantcast.com",
     "push.notifications.com",
     "pushwoosh.com",
-    "onesignal.com"
+    "onesignal.com",
   ];
 }

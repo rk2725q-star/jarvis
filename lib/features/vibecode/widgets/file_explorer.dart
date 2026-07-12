@@ -21,7 +21,11 @@ class FileExplorerPanel extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                const Icon(Icons.folder_open, color: Color(0xFF7C3AED), size: 14),
+                const Icon(
+                  Icons.folder_open,
+                  color: Color(0xFF7C3AED),
+                  size: 14,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -92,7 +96,9 @@ class _FileItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        color: isSelected ? const Color(0xFF7C3AED).withValues(alpha: 0.2) : Colors.transparent,
+        color: isSelected
+            ? const Color(0xFF7C3AED).withValues(alpha: 0.2)
+            : Colors.transparent,
         child: Row(
           children: [
             Icon(_fileIcon, size: 14, color: _fileColor),
@@ -144,7 +150,10 @@ class _CodeEditorPanelState extends State<CodeEditorPanel> {
           children: [
             Icon(Icons.code_off_rounded, size: 48, color: Colors.white10),
             SizedBox(height: 16),
-            Text('Select a file to view or edit code', style: TextStyle(color: Colors.white38)),
+            Text(
+              'Select a file to view or edit code',
+              style: TextStyle(color: Colors.white38),
+            ),
           ],
         ),
       );
@@ -166,16 +175,29 @@ class _CodeEditorPanelState extends State<CodeEditorPanel> {
             color: const Color(0xFF1E1E2E),
             child: Row(
               children: [
-                const Icon(Icons.code_rounded, size: 14, color: Color(0xFF7C3AED)),
+                const Icon(
+                  Icons.code_rounded,
+                  size: 14,
+                  color: Color(0xFF7C3AED),
+                ),
                 const SizedBox(width: 8),
                 Text(
                   file.path,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const Spacer(),
                 const Text(
                   'READ-WRITE MODE',
-                  style: TextStyle(color: Colors.greenAccent, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 1),
+                  style: TextStyle(
+                    color: Colors.greenAccent,
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Text(

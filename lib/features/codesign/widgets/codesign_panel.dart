@@ -29,7 +29,8 @@ class CodesignPanel extends StatefulWidget {
   State<CodesignPanel> createState() => _CodesignPanelState();
 }
 
-class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProviderStateMixin {
+class _CodesignPanelState extends State<CodesignPanel>
+    with SingleTickerProviderStateMixin {
   final _promptController = TextEditingController();
   final _editController = TextEditingController();
   InAppWebViewController? _webViewController;
@@ -62,7 +63,8 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
 
   String get activeHtml {
     if (widget.artifact == null) return '';
-    if (_historyIndex == -1 || _historyIndex >= widget.artifact!.history.length) {
+    if (_historyIndex == -1 ||
+        _historyIndex >= widget.artifact!.history.length) {
       return widget.artifact!.htmlContent;
     }
     return widget.artifact!.history[_historyIndex];
@@ -100,7 +102,9 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
 
     if (_webViewController != null) {
       final jsonStr = jsonEncode(_tweakTokens);
-      _webViewController!.evaluateJavascript(source: """
+      _webViewController!.evaluateJavascript(
+        source:
+            """
         if (typeof applyTweaks === 'function') {
           applyTweaks($jsonStr);
         } else {
@@ -116,7 +120,8 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
             }
           });
         }
-      """);
+      """,
+      );
     }
   }
 
@@ -159,7 +164,8 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                   ),
                 ),
                 const Spacer(),
-                if (widget.artifact != null && widget.artifact!.history.isNotEmpty)
+                if (widget.artifact != null &&
+                    widget.artifact!.history.isNotEmpty)
                   _buildHistoryDropdown(),
               ],
             ),
@@ -168,7 +174,14 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
             const SizedBox(height: 16),
 
             // Prompt input
-            const Text('Prompt / Visual Concept', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+            const Text(
+              'Prompt / Visual Concept',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 6),
             TextField(
               controller: _promptController,
@@ -196,7 +209,14 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
             const SizedBox(height: 12),
 
             // Type chips selector
-            const Text('Layout Category', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+            const Text(
+              'Layout Category',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 6),
             _buildTypeSelector(),
             const SizedBox(height: 16),
@@ -206,19 +226,38 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
               width: double.infinity,
               height: 46,
               child: ElevatedButton.icon(
-                onPressed: widget.isLoading ? null : () => widget.onGenerate(
-                  CodesignRequest(prompt: _promptController.text.trim(), type: _type),
-                ),
+                onPressed: widget.isLoading
+                    ? null
+                    : () => widget.onGenerate(
+                        CodesignRequest(
+                          prompt: _promptController.text.trim(),
+                          type: _type,
+                        ),
+                      ),
                 icon: widget.isLoading
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.black,
+                        ),
+                      )
                     : const Icon(Icons.auto_fix_high, size: 18),
-                label: Text(widget.isLoading ? 'Designing...' : 'Generate Design'),
+                label: Text(
+                  widget.isLoading ? 'Designing...' : 'Generate Design',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.tealAccent,
                   foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 5,
-                  textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
@@ -231,7 +270,14 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
               const SizedBox(height: 20),
               const Divider(color: Colors.white10),
               const SizedBox(height: 8),
-              const Text('Iterate & Refine Layout', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+              const Text(
+                'Iterate & Refine Layout',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -244,7 +290,10 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                         hintStyle: const TextStyle(color: Colors.white30),
                         fillColor: const Color(0xFF1E1E2E),
                         filled: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(color: Colors.white12),
@@ -311,7 +360,11 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                 const Spacer(),
                 // Viewport select toolbar (only for Preview tab)
                 if (_activeTab == 0 && widget.artifact != null) ...[
-                  _buildViewportButton('desktop', Icons.desktop_windows, 'Desktop'),
+                  _buildViewportButton(
+                    'desktop',
+                    Icons.desktop_windows,
+                    'Desktop',
+                  ),
                   const SizedBox(width: 6),
                   _buildViewportButton('tablet', Icons.tablet_mac, 'Tablet'),
                   const SizedBox(width: 6),
@@ -325,7 +378,9 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
             child: Container(
               padding: const EdgeInsets.all(16),
               color: const Color(0xFF0F0F16),
-              child: _activeTab == 0 ? _buildViewportPreview() : _buildCodeEditor(),
+              child: _activeTab == 0
+                  ? _buildViewportPreview()
+                  : _buildCodeEditor(),
             ),
           ),
           // Export options bar
@@ -335,9 +390,7 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
     );
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F0F16),
-      ),
+      decoration: const BoxDecoration(color: Color(0xFF0F0F16)),
       child: isWide
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -352,10 +405,7 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                 children: [
                   controlSidebar,
                   const SizedBox(height: 16),
-                  SizedBox(
-                    height: 600,
-                    child: workspaceView,
-                  ),
+                  SizedBox(height: 600, child: workspaceView),
                 ],
               ),
             ),
@@ -374,7 +424,11 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
         ),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: isSelected ? Colors.black : Colors.white70),
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.black : Colors.white70,
+            ),
             const SizedBox(width: 6),
             Text(
               label,
@@ -394,12 +448,20 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
     final isSelected = _viewport == mode;
     return IconButton(
       tooltip: tooltip,
-      icon: Icon(icon, color: isSelected ? Colors.tealAccent : Colors.white60, size: 20),
+      icon: Icon(
+        icon,
+        color: isSelected ? Colors.tealAccent : Colors.white60,
+        size: 20,
+      ),
       style: IconButton.styleFrom(
-        backgroundColor: isSelected ? const Color(0xFF1E1E2E) : Colors.transparent,
+        backgroundColor: isSelected
+            ? const Color(0xFF1E1E2E)
+            : Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: isSelected ? Colors.tealAccent : Colors.transparent),
+          side: BorderSide(
+            color: isSelected ? Colors.tealAccent : Colors.transparent,
+          ),
         ),
       ),
       onPressed: () => setState(() => _viewport = mode),
@@ -411,14 +473,22 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
     final items = <DropdownMenuItem<int>>[
       DropdownMenuItem(
         value: -1,
-        child: const Text('Latest', style: TextStyle(color: Colors.white, fontSize: 12)),
+        child: const Text(
+          'Latest',
+          style: TextStyle(color: Colors.white, fontSize: 12),
+        ),
       ),
     ];
     for (var i = historyLength - 1; i >= 0; i--) {
-      items.add(DropdownMenuItem(
-        value: i,
-        child: Text('Version ${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 12)),
-      ));
+      items.add(
+        DropdownMenuItem(
+          value: i,
+          child: Text(
+            'Version ${i + 1}',
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ),
+      );
     }
 
     return Container(
@@ -473,10 +543,15 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
             });
           },
           icon: const Icon(Icons.restore, size: 14, color: Colors.tealAccent),
-          label: const Text('Restore This Version', style: TextStyle(fontSize: 11, color: Colors.tealAccent)),
+          label: const Text(
+            'Restore This Version',
+            style: TextStyle(fontSize: 11, color: Colors.tealAccent),
+          ),
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Colors.teal),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
       ),
@@ -499,11 +574,19 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
           return Padding(
             padding: const EdgeInsets.only(right: 6),
             child: ChoiceChip(
-              label: Text(labels[t]!, style: TextStyle(fontSize: 11, color: isSelected ? Colors.black : Colors.white)),
+              label: Text(
+                labels[t]!,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isSelected ? Colors.black : Colors.white,
+                ),
+              ),
               selected: isSelected,
               selectedColor: Colors.tealAccent,
               backgroundColor: const Color(0xFF1E1E2E),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               onSelected: (_) => setState(() => _type = t),
             ),
           );
@@ -544,8 +627,12 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
           ..._tweakTokens.entries.map((entry) {
             final key = entry.key;
             final val = entry.value;
-            final humanName = key.replaceAllMapped(RegExp(r'([A-Z])'), (m) => ' ${m.group(1)}').trim();
-            final label = humanName.substring(0, 1).toUpperCase() + humanName.substring(1);
+            final humanName = key
+                .replaceAllMapped(RegExp(r'([A-Z])'), (m) => ' ${m.group(1)}')
+                .trim();
+            final label =
+                humanName.substring(0, 1).toUpperCase() +
+                humanName.substring(1);
 
             if (val is bool) {
               return Padding(
@@ -553,7 +640,13 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
                     Switch(
                       value: val,
                       activeThumbColor: Colors.tealAccent,
@@ -586,14 +679,29 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                        Text(doubleVal.toStringAsFixed(1), style: const TextStyle(color: Colors.tealAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                        Text(
+                          doubleVal.toStringAsFixed(1),
+                          style: const TextStyle(
+                            color: Colors.tealAccent,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                     SliderTheme(
                       data: SliderTheme.of(context).copyWith(
                         trackHeight: 2,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 6,
+                        ),
                       ),
                       child: Slider(
                         value: doubleVal,
@@ -603,20 +711,33 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                         activeColor: Colors.tealAccent,
                         inactiveColor: Colors.white24,
                         onChanged: (newVal) {
-                          _updateTweakValue(key, val is int ? newVal.round() : newVal);
+                          _updateTweakValue(
+                            key,
+                            val is int ? newVal.round() : newVal,
+                          );
                         },
                       ),
                     ),
                   ],
                 ),
               );
-            } else if (val is String && (val.startsWith('#') || val.startsWith('rgb') || val.startsWith('hsl') || val.startsWith('oklch'))) {
+            } else if (val is String &&
+                (val.startsWith('#') ||
+                    val.startsWith('rgb') ||
+                    val.startsWith('hsl') ||
+                    val.startsWith('oklch'))) {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
                     GestureDetector(
                       onTap: () => _showColorPickerDialog(key, val),
                       child: Container(
@@ -640,18 +761,32 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
                     SizedBox(
                       width: 100,
                       height: 28,
                       child: TextField(
                         controller: TextEditingController(text: val.toString()),
                         onSubmitted: (newVal) => _updateTweakValue(key, newVal),
-                        style: const TextStyle(color: Colors.white, fontSize: 11),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
                         decoration: const InputDecoration(
-                          contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           border: OutlineInputBorder(),
-                          enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white24),
+                          ),
                         ),
                       ),
                     ),
@@ -684,7 +819,10 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
       builder: (context) {
         return AlertDialog(
           backgroundColor: const Color(0xFF1E1E2E),
-          title: const Text('Pick Tweak Color', style: TextStyle(color: Colors.white, fontSize: 14)),
+          title: const Text(
+            'Pick Tweak Color',
+            style: TextStyle(color: Colors.white, fontSize: 14),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -692,7 +830,9 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                 spacing: 8,
                 runSpacing: 8,
                 children: presets.map((colorStr) {
-                  final color = Color(int.parse(colorStr.replaceFirst('#', '0xff')));
+                  final color = Color(
+                    int.parse(colorStr.replaceFirst('#', '0xff')),
+                  );
                   return GestureDetector(
                     onTap: () {
                       Navigator.pop(context);
@@ -705,7 +845,9 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                         color: color,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: currentColor.toLowerCase() == colorStr.toLowerCase()
+                          color:
+                              currentColor.toLowerCase() ==
+                                  colorStr.toLowerCase()
                               ? Colors.white
                               : Colors.transparent,
                           width: 2,
@@ -722,8 +864,12 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                 decoration: const InputDecoration(
                   labelText: 'Custom Hex Color',
                   labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white30)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.tealAccent)),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white30),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.tealAccent),
+                  ),
                 ),
               ),
             ],
@@ -731,21 +877,30 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white70),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
                 final txt = hexController.text.trim();
-                if (txt.startsWith('#') && (txt.length == 7 || txt.length == 9 || txt.length == 4)) {
+                if (txt.startsWith('#') &&
+                    (txt.length == 7 || txt.length == 9 || txt.length == 4)) {
                   Navigator.pop(context);
                   _updateTweakValue(key, txt);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invalid Hex Color format (e.g. #6366F1)')),
+                    const SnackBar(
+                      content: Text('Invalid Hex Color format (e.g. #6366F1)'),
+                    ),
                   );
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.tealAccent,
+                foregroundColor: Colors.black,
+              ),
               child: const Text('Save'),
             ),
           ],
@@ -765,9 +920,7 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
     }
 
     final webView = InAppWebView(
-      initialData: InAppWebViewInitialData(
-        data: activeHtml,
-      ),
+      initialData: InAppWebViewInitialData(data: activeHtml),
       onWebViewCreated: (controller) {
         _webViewController = controller;
         controller.loadData(data: activeHtml);
@@ -797,7 +950,11 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
-                    const BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.5), blurRadius: 20, offset: Offset(0, 10))
+                    const BoxShadow(
+                      color: Color.fromRGBO(0, 0, 0, 0.5),
+                      blurRadius: 20,
+                      offset: Offset(0, 10),
+                    ),
                   ],
                   border: Border.all(color: Colors.white24, width: 2),
                 ),
@@ -834,7 +991,11 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
         borderRadius: BorderRadius.circular(36),
         border: Border.all(color: const Color(0xFF2C2C3E), width: 8),
         boxShadow: [
-          const BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.6), blurRadius: 24, offset: Offset(0, 12)),
+          const BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.6),
+            blurRadius: 24,
+            offset: Offset(0, 12),
+          ),
         ],
       ),
       child: ClipRRect(
@@ -861,7 +1022,10 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                     child: Container(
                       width: 6,
                       height: 6,
-                      decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+                      decoration: const BoxDecoration(
+                        color: Colors.black,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
                 ),
@@ -876,7 +1040,10 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
   Widget _buildCodeEditor() {
     if (widget.artifact == null) {
       return const Center(
-        child: Text('No code available.', style: TextStyle(color: Colors.white38, fontSize: 13)),
+        child: Text(
+          'No code available.',
+          style: TextStyle(color: Colors.white38, fontSize: 13),
+        ),
       );
     }
 
@@ -893,13 +1060,23 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: const BoxDecoration(
               color: Color(0xFF1E1E2E),
-              borderRadius: BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
             ),
             child: Row(
               children: [
                 const Icon(Icons.code, color: Colors.tealAccent, size: 16),
                 const SizedBox(width: 8),
-                const Text('Source Code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                const Text(
+                  'Source Code',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
                 const Spacer(),
                 IconButton(
                   tooltip: 'Copy Code',
@@ -937,18 +1114,30 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Color(0xFF141420),
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        ),
       ),
       child: Row(
         children: [
           Expanded(
             child: OutlinedButton.icon(
               onPressed: () => widget.onExport?.call(widget.artifact!),
-              icon: const Icon(Icons.download, size: 16, color: Colors.tealAccent),
-              label: const Text('Export HTML', style: TextStyle(color: Colors.tealAccent, fontSize: 12)),
+              icon: const Icon(
+                Icons.download,
+                size: 16,
+                color: Colors.tealAccent,
+              ),
+              label: const Text(
+                'Export HTML',
+                style: TextStyle(color: Colors.tealAccent, fontSize: 12),
+              ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Colors.teal),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ),
@@ -963,11 +1152,20 @@ class _CodesignPanelState extends State<CodesignPanel> with SingleTickerProvider
                   }
                 }
               },
-              icon: const Icon(Icons.camera_alt, size: 16, color: Colors.tealAccent),
-              label: const Text('Save Screenshot', style: TextStyle(color: Colors.tealAccent, fontSize: 12)),
+              icon: const Icon(
+                Icons.camera_alt,
+                size: 16,
+                color: Colors.tealAccent,
+              ),
+              label: const Text(
+                'Save Screenshot',
+                style: TextStyle(color: Colors.tealAccent, fontSize: 12),
+              ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Colors.teal),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ),

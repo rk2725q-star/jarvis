@@ -18,12 +18,14 @@ final selectedCategoryProvider = StateProvider<AriaCategory>(
   (ref) => AriaCategory.news,
 );
 
-final categoryStreamProvider = StreamProvider.family<List<AriaSearchResult>, AriaCategory>(
-  (ref, category) {
-    final aggregator = ref.watch(aggregatorProvider);
-    return aggregator.categoryStream(category);
-  },
-);
+final categoryStreamProvider =
+    StreamProvider.family<List<AriaSearchResult>, AriaCategory>((
+      ref,
+      category,
+    ) {
+      final aggregator = ref.watch(aggregatorProvider);
+      return aggregator.categoryStream(category);
+    });
 
 class SearchState {
   final String query;
@@ -67,7 +69,9 @@ class SearchNotifier extends StateNotifier<SearchState> {
   }
 }
 
-final searchProvider = StateNotifierProvider<SearchNotifier, SearchState>((ref) {
+final searchProvider = StateNotifierProvider<SearchNotifier, SearchState>((
+  ref,
+) {
   final aggregator = ref.watch(aggregatorProvider);
   return SearchNotifier(aggregator);
 });

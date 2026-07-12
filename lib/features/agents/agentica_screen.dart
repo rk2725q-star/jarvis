@@ -24,7 +24,6 @@ class AgenticaScreen extends StatefulWidget {
 
 class _AgenticaScreenState extends State<AgenticaScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
-  
   // ── Engine ──────────────────────────────────────────────────────────
   late final AgenticaQueueManager _queueManager;
   late final AgenticaEngine _engine;
@@ -58,7 +57,7 @@ class _AgenticaScreenState extends State<AgenticaScreen>
 
   // ── Constants ───────────────────────────────────────────────────────
   static const _accCh = MethodChannel('jarvis.ai.os/accessibility');
-  
+
   static const _exampleTasks = [
     'Send a message on WhatsApp',
     'Call someone from contacts',
@@ -97,14 +96,17 @@ class _AgenticaScreenState extends State<AgenticaScreen>
     _engine.startScheduler();
 
     // Initial message
-    _addMessage(const _Msg(
-      text: '⚡ JARVIS Agentica — Universal Device Agent\n\n'
-          'I can autonomously control ANY installed app on your device.\n'
-          'I observe your screen, plan actions, and execute them step by step.\n\n'
-          'Just describe what you want done — I\'ll figure out the how.',
-      isUser: false,
-      type: 'info',
-    ));
+    _addMessage(
+      const _Msg(
+        text:
+            '⚡ JARVIS Agentica — Universal Device Agent\n\n'
+            'I can autonomously control ANY installed app on your device.\n'
+            'I observe your screen, plan actions, and execute them step by step.\n\n'
+            'Just describe what you want done — I\'ll figure out the how.',
+        isUser: false,
+        type: 'info',
+      ),
+    );
 
     _initSpeech();
     _checkAccessibilityAsync(); // Non-blocking
@@ -177,32 +179,46 @@ class _AgenticaScreenState extends State<AgenticaScreen>
             'timeout' => _AgentStatus.error,
             _ => _AgentStatus.idle,
           };
-          messages.add(_Msg(
-            text: e.message,
-            isUser: false,
-            type: s == 'done' ? 'success' : s == 'failed' ? 'error' : 'status',
-          ));
+          messages.add(
+            _Msg(
+              text: e.message,
+              isUser: false,
+              type: s == 'done'
+                  ? 'success'
+                  : s == 'failed'
+                  ? 'error'
+                  : 'status',
+            ),
+          );
           break;
         case 'tool':
           final tool = e.data['tool'] as String? ?? '';
-          final params = (e.data['params'] as Map?)?.entries
-              .map((e) => '${e.key}=${e.value}')
-              .join(', ') ?? '';
-          messages.add(_Msg(
-            text: '🔧 $tool${params.isNotEmpty ? '($params)' : ''}',
-            isUser: false,
-            type: 'tool',
-          ));
+          final params =
+              (e.data['params'] as Map?)?.entries
+                  .map((e) => '${e.key}=${e.value}')
+                  .join(', ') ??
+              '';
+          messages.add(
+            _Msg(
+              text: '🔧 $tool${params.isNotEmpty ? '($params)' : ''}',
+              isUser: false,
+              type: 'tool',
+            ),
+          );
           break;
         case 'completed':
-          messages.add(_Msg(text: '✅ Done: ${e.message}', isUser: false, type: 'success'));
+          messages.add(
+            _Msg(text: '✅ Done: ${e.message}', isUser: false, type: 'success'),
+          );
           _ttsService.speak(e.message);
           stats = stats.copyWith(done: stats.done + 1);
           status = _AgentStatus.success;
           break;
         case 'confirmation':
           confirm = e.message;
-          messages.add(_Msg(text: '❓ ${e.message}', isUser: false, type: 'confirm'));
+          messages.add(
+            _Msg(text: '❓ ${e.message}', isUser: false, type: 'confirm'),
+          );
           _ttsService.speak(e.message);
           break;
       }
@@ -240,7 +256,10 @@ class _AgenticaScreenState extends State<AgenticaScreen>
           if (status == 'done' || status == 'notListening') {
             if (_speechStateNotifier.value.isListening) {
               // Auto-restart if still in listening mode
-              Future.delayed(const Duration(milliseconds: 100), _startListening);
+              Future.delayed(
+                const Duration(milliseconds: 100),
+                _startListening,
+              );
             }
           }
         },
@@ -250,7 +269,10 @@ class _AgenticaScreenState extends State<AgenticaScreen>
           }
         },
       );
-      _speechStateNotifier.value = _SpeechState(available: available, isListening: false);
+      _speechStateNotifier.value = _SpeechState(
+        available: available,
+        isListening: false,
+      );
     } catch (_) {}
   }
 
@@ -260,9 +282,15 @@ class _AgenticaScreenState extends State<AgenticaScreen>
 
     if (current.isListening) {
       await _speech.stop();
-      _speechStateNotifier.value = _SpeechState(available: true, isListening: false);
+      _speechStateNotifier.value = _SpeechState(
+        available: true,
+        isListening: false,
+      );
     } else {
-      _speechStateNotifier.value = _SpeechState(available: true, isListening: true);
+      _speechStateNotifier.value = _SpeechState(
+        available: true,
+        isListening: true,
+      );
       _startListening();
     }
   }
@@ -318,7 +346,10 @@ class _AgenticaScreenState extends State<AgenticaScreen>
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A2E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Enable JARVIS Access', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Enable JARVIS Access',
+          style: TextStyle(color: Colors.white),
+        ),
         content: const Text(
           'Go to:\nSettings → Accessibility → Installed apps → JARVIS\n\nTurn ON the JARVIS Accessibility Service.',
           style: TextStyle(color: Color(0xFFB0B0C8), height: 1.6),
@@ -379,7 +410,7 @@ class _AgenticaScreenState extends State<AgenticaScreen>
               statsNotifier: _statsNotifier,
               onCancel: _queueManager.cancel,
             ),
-            
+
             // Accessibility: ONLY rebuilds on permission change
             ValueListenableBuilder<bool>(
               valueListenable: _accessibilityNotifier,
@@ -388,7 +419,7 @@ class _AgenticaScreenState extends State<AgenticaScreen>
                 return _AccessibilityBanner(onTap: _openAccessibilitySettings);
               },
             ),
-            
+
             // Messages: AnimatedList, isolated rebuilds
             Expanded(
               child: _MessageList(
@@ -397,7 +428,7 @@ class _AgenticaScreenState extends State<AgenticaScreen>
                 scrollController: _scrollCtrl,
               ),
             ),
-            
+
             // Example chips: ONLY shown when idle
             ValueListenableBuilder<_AgentStatus>(
               valueListenable: _statusNotifier,
@@ -406,7 +437,7 @@ class _AgenticaScreenState extends State<AgenticaScreen>
                 return _ExampleChips(tasks: _exampleTasks, onTap: _send);
               },
             ),
-            
+
             // Input: Isolated with own notifiers
             _InputBar(
               controller: _inputCtrl,
@@ -476,7 +507,7 @@ class _Header extends StatelessWidget {
                                   color: const Color(0xFF9B88FF).withAlpha(100),
                                   blurRadius: 8,
                                   spreadRadius: 2,
-                                )
+                                ),
                               ]
                             : null,
                       ),
@@ -519,18 +550,31 @@ class _Header extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (stats.running > 0)
-                    _Chip(label: '${stats.running} running', color: const Color(0xFF9B88FF)),
+                    _Chip(
+                      label: '${stats.running} running',
+                      color: const Color(0xFF9B88FF),
+                    ),
                   if (stats.done > 0)
-                    _Chip(label: '${stats.done} done', color: Colors.greenAccent),
+                    _Chip(
+                      label: '${stats.done} done',
+                      color: Colors.greenAccent,
+                    ),
                   if (stats.failed > 0)
-                    _Chip(label: '${stats.failed} failed', color: Colors.redAccent),
+                    _Chip(
+                      label: '${stats.failed} failed',
+                      color: Colors.redAccent,
+                    ),
                 ],
               );
             },
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.stop_circle_outlined, color: Colors.redAccent, size: 20),
+            icon: const Icon(
+              Icons.stop_circle_outlined,
+              color: Colors.redAccent,
+              size: 20,
+            ),
             tooltip: 'Cancel',
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
@@ -560,7 +604,11 @@ class _Chip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -591,7 +639,11 @@ class _AccessibilityBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 '⚠️ Accessibility permission needed\nTap here → Enable JARVIS in Settings → Accessibility',
-                style: TextStyle(color: Colors.amber, fontSize: 12, height: 1.5),
+                style: TextStyle(
+                  color: Colors.amber,
+                  fontSize: 12,
+                  height: 1.5,
+                ),
               ),
             ),
             Icon(Icons.chevron_right_rounded, color: Colors.amber, size: 18),
@@ -624,10 +676,7 @@ class _MessageList extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
           initialItemCount: messages.length,
           itemBuilder: (context, index, animation) {
-            return _MessageItem(
-              msg: messages[index],
-              animation: animation,
-            );
+            return _MessageItem(msg: messages[index], animation: animation);
           },
         );
       },
@@ -647,13 +696,12 @@ class _MessageItem extends StatelessWidget {
 
     return SlideTransition(
       position: animation.drive(
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero)
-          .chain(CurveTween(curve: Curves.easeOutQuad)),
+        Tween<Offset>(
+          begin: const Offset(0, 0.3),
+          end: Offset.zero,
+        ).chain(CurveTween(curve: Curves.easeOutQuad)),
       ),
-      child: FadeTransition(
-        opacity: animation,
-        child: widget,
-      ),
+      child: FadeTransition(opacity: animation, child: widget),
     );
   }
 
@@ -664,7 +712,9 @@ class _MessageItem extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8, left: 48),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: const BoxDecoration(
-          gradient: LinearGradient(colors: [Color(0xFF9B88FF), Color(0xFF6040FF)]),
+          gradient: LinearGradient(
+            colors: [Color(0xFF9B88FF), Color(0xFF6040FF)],
+          ),
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(16),
             topRight: Radius.circular(4),
@@ -725,7 +775,9 @@ class _MessageItem extends StatelessWidget {
                 msg.text,
                 style: (msg.type == 'log' || msg.type == 'tool')
                     ? GoogleFonts.jetBrainsMono(
-                        color: msg.type == 'tool' ? const Color(0xFFFFB347) : Colors.white38,
+                        color: msg.type == 'tool'
+                            ? const Color(0xFFFFB347)
+                            : Colors.white38,
                         fontSize: 11,
                       )
                     : GoogleFonts.inter(
@@ -815,11 +867,17 @@ class _InputBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFF4DD0E1).withAlpha(18),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF4DD0E1).withAlpha(70)),
+                  border: Border.all(
+                    color: const Color(0xFF4DD0E1).withAlpha(70),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.help_outline, size: 13, color: Color(0xFF4DD0E1)),
+                    const Icon(
+                      Icons.help_outline,
+                      size: 13,
+                      color: Color(0xFF4DD0E1),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -853,9 +911,15 @@ class _InputBar extends StatelessWidget {
                     onSubmitted: onSend,
                     decoration: InputDecoration(
                       hintText: 'Tell Agentica what to do...',
-                      hintStyle: GoogleFonts.inter(color: Colors.white24, fontSize: 13),
+                      hintStyle: GoogleFonts.inter(
+                        color: Colors.white24,
+                        fontSize: 13,
+                      ),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                 ),
@@ -887,8 +951,12 @@ class _InputBar extends StatelessWidget {
                         ),
                         child: Center(
                           child: Icon(
-                            state.isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                            color: state.isListening ? const Color(0xFF9B88FF) : Colors.white54,
+                            state.isListening
+                                ? Icons.mic_rounded
+                                : Icons.mic_none_rounded,
+                            color: state.isListening
+                                ? const Color(0xFF9B88FF)
+                                : Colors.white54,
                             size: 20,
                           ),
                         ),
@@ -909,7 +977,11 @@ class _InputBar extends StatelessWidget {
                     ),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.send_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
               ),
             ],
@@ -931,17 +1003,9 @@ class _TaskStats {
   final int done;
   final int failed;
 
-  const _TaskStats({
-    this.running = 0,
-    this.done = 0,
-    this.failed = 0,
-  });
+  const _TaskStats({this.running = 0, this.done = 0, this.failed = 0});
 
-  _TaskStats copyWith({
-    int? running,
-    int? done,
-    int? failed,
-  }) {
+  _TaskStats copyWith({int? running, int? done, int? failed}) {
     return _TaskStats(
       running: running ?? this.running,
       done: done ?? this.done,
@@ -954,15 +1018,9 @@ class _SpeechState {
   final bool available;
   final bool isListening;
 
-  const _SpeechState({
-    this.available = false,
-    this.isListening = false,
-  });
+  const _SpeechState({this.available = false, this.isListening = false});
 
-  _SpeechState copyWith({
-    bool? available,
-    bool? isListening,
-  }) {
+  _SpeechState copyWith({bool? available, bool? isListening}) {
     return _SpeechState(
       available: available ?? this.available,
       isListening: isListening ?? this.isListening,
@@ -974,9 +1032,5 @@ class _Msg {
   final String text;
   final bool isUser;
   final String type;
-  const _Msg({
-    required this.text,
-    required this.isUser,
-    required this.type,
-  });
+  const _Msg({required this.text, required this.isUser, required this.type});
 }

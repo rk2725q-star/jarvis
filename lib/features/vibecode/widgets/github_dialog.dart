@@ -46,7 +46,11 @@ class _GithubDialogState extends State<GithubDialog> {
                 SizedBox(width: 12),
                 Text(
                   'GitHub Export',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -63,7 +67,9 @@ class _GithubDialogState extends State<GithubDialog> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF7C3AED),
                   minimumSize: const Size(double.infinity, 44),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 onPressed: () {
                   vc.connectGithub(_tokenController.text.trim());
@@ -87,7 +93,10 @@ class _GithubDialogState extends State<GithubDialog> {
                     onChanged: (v) => setState(() => _isPrivate = v ?? false),
                     activeColor: const Color(0xFF7C3AED),
                   ),
-                  const Text('Private Repository', style: TextStyle(color: Colors.white70)),
+                  const Text(
+                    'Private Repository',
+                    style: TextStyle(color: Colors.white70),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -116,32 +125,42 @@ class _GithubDialogState extends State<GithubDialog> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF24292E),
                   minimumSize: const Size(double.infinity, 44),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                onPressed: _isExporting ? null : () async {
-                  final repoName = _repoNameController.text.trim();
-                  if (repoName.isEmpty) return;
-                  setState(() => _isExporting = true);
-                  final result = await vc.exportToGithub(
-                    repoName: repoName,
-                    description: _descController.text.trim(),
-                    isPrivate: _isPrivate,
-                  );
-                  setState(() {
-                    _isExporting = false;
-                    _resultSuccess = result['success'] == true;
-                    _resultMessage = _resultSuccess
-                        ? '✅ Exported! ${result['url']}'
-                        : '❌ ${result['error']}';
-                  });
-                },
+                onPressed: _isExporting
+                    ? null
+                    : () async {
+                        final repoName = _repoNameController.text.trim();
+                        if (repoName.isEmpty) return;
+                        setState(() => _isExporting = true);
+                        final result = await vc.exportToGithub(
+                          repoName: repoName,
+                          description: _descController.text.trim(),
+                          isPrivate: _isPrivate,
+                        );
+                        setState(() {
+                          _isExporting = false;
+                          _resultSuccess = result['success'] == true;
+                          _resultMessage = _resultSuccess
+                              ? '✅ Exported! ${result['url']}'
+                              : '❌ ${result['error']}';
+                        });
+                      },
                 child: _isExporting
                     ? const SizedBox(
                         height: 18,
                         width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Text('🐙 Export to GitHub', style: TextStyle(color: Colors.white)),
+                    : const Text(
+                        '🐙 Export to GitHub',
+                        style: TextStyle(color: Colors.white),
+                      ),
               ),
             ],
             const SizedBox(height: 8),
@@ -155,7 +174,11 @@ class _GithubDialogState extends State<GithubDialog> {
     );
   }
 
-  Widget _buildTextField(TextEditingController ctrl, String label, {bool obscure = false}) {
+  Widget _buildTextField(
+    TextEditingController ctrl,
+    String label, {
+    bool obscure = false,
+  }) {
     return TextField(
       controller: ctrl,
       obscureText: obscure,

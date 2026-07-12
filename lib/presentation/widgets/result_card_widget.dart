@@ -17,10 +17,7 @@ class ResultCardWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF161B22),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: _borderColor(),
-            width: 1,
-          ),
+          border: Border.all(color: _borderColor(), width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,7 +44,11 @@ class ResultCardWidget extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               result.title,
-              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -68,7 +69,10 @@ class ResultCardWidget extends StatelessWidget {
                 Expanded(
                   child: Text(
                     result.url,
-                    style: const TextStyle(color: Color(0xFF58A6FF), fontSize: 10),
+                    style: const TextStyle(
+                      color: Color(0xFF58A6FF),
+                      fontSize: 10,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -87,25 +91,34 @@ class ResultCardWidget extends StatelessWidget {
 
   Color _borderColor() {
     switch (result.confidenceLabel) {
-      case ConfidenceLabel.verified: return Colors.green.shade700;
-      case ConfidenceLabel.high:     return Colors.blue.shade700;
-      case ConfidenceLabel.medium:   return const Color(0xFF30363D);
-      case ConfidenceLabel.low:      return Colors.red.shade900;
+      case ConfidenceLabel.verified:
+        return Colors.green.shade700;
+      case ConfidenceLabel.high:
+        return Colors.blue.shade700;
+      case ConfidenceLabel.medium:
+        return const Color(0xFF30363D);
+      case ConfidenceLabel.low:
+        return Colors.red.shade900;
     }
   }
 
   IconData _typeIcon() {
     switch (result.resultType) {
-      case ResultType.news:          return Icons.newspaper;
-      case ResultType.instantAnswer: return Icons.auto_awesome;
-      default:                       return Icons.article;
+      case ResultType.news:
+        return Icons.newspaper;
+      case ResultType.instantAnswer:
+        return Icons.auto_awesome;
+      default:
+        return Icons.article;
     }
   }
 
   String _freshnessLabel() {
-    final diff = DateTime.now().difference(result.publishedAt ?? result.fetchedAt);
-    if (diff.inMinutes < 60)  return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24)    return '${diff.inHours}h ago';
+    final diff = DateTime.now().difference(
+      result.publishedAt ?? result.fetchedAt,
+    );
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
   }
 
@@ -132,17 +145,25 @@ class _ConfidenceBadge extends StatelessWidget {
       ),
       child: Text(
         label.name.toUpperCase(),
-        style: TextStyle(color: _color(), fontSize: 9, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: _color(),
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
 
   Color _color() {
     switch (label) {
-      case ConfidenceLabel.verified: return Colors.green;
-      case ConfidenceLabel.high:     return Colors.blue;
-      case ConfidenceLabel.medium:   return Colors.orange;
-      case ConfidenceLabel.low:      return Colors.red;
+      case ConfidenceLabel.verified:
+        return Colors.green;
+      case ConfidenceLabel.high:
+        return Colors.blue;
+      case ConfidenceLabel.medium:
+        return Colors.orange;
+      case ConfidenceLabel.low:
+        return Colors.red;
     }
   }
 }

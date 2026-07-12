@@ -8,8 +8,7 @@ class ImagiyaService {
   final AIRouter _router;
   static const _uuid = Uuid();
 
-  ImagiyaService({required AIRouter router})
-      : _router = router;
+  ImagiyaService({required AIRouter router}) : _router = router;
 
   /// Stream-based generation — emits status updates
   Stream<GeneratedImage> generate(ImagiyaPrompt prompt) async* {
@@ -68,8 +67,5 @@ class ImagiyaService {
   }
 
   /// Available free models
-  static const availableModels = [
-    'minimax-m3',
-    'imagen-3.0-generate-002',
-  ];
+  static const availableModels = ['minimax-m3', 'imagen-3.0-generate-002'];
 }

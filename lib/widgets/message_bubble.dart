@@ -32,12 +32,12 @@ import 'jarvis_pdf_button.dart';
 // ── Model DNA config (emoji + short label + accent color) ──
 const _dnaConfig = [
   _DnaInfo('claude-sonnet-4-6', '⚡', 'Sonnet 4.6', Color(0xFFFF8C00)),
-  _DnaInfo('claude-opus-4-6',  '🧠', 'Opus 4.6',   Color(0xFF7C3AED)),
-  _DnaInfo('claude-opus-4-7',  '🔬', 'Opus 4.7',   Color(0xFF06B6D4)),
-  _DnaInfo('claude-opus-4-8',  '🏆', 'Opus 4.8',   Color(0xFFFFD700)),
-  _DnaInfo('gemini-3-5-flash', '🚀', 'Flash 3.5',  Color(0xFF4285F4)),
-  _DnaInfo('gpt-5-5',          '🧩', 'GPT 5.5',    Color(0xFF00A67E)),
-  _DnaInfo('kimi-k2-6',        '🌊', 'Kimi K2.6',  Color(0xFF0EA5E9)),
+  _DnaInfo('claude-opus-4-6', '🧠', 'Opus 4.6', Color(0xFF7C3AED)),
+  _DnaInfo('claude-opus-4-7', '🔬', 'Opus 4.7', Color(0xFF06B6D4)),
+  _DnaInfo('claude-opus-4-8', '🏆', 'Opus 4.8', Color(0xFFFFD700)),
+  _DnaInfo('gemini-3-5-flash', '🚀', 'Flash 3.5', Color(0xFF4285F4)),
+  _DnaInfo('gpt-5-5', '🧩', 'GPT 5.5', Color(0xFF00A67E)),
+  _DnaInfo('kimi-k2-6', '🌊', 'Kimi K2.6', Color(0xFF0EA5E9)),
 ];
 
 class _DnaInfo {
@@ -47,6 +47,7 @@ class _DnaInfo {
   final Color color;
   const _DnaInfo(this.id, this.emoji, this.label, this.color);
 }
+
 class MessageBubble extends StatelessWidget {
   final Message message;
 
@@ -54,24 +55,35 @@ class MessageBubble extends StatelessWidget {
 
   Color _providerColor(String? provider) {
     switch (provider?.toLowerCase()) {
-      case 'gemini': return JarvisColors.geminiColor;
-      case 'ollama': return JarvisColors.ollamaColor;
-      case 'nvidia': return JarvisColors.nvidiaColor;
-      case 'deepseek': return JarvisColors.deepseekColor;
-      case 'local': return JarvisColors.localColor;
-      default: return JarvisColors.accentPrimary;
+      case 'gemini':
+        return JarvisColors.geminiColor;
+      case 'ollama':
+        return JarvisColors.ollamaColor;
+      case 'nvidia':
+        return JarvisColors.nvidiaColor;
+      case 'deepseek':
+        return JarvisColors.deepseekColor;
+      case 'local':
+        return JarvisColors.localColor;
+      default:
+        return JarvisColors.accentPrimary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (message.isUser) {
-      if (message.provider != null && message.provider!.isNotEmpty &&
-          message.provider != 'imagiya' && message.provider != 'codesign') {
+      if (message.provider != null &&
+          message.provider!.isNotEmpty &&
+          message.provider != 'imagiya' &&
+          message.provider != 'codesign') {
         return Column(
           children: [
             _UserBubble(message: message),
-            _InlineIntegrationBrowser(integrationId: message.provider!, query: message.content),
+            _InlineIntegrationBrowser(
+              integrationId: message.provider!,
+              query: message.content,
+            ),
           ],
         );
       }
@@ -113,7 +125,10 @@ class MessageBubble extends StatelessWidget {
         child: IntegrationCardBubble(rawContent: message.content),
       );
     } else {
-      return _AIBubble(message: message, providerColor: _providerColor(message.provider));
+      return _AIBubble(
+        message: message,
+        providerColor: _providerColor(message.provider),
+      );
     }
   }
 }
@@ -122,10 +137,14 @@ class _InlineIntegrationBrowser extends StatefulWidget {
   final String integrationId;
   final String query;
 
-  const _InlineIntegrationBrowser({required this.integrationId, required this.query});
+  const _InlineIntegrationBrowser({
+    required this.integrationId,
+    required this.query,
+  });
 
   @override
-  State<_InlineIntegrationBrowser> createState() => _InlineIntegrationBrowserState();
+  State<_InlineIntegrationBrowser> createState() =>
+      _InlineIntegrationBrowserState();
 }
 
 class _InlineIntegrationBrowserState extends State<_InlineIntegrationBrowser> {
@@ -134,9 +153,9 @@ class _InlineIntegrationBrowserState extends State<_InlineIntegrationBrowser> {
   @override
   Widget build(BuildContext context) {
     final integration = kAIIntegrations.cast<AIIntegration?>().firstWhere(
-          (i) => i?.id == widget.integrationId,
-          orElse: () => null,
-        );
+      (i) => i?.id == widget.integrationId,
+      orElse: () => null,
+    );
     if (integration == null) return const SizedBox.shrink();
 
     final launchUrl = integration.buildTaskUrl(widget.query);
@@ -146,47 +165,58 @@ class _InlineIntegrationBrowserState extends State<_InlineIntegrationBrowser> {
     }
 
     return Container(
-      width: double.infinity,
-      height: MediaQuery.of(context).size.height * 0.68,
-      margin: const EdgeInsets.only(top: 8, bottom: 24, left: 4, right: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: JarvisColors.border, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: integration.gradientColors.isNotEmpty 
-                ? Color(integration.gradientColors.first).withValues(alpha: 0.1)
-                : Colors.black26,
-            blurRadius: 20,
-          )
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          InAppWebView(
-            initialUrlRequest: URLRequest(url: WebUri(launchUrl)),
-            gestureRecognizers: {
-              Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
-              Factory<HorizontalDragGestureRecognizer>(() => HorizontalDragGestureRecognizer()),
-              Factory<ScaleGestureRecognizer>(() => ScaleGestureRecognizer()),
-            },
-            initialSettings: InAppWebViewSettings(
-              useWideViewPort: true,
-              loadWithOverviewMode: true,
-              javaScriptEnabled: true,
-              transparentBackground: true,
-              preferredContentMode: UserPreferredContentMode.MOBILE,
-              supportZoom: true,
-            ),
-            onLoadStop: (controller, url) async {
-              if (!_hasInjected && widget.query.isNotEmpty) {
-                _hasInjected = true;
-                
-                // Human-like typewriting simulation to bypass detection and wait 2 seconds
-                String query = widget.query.replaceAll('"', '\\"').replaceAll('\n', '\\n');
-                String script = '''
+          width: double.infinity,
+          height: MediaQuery.of(context).size.height * 0.68,
+          margin: const EdgeInsets.only(top: 8, bottom: 24, left: 4, right: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0A0F),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: JarvisColors.border, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: integration.gradientColors.isNotEmpty
+                    ? Color(
+                        integration.gradientColors.first,
+                      ).withValues(alpha: 0.1)
+                    : Colors.black26,
+                blurRadius: 20,
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              InAppWebView(
+                initialUrlRequest: URLRequest(url: WebUri(launchUrl)),
+                gestureRecognizers: {
+                  Factory<VerticalDragGestureRecognizer>(
+                    () => VerticalDragGestureRecognizer(),
+                  ),
+                  Factory<HorizontalDragGestureRecognizer>(
+                    () => HorizontalDragGestureRecognizer(),
+                  ),
+                  Factory<ScaleGestureRecognizer>(
+                    () => ScaleGestureRecognizer(),
+                  ),
+                },
+                initialSettings: InAppWebViewSettings(
+                  useWideViewPort: true,
+                  loadWithOverviewMode: true,
+                  javaScriptEnabled: true,
+                  transparentBackground: true,
+                  preferredContentMode: UserPreferredContentMode.MOBILE,
+                  supportZoom: true,
+                ),
+                onLoadStop: (controller, url) async {
+                  if (!_hasInjected && widget.query.isNotEmpty) {
+                    _hasInjected = true;
+
+                    // Human-like typewriting simulation to bypass detection and wait 2 seconds
+                    String query = widget.query
+                        .replaceAll('"', '\\"')
+                        .replaceAll('\n', '\\n');
+                    String script =
+                        '''
                   (async function() {
                     const humanType = async (el, text) => {
                       el.focus();
@@ -240,41 +270,64 @@ class _InlineIntegrationBrowserState extends State<_InlineIntegrationBrowser> {
                     }
                   })();
                 ''';
-                await controller.evaluateJavascript(source: script);
-              }
-            },
-          ),
-          Positioned(
-            bottom: 8,
-            right: 8,
-            child: GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => IntegrationBrowserScreen(integration: integration)),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Row(
-                  children: [
-                    Text(integration.emoji, style: const TextStyle(fontSize: 14)),
-                    const SizedBox(width: 6),
-                    Text(integration.name, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.open_in_new, color: Colors.white54, size: 12),
-                  ],
+                    await controller.evaluateJavascript(source: script);
+                  }
+                },
+              ),
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            IntegrationBrowserScreen(integration: integration),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          integration.emoji,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          integration.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.open_in_new,
+                          color: Colors.white54,
+                          size: 12,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0, curve: Curves.easeOut);
+        )
+        .animate()
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.1, end: 0, curve: Curves.easeOut);
   }
 }
 
@@ -314,16 +367,25 @@ class _ImagiyaImageBubbleState extends State<_ImagiyaImageBubble> {
     setState(() => _saving = true);
     try {
       final bytes = await _getImageBytes();
-      await Gal.putImageBytes(bytes, name: 'jarvis_imagiya_${DateTime.now().millisecondsSinceEpoch}');
+      await Gal.putImageBytes(
+        bytes,
+        name: 'jarvis_imagiya_${DateTime.now().millisecondsSinceEpoch}',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Image saved to gallery!'), backgroundColor: Color(0xFF22C55E)),
+          const SnackBar(
+            content: Text('✅ Image saved to gallery!'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Save failed: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -337,18 +399,29 @@ class _ImagiyaImageBubbleState extends State<_ImagiyaImageBubble> {
       final bytes = await _getImageBytes();
       final pdfDoc = pw.Document();
       final image = pw.MemoryImage(bytes);
-      pdfDoc.addPage(pw.Page(build: (pw.Context context) {
-        return pw.Center(child: pw.Image(image));
-      }));
+      pdfDoc.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Center(child: pw.Image(image));
+          },
+        ),
+      );
       final pdfBytes = await pdfDoc.save();
       final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/imagiya_image_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      final file = File(
+        '${tempDir.path}/imagiya_image_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
       await file.writeAsBytes(pdfBytes, flush: true);
-      await Share.shareXFiles([XFile(file.path, mimeType: 'application/pdf')], subject: 'JARVIS Imagiya PDF');
+      await Share.shareXFiles([
+        XFile(file.path, mimeType: 'application/pdf'),
+      ], subject: 'JARVIS Imagiya PDF');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PDF Export failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('PDF Export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -357,108 +430,157 @@ class _ImagiyaImageBubbleState extends State<_ImagiyaImageBubble> {
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.90),
-        margin: const EdgeInsets.only(left: 16, right: 8, bottom: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Provider badge
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: widget.providerColor)),
-                  const SizedBox(width: 8),
-                  Text(widget.label, style: TextStyle(color: widget.providerColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.0)),
-                ],
-              ),
+          alignment: Alignment.centerLeft,
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.90,
             ),
-            // Image with rounded corners
-            if (widget.imageUrl.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: widget.imageUrl.startsWith('data:image/')
-                    ? Image.memory(
-                        base64Decode(widget.imageUrl.split(',').last),
-                        fit: BoxFit.contain,
-                      )
-                    : Image.network(
-                        widget.imageUrl,
-                        fit: BoxFit.contain,
-                        loadingBuilder: (ctx, child, progress) {
-                          if (progress == null) return child;
-                          return Container(
-                            height: 220,
-                            decoration: BoxDecoration(color: const Color(0xFF1A1A2E), borderRadius: BorderRadius.circular(16)),
-                            child: Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  CircularProgressIndicator(
-                                    value: progress.expectedTotalBytes != null
-                                        ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                        : null,
-                                    color: widget.providerColor,
-                                    strokeWidth: 2,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text('Generating image...', style: TextStyle(color: widget.providerColor.withValues(alpha: 0.7), fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (ctx, err, st) => Container(
-                          height: 100,
-                          decoration: BoxDecoration(color: const Color(0xFF1A1A2E), borderRadius: BorderRadius.circular(16)),
-                          child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white30, size: 40)),
+            margin: const EdgeInsets.only(left: 16, right: 8, bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Provider badge
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: widget.providerColor,
                         ),
                       ),
-              ),
-            const SizedBox(height: 10),
-            // Action bar
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _ImageActionBtn(
-                  icon: _saving ? Icons.hourglass_top_rounded : Icons.download_rounded,
-                  label: _saving ? 'Saving...' : 'Download',
-                  color: const Color(0xFF22C55E),
-                  onTap: _saving ? null : _downloadToGallery,
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.label,
+                        style: TextStyle(
+                          color: widget.providerColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _ImageActionBtn(
-                  icon: Icons.share_rounded,
-                  label: 'Share',
-                  color: widget.providerColor,
-                  onTap: () => Share.share(widget.imageUrl, subject: 'JARVIS Imagiya Image'),
-                ),
-                _ImageActionBtn(
-                  icon: Icons.picture_as_pdf_rounded,
-                  label: 'PDF',
-                  color: const Color(0xFFEF4444),
-                  onTap: _exportPdf,
-                ),
-                _ImageActionBtn(
-                  icon: Icons.copy_rounded,
-                  label: 'Copy URL',
-                  color: Colors.white54,
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: widget.imageUrl));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Image URL copied!'), duration: Duration(seconds: 1)),
-                    );
-                  },
+                // Image with rounded corners
+                if (widget.imageUrl.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: widget.imageUrl.startsWith('data:image/')
+                        ? Image.memory(
+                            base64Decode(widget.imageUrl.split(',').last),
+                            fit: BoxFit.contain,
+                          )
+                        : Image.network(
+                            widget.imageUrl,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (ctx, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1A1A2E),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      CircularProgressIndicator(
+                                        value:
+                                            progress.expectedTotalBytes != null
+                                            ? progress.cumulativeBytesLoaded /
+                                                  progress.expectedTotalBytes!
+                                            : null,
+                                        color: widget.providerColor,
+                                        strokeWidth: 2,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Generating image...',
+                                        style: TextStyle(
+                                          color: widget.providerColor
+                                              .withValues(alpha: 0.7),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (ctx, err, st) => Container(
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A1A2E),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.broken_image_rounded,
+                                  color: Colors.white30,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                const SizedBox(height: 10),
+                // Action bar
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _ImageActionBtn(
+                      icon: _saving
+                          ? Icons.hourglass_top_rounded
+                          : Icons.download_rounded,
+                      label: _saving ? 'Saving...' : 'Download',
+                      color: const Color(0xFF22C55E),
+                      onTap: _saving ? null : _downloadToGallery,
+                    ),
+                    _ImageActionBtn(
+                      icon: Icons.share_rounded,
+                      label: 'Share',
+                      color: widget.providerColor,
+                      onTap: () => Share.share(
+                        widget.imageUrl,
+                        subject: 'JARVIS Imagiya Image',
+                      ),
+                    ),
+                    _ImageActionBtn(
+                      icon: Icons.picture_as_pdf_rounded,
+                      label: 'PDF',
+                      color: const Color(0xFFEF4444),
+                      onTap: _exportPdf,
+                    ),
+                    _ImageActionBtn(
+                      icon: Icons.copy_rounded,
+                      label: 'Copy URL',
+                      color: Colors.white54,
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: widget.imageUrl));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Image URL copied!'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    ).animate().slideX(begin: -0.05, end: 0, duration: 200.ms, curve: Curves.easeOut).fadeIn(duration: 150.ms);
+          ),
+        )
+        .animate()
+        .slideX(begin: -0.05, end: 0, duration: 200.ms, curve: Curves.easeOut)
+        .fadeIn(duration: 150.ms);
   }
 }
 
@@ -467,7 +589,12 @@ class _ImageActionBtn extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback? onTap;
-  const _ImageActionBtn({required this.icon, required this.label, required this.color, this.onTap});
+  const _ImageActionBtn({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -485,7 +612,14 @@ class _ImageActionBtn extends StatelessWidget {
           children: [
             Icon(icon, size: 13, color: color),
             const SizedBox(width: 5),
-            Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -501,38 +635,64 @@ class _CodesignGeneratingBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     const teal = Color(0xFF4DD0E1);
     return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(left: 16, right: 8, bottom: 16),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D1117),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: teal.withValues(alpha: 0.25)),
-          boxShadow: [BoxShadow(color: teal.withValues(alpha: 0.08), blurRadius: 20, spreadRadius: 2)],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 28, height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 2, color: teal,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('CoDesign', style: TextStyle(color: teal, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
-                const SizedBox(height: 2),
-                Text('Crafting your UI...', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13)),
+          alignment: Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(left: 16, right: 8, bottom: 16),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D1117),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: teal.withValues(alpha: 0.25)),
+              boxShadow: [
+                BoxShadow(
+                  color: teal.withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
               ],
             ),
-          ],
-        ),
-      ),
-    ).animate().fadeIn(duration: 300.ms).shimmer(delay: 500.ms, duration: 1500.ms, color: teal.withValues(alpha: 0.08));
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: teal),
+                ),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CoDesign',
+                      style: TextStyle(
+                        color: teal,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Crafting your UI...',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        )
+        .animate()
+        .fadeIn(duration: 300.ms)
+        .shimmer(
+          delay: 500.ms,
+          duration: 1500.ms,
+          color: teal.withValues(alpha: 0.08),
+        );
   }
 }
 
@@ -572,30 +732,39 @@ class _CodesignHtmlBubbleState extends State<_CodesignHtmlBubble> {
       if (mounted) setState(() => _codeCopied = false);
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ HTML code copied!'), duration: Duration(seconds: 2), backgroundColor: Color(0xFF22C55E)),
+      const SnackBar(
+        content: Text('✅ HTML code copied!'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Color(0xFF22C55E),
+      ),
     );
   }
 
   Future<void> _shareHtml() async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/codesign_jarvis_${DateTime.now().millisecondsSinceEpoch}.html');
-      await file.writeAsString(widget.htmlCode, flush: true);
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'text/html')],
-        subject: 'CoDesign by JARVIS',
+      final file = File(
+        '${tempDir.path}/codesign_jarvis_${DateTime.now().millisecondsSinceEpoch}.html',
       );
+      await file.writeAsString(widget.htmlCode, flush: true);
+      await Share.shareXFiles([
+        XFile(file.path, mimeType: 'text/html'),
+      ], subject: 'CoDesign by JARVIS');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Share failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Share failed: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
   Future<void> _openInBrowser() async {
-    final dataUrl = 'data:text/html;charset=utf-8,${Uri.encodeComponent(widget.htmlCode)}';
+    final dataUrl =
+        'data:text/html;charset=utf-8,${Uri.encodeComponent(widget.htmlCode)}';
     final uri = Uri.parse(dataUrl);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -609,13 +778,20 @@ class _CodesignHtmlBubbleState extends State<_CodesignHtmlBubble> {
         format: PdfPageFormat.a4,
       );
       final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/codesign_ui_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      final file = File(
+        '${tempDir.path}/codesign_ui_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
       await file.writeAsBytes(pdfBytes, flush: true);
-      await Share.shareXFiles([XFile(file.path, mimeType: 'application/pdf')], subject: 'JARVIS CoDesign PDF');
+      await Share.shareXFiles([
+        XFile(file.path, mimeType: 'application/pdf'),
+      ], subject: 'JARVIS CoDesign PDF');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PDF Export failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('PDF Export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -636,13 +812,35 @@ class _CodesignHtmlBubbleState extends State<_CodesignHtmlBubble> {
                 icon: const Icon(Icons.close, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
-              title: Row(children: [
-                Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: _teal)),
-                const SizedBox(width: 8),
-                const Text('CoDesign Preview', style: TextStyle(color: _teal, fontSize: 13, fontWeight: FontWeight.w700)),
-              ]),
+              title: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _teal,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'CoDesign Preview',
+                    style: TextStyle(
+                      color: _teal,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
               actions: [
-                IconButton(icon: const Icon(Icons.code, color: Colors.white70), onPressed: () { Navigator.pop(context); _copyHtmlCode(); }),
+                IconButton(
+                  icon: const Icon(Icons.code, color: Colors.white70),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _copyHtmlCode();
+                  },
+                ),
                 const SizedBox(width: 8),
               ],
             ),
@@ -681,159 +879,200 @@ class _CodesignHtmlBubbleState extends State<_CodesignHtmlBubble> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        width: screenWidth - 24,
-        margin: const EdgeInsets.only(left: 16, right: 8, bottom: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Provider badge
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8, height: 8,
-                    decoration: const BoxDecoration(shape: BoxShape.circle, color: _teal,
-                      boxShadow: [BoxShadow(color: Color(0x664DD0E1), blurRadius: 8, spreadRadius: 1)],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text('CODESIGN · Live Preview', style: TextStyle(color: _teal, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.0)),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: _toggleFullscreen,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _teal.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: _teal.withValues(alpha: 0.3)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.open_in_full_rounded, color: _teal, size: 11),
-                          SizedBox(width: 4),
-                          Text('Expand', style: TextStyle(color: _teal, fontSize: 10, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // WebView preview
-            Container(
-              height: 380,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _teal.withValues(alpha: 0.2)),
-                boxShadow: [BoxShadow(color: _teal.withValues(alpha: 0.06), blurRadius: 20)],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: _buildWebView(),
-            ),
-            const SizedBox(height: 10),
-            // Action bar
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: screenWidth - 24,
+            margin: const EdgeInsets.only(left: 16, right: 8, bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ImageActionBtn(
-                  icon: Icons.open_in_full_rounded,
-                  label: 'Fullscreen',
-                  color: _teal,
-                  onTap: _toggleFullscreen,
+                // Provider badge
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _teal,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x664DD0E1),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'CODESIGN · Live Preview',
+                        style: TextStyle(
+                          color: _teal,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: _toggleFullscreen,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _teal.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _teal.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.open_in_full_rounded,
+                                color: _teal,
+                                size: 11,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Expand',
+                                style: TextStyle(
+                                  color: _teal,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _ImageActionBtn(
-                  icon: _codeCopied ? Icons.check_rounded : Icons.code_rounded,
-                  label: _codeCopied ? 'Copied!' : 'Copy HTML',
-                  color: _codeCopied ? const Color(0xFF22C55E) : Colors.white70,
-                  onTap: _copyHtmlCode,
+                // WebView preview
+                Container(
+                  height: 380,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _teal.withValues(alpha: 0.2)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _teal.withValues(alpha: 0.06),
+                        blurRadius: 20,
+                      ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: _buildWebView(),
                 ),
-                _ImageActionBtn(
-                  icon: Icons.download_rounded,
-                  label: 'Download HTML',
-                  color: const Color(0xFF22C55E),
-                  onTap: _shareHtml,
-                ),
-                _ImageActionBtn(
-                  icon: Icons.share_rounded,
-                  label: 'Share',
-                  color: _teal,
-                  onTap: _shareHtml,
-                ),
-                _ImageActionBtn(
-                  icon: Icons.picture_as_pdf_rounded,
-                  label: 'PDF',
-                  color: const Color(0xFFEF4444),
-                  onTap: _exportPdf,
-                ),
-                _ImageActionBtn(
-                  icon: Icons.open_in_browser_rounded,
-                  label: 'Browser',
-                  color: Colors.white54,
-                  onTap: _openInBrowser,
+                const SizedBox(height: 10),
+                // Action bar
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _ImageActionBtn(
+                      icon: Icons.open_in_full_rounded,
+                      label: 'Fullscreen',
+                      color: _teal,
+                      onTap: _toggleFullscreen,
+                    ),
+                    _ImageActionBtn(
+                      icon: _codeCopied
+                          ? Icons.check_rounded
+                          : Icons.code_rounded,
+                      label: _codeCopied ? 'Copied!' : 'Copy HTML',
+                      color: _codeCopied
+                          ? const Color(0xFF22C55E)
+                          : Colors.white70,
+                      onTap: _copyHtmlCode,
+                    ),
+                    _ImageActionBtn(
+                      icon: Icons.download_rounded,
+                      label: 'Download HTML',
+                      color: const Color(0xFF22C55E),
+                      onTap: _shareHtml,
+                    ),
+                    _ImageActionBtn(
+                      icon: Icons.share_rounded,
+                      label: 'Share',
+                      color: _teal,
+                      onTap: _shareHtml,
+                    ),
+                    _ImageActionBtn(
+                      icon: Icons.picture_as_pdf_rounded,
+                      label: 'PDF',
+                      color: const Color(0xFFEF4444),
+                      onTap: _exportPdf,
+                    ),
+                    _ImageActionBtn(
+                      icon: Icons.open_in_browser_rounded,
+                      label: 'Browser',
+                      color: Colors.white54,
+                      onTap: _openInBrowser,
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    ).animate().slideX(begin: -0.05, end: 0, duration: 200.ms, curve: Curves.easeOut).fadeIn(duration: 150.ms);
+          ),
+        )
+        .animate()
+        .slideX(begin: -0.05, end: 0, duration: 200.ms, curve: Curves.easeOut)
+        .fadeIn(duration: 150.ms);
   }
 }
-
 
 class _UserBubble extends StatelessWidget {
   final Message message;
   const _UserBubble({required this.message});
 
-
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.78,
-        ),
-        margin: const EdgeInsets.only(left: 48, bottom: 12, right: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: BoxDecoration(
-          gradient: JarvisColors.primaryGradient,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(4),
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(20),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: JarvisColors.accentPrimary.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+          alignment: Alignment.centerRight,
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.78,
             ),
-          ],
-        ),
-        child: Text(
-          message.content,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 15,
-            height: 1.5,
+            margin: const EdgeInsets.only(left: 48, bottom: 12, right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: JarvisColors.primaryGradient,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(4),
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: JarvisColors.accentPrimary.withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Text(
+              message.content,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                height: 1.5,
+              ),
+            ),
           ),
-        ),
-      ),
-    ).animate().slideX(
-      begin: 0.1,
-      end: 0,
-      duration: 200.ms,
-      curve: Curves.easeOut,
-    ).fadeIn(duration: 150.ms);
+        )
+        .animate()
+        .slideX(begin: 0.1, end: 0, duration: 200.ms, curve: Curves.easeOut)
+        .fadeIn(duration: 150.ms);
   }
 }
 
@@ -845,289 +1084,326 @@ class _AIBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.98,
-        ),
-        margin: const EdgeInsets.only(right: 8, bottom: 16, left: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Provider badge
-            if (message.provider != null || message.tokenCount != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: providerColor,
-                        boxShadow: [
-                          BoxShadow(
-                            color: providerColor.withValues(alpha: 0.5),
-                            blurRadius: 10,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${message.provider?.toUpperCase() ?? 'JARVIS'}'
-                      '${message.model != null ? " · ${message.model}" : ""}'
-                      '${message.tokenCount != null ? " · ${message.tokenCount} tokens" : ""}',
-                      style: TextStyle(
-                        color: providerColor.withValues(alpha: 0.9),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            // ── JARVIS Intelligence Panel (live during streaming) ──
-            if (message.isStreaming)
-              Consumer<ChatProvider>(
-                builder: (context, cp, _) {
-                  if (cp.activeDnaModels.isEmpty && cp.activeContextualSkills.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return _JarvisIntelligencePanel(
-                    dnaModels: cp.activeDnaModels,
-                    contextualSkills: cp.activeContextualSkills,
-                    providerColor: providerColor,
-                  );
-                },
-              ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              decoration: const BoxDecoration(
-                // Remove fixed box decoration for an airy feel
-                color: Colors.transparent, 
-              ),
-              child: message.content.isEmpty
-                  ? _TypingIndicator()
-                  : SelectionArea(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (message.content.contains('<!--JARVIS_DIAGRAM-->')) ...[
-                            Builder(
-                              builder: (context) {
-                                final parts = message.content.split('<!--JARVIS_DIAGRAM-->');
-                                final textPart = parts[0].trim();
-                                final htmlPart = parts.sublist(1).join('<!--JARVIS_DIAGRAM-->').trim();
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (textPart.isNotEmpty)
-                                      _buildMarkdown(context, textPart),
-                                    if (htmlPart.isNotEmpty)
-                                      message.isStreaming
-                                          ? Container(
-                                              height: 160,
-                                              width: double.infinity,
-                                              margin: const EdgeInsets.only(top: 8),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFF080810),
-                                                borderRadius: BorderRadius.circular(16),
-                                                border: Border.all(color: JarvisColors.border),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: JarvisColors.accentPrimary.withValues(alpha: 0.1),
-                                                    blurRadius: 10,
-                                                    spreadRadius: 2,
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  const SizedBox(
-                                                    width: 28, height: 28,
-                                                    child: CircularProgressIndicator(strokeWidth: 2.5, color: JarvisColors.accentPrimary),
-                                                  ),
-                                                  const SizedBox(height: 16),
-                                                  Text(
-                                                    'Crafting Diagram...',
-                                                    style: GoogleFonts.outfit(
-                                                      color: JarvisColors.accentPrimary.withValues(alpha: 0.8),
-                                                      fontSize: 13,
-                                                      fontWeight: FontWeight.w600,
-                                                      letterSpacing: 0.5,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            )
-                                          : _InlineDiagram(html: htmlPart),
-                                  ],
-                                );
-                              }
-                            ),
-                          ] else ...[
-                            _buildMarkdown(context, message.content),
-                          ],
-                          if (message.isStreaming) ...[
-                            const SizedBox(height: 12),
-                            _StreamingCursor(),
-                          ] else ...[
-                            const SizedBox(height: 12),
-                            _buildActionRow(context),
-                          ],
-                        ],
-                      ),
-                    ),
+          alignment: Alignment.centerLeft,
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.98,
             ),
-          ],
-        ),
-      ),
-    ).animate().slideX(
-      begin: -0.05,
-      end: 0,
-      duration: 200.ms,
-      curve: Curves.easeOut,
-    ).fadeIn(duration: 150.ms);
+            margin: const EdgeInsets.only(right: 8, bottom: 16, left: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Provider badge
+                if (message.provider != null || message.tokenCount != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: providerColor,
+                            boxShadow: [
+                              BoxShadow(
+                                color: providerColor.withValues(alpha: 0.5),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${message.provider?.toUpperCase() ?? 'JARVIS'}'
+                          '${message.model != null ? " · ${message.model}" : ""}'
+                          '${message.tokenCount != null ? " · ${message.tokenCount} tokens" : ""}',
+                          style: TextStyle(
+                            color: providerColor.withValues(alpha: 0.9),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // ── JARVIS Intelligence Panel (live during streaming) ──
+                if (message.isStreaming)
+                  Consumer<ChatProvider>(
+                    builder: (context, cp, _) {
+                      if (cp.activeDnaModels.isEmpty &&
+                          cp.activeContextualSkills.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return _JarvisIntelligencePanel(
+                        dnaModels: cp.activeDnaModels,
+                        contextualSkills: cp.activeContextualSkills,
+                        providerColor: providerColor,
+                      );
+                    },
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 8,
+                  ),
+                  decoration: const BoxDecoration(
+                    // Remove fixed box decoration for an airy feel
+                    color: Colors.transparent,
+                  ),
+                  child: message.content.isEmpty
+                      ? _TypingIndicator()
+                      : SelectionArea(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (message.content.contains(
+                                '<!--JARVIS_DIAGRAM-->',
+                              )) ...[
+                                Builder(
+                                  builder: (context) {
+                                    final parts = message.content.split(
+                                      '<!--JARVIS_DIAGRAM-->',
+                                    );
+                                    final textPart = parts[0].trim();
+                                    final htmlPart = parts
+                                        .sublist(1)
+                                        .join('<!--JARVIS_DIAGRAM-->')
+                                        .trim();
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (textPart.isNotEmpty)
+                                          _buildMarkdown(context, textPart),
+                                        if (htmlPart.isNotEmpty)
+                                          message.isStreaming
+                                              ? Container(
+                                                  height: 160,
+                                                  width: double.infinity,
+                                                  margin: const EdgeInsets.only(
+                                                    top: 8,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                      0xFF080810,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
+                                                    border: Border.all(
+                                                      color:
+                                                          JarvisColors.border,
+                                                    ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: JarvisColors
+                                                            .accentPrimary
+                                                            .withValues(
+                                                              alpha: 0.1,
+                                                            ),
+                                                        blurRadius: 10,
+                                                        spreadRadius: 2,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      const SizedBox(
+                                                        width: 28,
+                                                        height: 28,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                              strokeWidth: 2.5,
+                                                              color: JarvisColors
+                                                                  .accentPrimary,
+                                                            ),
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 16,
+                                                      ),
+                                                      Text(
+                                                        'Crafting Diagram...',
+                                                        style:
+                                                            GoogleFonts.outfit(
+                                                              color: JarvisColors
+                                                                  .accentPrimary
+                                                                  .withValues(
+                                                                    alpha: 0.8,
+                                                                  ),
+                                                              fontSize: 13,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              letterSpacing:
+                                                                  0.5,
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                )
+                                              : _InlineDiagram(html: htmlPart),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ] else ...[
+                                _buildMarkdown(context, message.content),
+                              ],
+                              if (message.isStreaming) ...[
+                                const SizedBox(height: 12),
+                                _StreamingCursor(),
+                              ] else ...[
+                                const SizedBox(height: 12),
+                                _buildActionRow(context),
+                              ],
+                            ],
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        )
+        .animate()
+        .slideX(begin: -0.05, end: 0, duration: 200.ms, curve: Curves.easeOut)
+        .fadeIn(duration: 150.ms);
   }
 
-Widget _buildMarkdown(BuildContext context, String content) {
-  return MarkdownBody(
-    data: _cleanResponse(content),
-    imageBuilder: (uri, title, alt) {
-      final src = uri.toString();
-      if (src.startsWith('data:image/')) {
-        try {
-          final b64 = src.split(',').last;
-          if (b64.length % 4 != 0) {
-            // incomplete base64 mid-stream — show lightweight placeholder, don't attempt decode
+  Widget _buildMarkdown(BuildContext context, String content) {
+    return MarkdownBody(
+      data: _cleanResponse(content),
+      imageBuilder: (uri, title, alt) {
+        final src = uri.toString();
+        if (src.startsWith('data:image/')) {
+          try {
+            final b64 = src.split(',').last;
+            if (b64.length % 4 != 0) {
+              // incomplete base64 mid-stream — show lightweight placeholder, don't attempt decode
+              return const SizedBox(
+                height: 120,
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              );
+            }
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(base64Decode(b64), fit: BoxFit.contain),
+            );
+          } catch (_) {
             return const SizedBox(
-              height: 120,
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              height: 100,
+              child: Center(
+                child: Icon(Icons.broken_image_rounded, color: Colors.white30),
+              ),
             );
           }
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.memory(base64Decode(b64), fit: BoxFit.contain),
-          );
-        } catch (_) {
-          return const SizedBox(
-            height: 100,
-            child: Center(child: Icon(Icons.broken_image_rounded, color: Colors.white30)),
-          );
         }
-      }
-      return Image.network(
-        src,
-        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image_rounded, color: Colors.white30),
-      );
-    },
-    builders: {
-      'latex': LatexElementBuilder(
-        textStyle: TextStyle(color: JarvisColors.textPrimary),
-        textScaleFactor: 1.1,
-      ),
-      'customtable': CustomTableBuilder(),
-      'custommermaid': CustomMermaidBuilder(),
-    },
-    styleSheetTheme: MarkdownStyleSheetBaseTheme.cupertino,
-    extensionSet: md.ExtensionSet(
-      [
-        LatexBlockSyntax(),
-        const CustomTableSyntax(),
-        const CustomMermaidSyntax(),
-        ...md.ExtensionSet.gitHubFlavored.blockSyntaxes
-      ],
-      [LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
-    ),
-    styleSheet: MarkdownStyleSheet(
-      p: GoogleFonts.outfit(
-        color: JarvisColors.textPrimary,
-        fontSize: 15,
-        height: 1.6,
-      ),
-      h2: GoogleFonts.outfit(
-        color: JarvisColors.accentSecondary,
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        height: 2.0,
-      ),
-      h3: GoogleFonts.outfit(
-        color: JarvisColors.accentPrimary,
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-        height: 1.8,
-      ),
-      strong: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-      ),
-      listBullet: const TextStyle(
-        color: JarvisColors.accentPrimary,
-      ),
-      tableHead: GoogleFonts.outfit(
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
-      ),
-      tableBody: GoogleFonts.outfit(
-        color: JarvisColors.textPrimary,
-      ),
-      tableBorder: TableBorder.all(
-        color: JarvisColors.border,
-        width: 1,
-      ),
-      blockquote: GoogleFonts.outfit(
-        color: const Color(0xFFD0D0F0),
-        fontSize: 14,
-        fontStyle: FontStyle.italic,
-        height: 1.5,
-      ),
-      blockquoteDecoration: BoxDecoration(
-        color: const Color(0xFF161622),
-        border: const Border(
-          left: BorderSide(
-            color: JarvisColors.accentPrimary,
-            width: 4,
-          ),
+        return Image.network(
+          src,
+          errorBuilder: (ctx, err, st) =>
+              const Icon(Icons.broken_image_rounded, color: Colors.white30),
+        );
+      },
+      builders: {
+        'latex': LatexElementBuilder(
+          textStyle: TextStyle(color: JarvisColors.textPrimary),
+          textScaleFactor: 1.1,
         ),
-        borderRadius: BorderRadius.circular(8),
+        'customtable': CustomTableBuilder(),
+        'custommermaid': CustomMermaidBuilder(),
+      },
+      styleSheetTheme: MarkdownStyleSheetBaseTheme.cupertino,
+      extensionSet: md.ExtensionSet(
+        [
+          LatexBlockSyntax(),
+          const CustomTableSyntax(),
+          const CustomMermaidSyntax(),
+          ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+        ],
+        [LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
       ),
-      blockquotePadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 12,
+      styleSheet: MarkdownStyleSheet(
+        p: GoogleFonts.outfit(
+          color: JarvisColors.textPrimary,
+          fontSize: 15,
+          height: 1.6,
+        ),
+        h2: GoogleFonts.outfit(
+          color: JarvisColors.accentSecondary,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          height: 2.0,
+        ),
+        h3: GoogleFonts.outfit(
+          color: JarvisColors.accentPrimary,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          height: 1.8,
+        ),
+        strong: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+        listBullet: const TextStyle(color: JarvisColors.accentPrimary),
+        tableHead: GoogleFonts.outfit(
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+        tableBody: GoogleFonts.outfit(color: JarvisColors.textPrimary),
+        tableBorder: TableBorder.all(color: JarvisColors.border, width: 1),
+        blockquote: GoogleFonts.outfit(
+          color: const Color(0xFFD0D0F0),
+          fontSize: 14,
+          fontStyle: FontStyle.italic,
+          height: 1.5,
+        ),
+        blockquoteDecoration: BoxDecoration(
+          color: const Color(0xFF161622),
+          border: const Border(
+            left: BorderSide(color: JarvisColors.accentPrimary, width: 4),
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        blockquotePadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        code: GoogleFonts.firaCode(
+          backgroundColor: Colors.black26,
+          fontSize: 13,
+          color: JarvisColors.accentPrimary,
+        ),
+        codeblockDecoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: JarvisColors.border),
+        ),
+        codeblockPadding: const EdgeInsets.all(12),
       ),
-      code: GoogleFonts.firaCode(
-        backgroundColor: Colors.black26,
-        fontSize: 13,
-        color: JarvisColors.accentPrimary,
-      ),
-      codeblockDecoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: JarvisColors.border),
-      ),
-      codeblockPadding: const EdgeInsets.all(12),
-    ),
-    onTapLink: (text, href, title) {
-      if (href != null) launchUrl(Uri.parse(href));
-    },
-  );
-}
+      onTapLink: (text, href, title) {
+        if (href != null) launchUrl(Uri.parse(href));
+      },
+    );
+  }
 
-Widget _buildActionRow(BuildContext context) {
-  final isDiagram = message.content.contains('<!--JARVIS_DIAGRAM-->');
+  Widget _buildActionRow(BuildContext context) {
+    final isDiagram = message.content.contains('<!--JARVIS_DIAGRAM-->');
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         _ActionButton(
           icon: Icons.copy_all_rounded,
           onTap: () {
-            Clipboard.setData(ClipboardData(text: _getSharableContent(message.content)));
+            Clipboard.setData(
+              ClipboardData(text: _getSharableContent(message.content)),
+            );
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Clean content copied to clipboard!'),
@@ -1142,7 +1418,9 @@ Widget _buildActionRow(BuildContext context) {
         _ActionButton(
           icon: Icons.volume_up_rounded,
           onTap: () {
-            context.read<ChatProvider>().ttsService.speak(_getSharableContent(message.content));
+            context.read<ChatProvider>().ttsService.speak(
+              _getSharableContent(message.content),
+            );
           },
           tooltip: 'Speak',
         ),
@@ -1150,13 +1428,18 @@ Widget _buildActionRow(BuildContext context) {
         _ActionButton(
           icon: Icons.share_rounded,
           onTap: () {
-            Share.share(_getSharableContent(message.content, includeDiagramCode: true));
+            Share.share(
+              _getSharableContent(message.content, includeDiagramCode: true),
+            );
           },
           tooltip: 'Share response',
         ),
         const SizedBox(width: 12),
         JarvisPDFButton(
-          responseText: _getSharableContent(message.content, includeDiagramCode: true),
+          responseText: _getSharableContent(
+            message.content,
+            includeDiagramCode: true,
+          ),
         ),
         if (isDiagram) ...[
           const SizedBox(width: 12),
@@ -1164,7 +1447,10 @@ Widget _buildActionRow(BuildContext context) {
             icon: Icons.download_rounded,
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Long-press the diagram to save it'), duration: Duration(seconds: 2)),
+                const SnackBar(
+                  content: Text('Long-press the diagram to save it'),
+                  duration: Duration(seconds: 2),
+                ),
               );
             },
             tooltip: 'Save diagram',
@@ -1174,9 +1460,11 @@ Widget _buildActionRow(BuildContext context) {
     );
   }
 
-
-
-  String _getSharableContent(String text, {bool includeDiagramCode = false, bool isForPdf = false}) {
+  String _getSharableContent(
+    String text, {
+    bool includeDiagramCode = false,
+    bool isForPdf = false,
+  }) {
     String clean = text
         .replaceAll(RegExp(r'<SCHEDULE_REMINDER[^>]*>'), '')
         .replaceAll(RegExp(r'<CANCEL_REMINDER[^>]*>'), '')
@@ -1189,21 +1477,27 @@ Widget _buildActionRow(BuildContext context) {
 
     // Fix for PDF/Sharing: Handle Mermaid diagrams gracefully
     if (!includeDiagramCode) {
-      clean = clean.replaceAll(RegExp(r'```mermaid[\s\S]*?```'), '[Diagram Included]');
-      clean = clean.replaceAll(RegExp(r'<body[^>]*>[\s\S]*?</body>'), '[Diagram Content]');
+      clean = clean.replaceAll(
+        RegExp(r'```mermaid[\s\S]*?```'),
+        '[Diagram Included]',
+      );
+      clean = clean.replaceAll(
+        RegExp(r'<body[^>]*>[\s\S]*?</body>'),
+        '[Diagram Content]',
+      );
     }
 
     if (isForPdf) {
       // COMPREHENSIVE EMOJI STRIPPING: Standard PDF fonts don't support emojis, causing 'block' squares.
       clean = clean
-          .replaceAll(RegExp(r'[\u{10000}-\u{10FFFF}]', unicode: true), '') 
-          .replaceAll(RegExp(r'[\u{2600}-\u{27BF}]', unicode: true), '') 
-          .replaceAll(RegExp(r'\*\*([^*]+)\*\*'), r'\1') 
+          .replaceAll(RegExp(r'[\u{10000}-\u{10FFFF}]', unicode: true), '')
+          .replaceAll(RegExp(r'[\u{2600}-\u{27BF}]', unicode: true), '')
+          .replaceAll(RegExp(r'\*\*([^*]+)\*\*'), r'\1')
           .replaceAll(RegExp(r'\*([^*]+)\*'), r'\1')
-          .replaceAll(RegExp(r'#{1,6}\s+'), '')  
+          .replaceAll(RegExp(r'#{1,6}\s+'), '')
           .replaceAll(RegExp(r'\[([^\]]+)\]\(([^)]+)\)'), r'\1 (\2)');
     }
-    
+
     return clean.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
   }
 
@@ -1221,9 +1515,13 @@ class _TypingIndicator extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(3, (i) {
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          child: const _PulseDot(),
-        ).animate(delay: Duration(milliseconds: i * 150), onPlay: (c) => c.repeat())
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              child: const _PulseDot(),
+            )
+            .animate(
+              delay: Duration(milliseconds: i * 150),
+              onPlay: (c) => c.repeat(),
+            )
             .fadeIn(duration: 400.ms)
             .then()
             .fadeOut(duration: 400.ms);
@@ -1252,13 +1550,15 @@ class _StreamingCursor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 8,
-      height: 16,
-      decoration: BoxDecoration(
-        color: JarvisColors.accentPrimary,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    ).animate(onPlay: (c) => c.repeat()).fadeIn(duration: 500.ms)
+          width: 8,
+          height: 16,
+          decoration: BoxDecoration(
+            color: JarvisColors.accentPrimary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        )
+        .animate(onPlay: (c) => c.repeat())
+        .fadeIn(duration: 500.ms)
         .then()
         .fadeOut(duration: 500.ms);
   }
@@ -1320,12 +1620,16 @@ class _InlineDiagramState extends State<_InlineDiagram> {
 
   void _updateHeight() async {
     if (_webViewController != null) {
-      final hStr = await _webViewController!.evaluateJavascript(source: "document.documentElement.scrollHeight;");
+      final hStr = await _webViewController!.evaluateJavascript(
+        source: "document.documentElement.scrollHeight;",
+      );
       if (hStr != null && hStr.toString().isNotEmpty) {
         final double contentHeight = double.tryParse(hStr.toString()) ?? 100.0;
         if (contentHeight > _height && mounted) {
           setState(() {
-            _height = contentHeight + 40.0; // Adding a 40px buffer to entirely prevent clipping
+            _height =
+                contentHeight +
+                40.0; // Adding a 40px buffer to entirely prevent clipping
           });
         }
       }
@@ -1367,7 +1671,8 @@ class _InlineDiagramState extends State<_InlineDiagram> {
                 javaScriptEnabled: true,
                 transparentBackground: true,
                 disableHorizontalScroll: true,
-                disableVerticalScroll: true, // Native gesture scroll pass-through
+                disableVerticalScroll:
+                    true, // Native gesture scroll pass-through
                 supportZoom: false,
               ),
               onWebViewCreated: (controller) {
@@ -1380,7 +1685,9 @@ class _InlineDiagramState extends State<_InlineDiagram> {
                 );
               },
               onLoadStop: (controller, url) async {
-                setState(() { _isLoaded = true; });
+                setState(() {
+                  _isLoaded = true;
+                });
                 // Polling height evaluation to account for delayed async JS Mermaid rendering
                 for (int i = 0; i < 5; i++) {
                   await Future.delayed(const Duration(milliseconds: 500));
@@ -1391,8 +1698,12 @@ class _InlineDiagramState extends State<_InlineDiagram> {
             if (!_isLoaded)
               const Center(
                 child: SizedBox(
-                   width: 30, height: 30,
-                   child: CircularProgressIndicator(strokeWidth: 2, color: JarvisColors.accentPrimary),
+                  width: 30,
+                  height: 30,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: JarvisColors.accentPrimary,
+                  ),
                 ),
               ),
           ],
@@ -1417,7 +1728,8 @@ class _JarvisIntelligencePanel extends StatefulWidget {
   });
 
   @override
-  State<_JarvisIntelligencePanel> createState() => _JarvisIntelligencePanelState();
+  State<_JarvisIntelligencePanel> createState() =>
+      _JarvisIntelligencePanelState();
 }
 
 class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
@@ -1445,8 +1757,10 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
   void initState() {
     super.initState();
 
-    _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat(reverse: true);
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
     _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -1454,19 +1768,24 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    _rotateController = AnimationController(vsync: this, duration: const Duration(seconds: 3))
-      ..repeat();
+    _rotateController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
     _rotateAnim = Tween<double>(begin: 0, end: 1).animate(_rotateController);
 
-    _thinkController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..addStatusListener((status) {
-      if (status == AnimationStatus.completed && mounted) {
-        setState(() => _thinkStep = (_thinkStep + 1) % _thinkingSteps.length);
-        _thinkController.forward(from: 0);
-      }
-    });
+    _thinkController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 900),
+        )..addStatusListener((status) {
+          if (status == AnimationStatus.completed && mounted) {
+            setState(
+              () => _thinkStep = (_thinkStep + 1) % _thinkingSteps.length,
+            );
+            _thinkController.forward(from: 0);
+          }
+        });
     _thinkController.forward();
   }
 
@@ -1480,7 +1799,8 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
 
   @override
   Widget build(BuildContext context) {
-    final totalSkills = widget.dnaModels.length + widget.contextualSkills.length;
+    final totalSkills =
+        widget.dnaModels.length + widget.contextualSkills.length;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -1519,7 +1839,9 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: SweepGradient(
-                            transform: GradientRotation(_rotateAnim.value * 6.28),
+                            transform: GradientRotation(
+                              _rotateAnim.value * 6.28,
+                            ),
                             colors: const [
                               Color(0xFF7C3AED),
                               Color(0xFF06B6D4),
@@ -1529,7 +1851,9 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF7C3AED).withValues(alpha: _glowAnim.value),
+                              color: const Color(
+                                0xFF7C3AED,
+                              ).withValues(alpha: _glowAnim.value),
                               blurRadius: 12,
                               spreadRadius: 1,
                             ),
@@ -1562,11 +1886,20 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
                               ),
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF7C3AED).withValues(alpha: 0.2),
+                                  color: const Color(
+                                    0xFF7C3AED,
+                                  ).withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.4)),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFF7C3AED,
+                                    ).withValues(alpha: 0.4),
+                                  ),
                                 ),
                                 child: Text(
                                   '$totalSkills ACTIVE',
@@ -1615,33 +1948,43 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
               child: Row(
                 children: _dnaConfig.map((dna) {
                   return Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: dna.color.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: dna.color.withValues(alpha: 0.35),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(dna.emoji, style: const TextStyle(fontSize: 11)),
-                        const SizedBox(width: 4),
-                        Text(
-                          dna.label,
-                          style: TextStyle(
-                            color: dna.color,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: dna.color.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: dna.color.withValues(alpha: 0.35),
+                            width: 1,
                           ),
                         ),
-                      ],
-                    ),
-                  ).animate(onPlay: (c) => c.repeat(reverse: true))
-                    .shimmer(duration: 2000.ms, color: dna.color.withValues(alpha: 0.15));
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              dna.emoji,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              dna.label,
+                              style: TextStyle(
+                                color: dna.color,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                      .animate(onPlay: (c) => c.repeat(reverse: true))
+                      .shimmer(
+                        duration: 2000.ms,
+                        color: dna.color.withValues(alpha: 0.15),
+                      );
                 }).toList(),
               ),
             ),
@@ -1687,17 +2030,26 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
                           runSpacing: 5,
                           children: widget.contextualSkills.map((skillName) {
                             return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF4ADE80).withValues(alpha: 0.06),
+                                color: const Color(
+                                  0xFF4ADE80,
+                                ).withValues(alpha: 0.06),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: const Color(0xFF4ADE80).withValues(alpha: 0.2),
+                                  color: const Color(
+                                    0xFF4ADE80,
+                                  ).withValues(alpha: 0.2),
                                   width: 0.7,
                                 ),
                               ),
                               child: Text(
-                                skillName.length > 25 ? '${skillName.substring(0, 25)}…' : skillName,
+                                skillName.length > 25
+                                    ? '${skillName.substring(0, 25)}…'
+                                    : skillName,
                                 style: const TextStyle(
                                   color: Color(0xFF4ADE80),
                                   fontSize: 9,
@@ -1722,7 +2074,9 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
                 padding: const EdgeInsets.symmetric(vertical: 5),
                 decoration: BoxDecoration(
                   border: Border(
-                    top: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
+                    top: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.04),
+                    ),
                   ),
                 ),
                 child: Center(
@@ -1765,7 +2119,7 @@ class CustomMermaidSyntax extends md.BlockSyntax {
     if (match == null) return null;
     final data = match.group(1)!;
     parser.advance();
-    
+
     final element = md.Element('custommermaid', []);
     element.attributes['data'] = data;
     return element;
@@ -1818,7 +2172,9 @@ class _InlineMermaidDiagramState extends State<_InlineMermaidDiagram> {
 
   void _updateHeight() async {
     if (_webViewController != null) {
-      final hStr = await _webViewController!.evaluateJavascript(source: "document.documentElement.scrollHeight;");
+      final hStr = await _webViewController!.evaluateJavascript(
+        source: "document.documentElement.scrollHeight;",
+      );
       if (hStr != null && hStr.toString().isNotEmpty) {
         final double contentHeight = double.tryParse(hStr.toString()) ?? 250.0;
         if (contentHeight > _height && mounted) {
@@ -1866,7 +2222,8 @@ class _InlineMermaidDiagramState extends State<_InlineMermaidDiagram> {
               initialSettings: InAppWebViewSettings(
                 javaScriptEnabled: true,
                 transparentBackground: true,
-                disableHorizontalScroll: false, // Diagrams can scroll horizontally if large
+                disableHorizontalScroll:
+                    false, // Diagrams can scroll horizontally if large
                 disableVerticalScroll: true,
                 supportZoom: true,
               ),
@@ -1880,7 +2237,9 @@ class _InlineMermaidDiagramState extends State<_InlineMermaidDiagram> {
                 );
               },
               onLoadStop: (controller, url) async {
-                setState(() { _isLoaded = true; });
+                setState(() {
+                  _isLoaded = true;
+                });
                 // Polling height evaluation to account for delayed async JS Mermaid rendering
                 for (int i = 0; i < 5; i++) {
                   await Future.delayed(const Duration(milliseconds: 500));
@@ -1891,8 +2250,12 @@ class _InlineMermaidDiagramState extends State<_InlineMermaidDiagram> {
             if (!_isLoaded)
               const Center(
                 child: SizedBox(
-                   width: 30, height: 30,
-                   child: CircularProgressIndicator(strokeWidth: 2, color: JarvisColors.accentPrimary),
+                  width: 30,
+                  height: 30,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: JarvisColors.accentPrimary,
+                  ),
                 ),
               ),
           ],
@@ -2126,7 +2489,7 @@ class CustomTableSyntax extends md.BlockSyntax {
     if (match == null) return null;
     final data = match.group(1)!;
     parser.advance();
-    
+
     final element = md.Element('customtable', []);
     element.attributes['data'] = data;
     return element;
@@ -2160,9 +2523,7 @@ class CustomTableBuilder extends MarkdownElementBuilder {
       // Header row
       tableRows.add(
         TableRow(
-          decoration: const BoxDecoration(
-            color: Color(0xFF161626),
-          ),
+          decoration: const BoxDecoration(color: Color(0xFF161626)),
           children: headers.map((headerText) {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2202,7 +2563,10 @@ class CustomTableBuilder extends MarkdownElementBuilder {
             ),
             children: cells.map((cellText) {
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 child: Text(
                   cellText,
                   style: GoogleFonts.outfit(

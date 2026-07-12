@@ -41,10 +41,12 @@ class SessionService {
   Future<void> deleteSession(String id) async {
     await _sessionsBox_?.delete(id);
     // Also delete all messages in session
-    final toDelete = _messagesBox_?.values
-        .where((m) => m.sessionId == id)
-        .map((m) => m.id)
-        .toList() ?? [];
+    final toDelete =
+        _messagesBox_?.values
+            .where((m) => m.sessionId == id)
+            .map((m) => m.id)
+            .toList() ??
+        [];
     for (final msgId in toDelete) {
       await _messagesBox_?.delete(msgId);
     }
@@ -62,8 +64,8 @@ class SessionService {
             : message.content,
         title: session.title == 'New Chat' && message.isUser
             ? (message.content.length > 40
-                ? message.content.substring(0, 40)
-                : message.content)
+                  ? message.content.substring(0, 40)
+                  : message.content)
             : session.title,
       );
       await _sessionsBox_?.put(updated.id, updated);
@@ -76,18 +78,20 @@ class SessionService {
   }
 
   List<Message> getMessages(String sessionId) {
-    final msgs = _messagesBox_?.values
-        .where((m) => m.sessionId == sessionId)
-        .toList() ?? [];
+    final msgs =
+        _messagesBox_?.values.where((m) => m.sessionId == sessionId).toList() ??
+        [];
     msgs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return msgs;
   }
 
   Future<void> clearMessages(String sessionId) async {
-    final toDelete = _messagesBox_?.values
-        .where((m) => m.sessionId == sessionId)
-        .map((m) => m.id)
-        .toList() ?? [];
+    final toDelete =
+        _messagesBox_?.values
+            .where((m) => m.sessionId == sessionId)
+            .map((m) => m.id)
+            .toList() ??
+        [];
     for (final msgId in toDelete) {
       await _messagesBox_?.delete(msgId);
     }

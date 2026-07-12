@@ -25,12 +25,12 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
     super.initState();
     _controller = PainterController(
       settings: PainterSettings(
-        freeStyle: const FreeStyleSettings(
-          color: Colors.red,
-          strokeWidth: 5,
-        ),
+        freeStyle: const FreeStyleSettings(color: Colors.red, strokeWidth: 5),
         shape: ShapeSettings(
-          paint: Paint()..color = Colors.blue..style = PaintingStyle.stroke..strokeWidth = 5,
+          paint: Paint()
+            ..color = Colors.blue
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 5,
         ),
       ),
     );
@@ -41,7 +41,9 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
     final ui.Image renderedImage = await _controller.renderImage(
       Size(widget.image.width.toDouble(), widget.image.height.toDouble()),
     );
-    final ByteData? byteData = await renderedImage.toByteData(format: ui.ImageByteFormat.png);
+    final ByteData? byteData = await renderedImage.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
     if (!mounted) return;
     if (byteData != null) {
       Navigator.pop(context, byteData.buffer.asUint8List());
@@ -60,18 +62,13 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
             icon: const Icon(Icons.undo),
             onPressed: _controller.canUndo ? _controller.undo : null,
           ),
-          IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: _save,
-          ),
+          IconButton(icon: const Icon(Icons.check), onPressed: _save),
         ],
       ),
       body: Center(
         child: AspectRatio(
           aspectRatio: widget.image.width / widget.image.height,
-          child: FlutterPainter(
-            controller: _controller,
-          ),
+          child: FlutterPainter(controller: _controller),
         ),
       ),
       bottomNavigationBar: BottomAppBar(

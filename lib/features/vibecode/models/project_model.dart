@@ -1,6 +1,13 @@
 import 'generated_file.dart';
 
-enum ProjectType { website, webapp, reactApp, flutterWeb, flutterAndroidApp, unknown }
+enum ProjectType {
+  website,
+  webapp,
+  reactApp,
+  flutterWeb,
+  flutterAndroidApp,
+  unknown,
+}
 
 enum DeploymentStatus { none, deploying, deployed, failed }
 
@@ -29,8 +36,8 @@ class ProjectModel {
     this.deploymentStatus = DeploymentStatus.none,
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   /// Combines all HTML/CSS/JS files into a single preview HTML string
   String get combinedPreviewHtml {
@@ -54,7 +61,9 @@ class ProjectModel {
         .join('\n');
 
     String jsContent = files
-        .where((f) => f.name.endsWith('.js') && !f.name.contains('node_modules'))
+        .where(
+          (f) => f.name.endsWith('.js') && !f.name.contains('node_modules'),
+        )
         .map((f) => f.content)
         .join('\n');
 
@@ -84,8 +93,10 @@ class ProjectModel {
   }
 
   String _buildMobileMockup() {
-    final mainDart = files.firstWhere((f) => f.name == 'main.dart', orElse: () => files.first).content;
-    
+    final mainDart = files
+        .firstWhere((f) => f.name == 'main.dart', orElse: () => files.first)
+        .content;
+
     return '''
     <!DOCTYPE html>
     <html>

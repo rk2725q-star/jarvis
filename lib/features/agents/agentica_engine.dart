@@ -22,34 +22,41 @@ import 'agentica_memory.dart';
 // ─── Binary Tool Tokens (OpenClaw-style, 1-byte identifiers) ───────────
 // Reduces LLM token count by 90% vs text-based "TOOL:click_ref:ref=@e3"
 class ToolToken {
-  static const int SNAP = 0x01;      // Snapshot
-  static const int CLICK = 0x02;     // click_ref
-  static const int TYPE = 0x03;      // type_ref
-  static const int TAP = 0x04;       // tap coords
-  static const int SCROLL = 0x05;    // scroll
-  static const int BACK = 0x06;      // press_back
-  static const int HOME = 0x07;      // press_home
-  static const int OPEN = 0x08;      // open_app
-  static const int FIND = 0x09;      // find_by_text
-  static const int WAIT = 0x0A;      // wait
-  static const int CALL = 0x0B;      // direct_call
-  static const int MSG = 0x0C;       // send_message
-  static const int CONTACT = 0x0D;   // search_contacts
-  static const int LOCK = 0x0E;      // lock_screen
-  static const int TORCH = 0x0F;     // toggle_torch
-  static const int DONE = 0xFF;      // Task complete
+  static const int SNAP = 0x01; // Snapshot
+  static const int CLICK = 0x02; // click_ref
+  static const int TYPE = 0x03; // type_ref
+  static const int TAP = 0x04; // tap coords
+  static const int SCROLL = 0x05; // scroll
+  static const int BACK = 0x06; // press_back
+  static const int HOME = 0x07; // press_home
+  static const int OPEN = 0x08; // open_app
+  static const int FIND = 0x09; // find_by_text
+  static const int WAIT = 0x0A; // wait
+  static const int CALL = 0x0B; // direct_call
+  static const int MSG = 0x0C; // send_message
+  static const int CONTACT = 0x0D; // search_contacts
+  static const int LOCK = 0x0E; // lock_screen
+  static const int TORCH = 0x0F; // toggle_torch
+  static const int DONE = 0xFF; // Task complete
 }
 
 const _ch = MethodChannel('jarvis.ai.os/accessibility');
 
 // ─── Speed-First Constants ─────────────────────────────────────────────
 class _Speed {
-  static const int maxTurns = 20;           // Increased for web browsing tasks
-  static const int maxContextChars = 1800;  // Down from 6000
+  static const int maxTurns = 20; // Increased for web browsing tasks
+  static const int maxContextChars = 1800; // Down from 6000
 }
 
 // ─── Models ────────────────────────────────────────────────────────────
-enum AgenticaTaskStatus { queued, running, succeeded, failed, timedOut, cancelled }
+enum AgenticaTaskStatus {
+  queued,
+  running,
+  succeeded,
+  failed,
+  timedOut,
+  cancelled,
+}
 
 class AgenticaTask {
   final String id;
@@ -61,7 +68,7 @@ class AgenticaTask {
   int turnsUsed;
   int retryCount;
   DateTime? endedAt;
-  int latencyMs;  // NEW: Track performance
+  int latencyMs; // NEW: Track performance
 
   AgenticaTask({
     required this.id,
@@ -85,7 +92,7 @@ class AgenticaToolCall {
 
 // ─── Semantic Cache Entry ──────────────────────────────────────────────
 class _CacheEntry {
-  final String embedding;       // Semantic signature
+  final String embedding; // Semantic signature
   final List<AgenticaToolCall> sequence;
   final int avgLatencyMs;
   final DateTime lastUsed;
@@ -100,7 +107,7 @@ class _CacheEntry {
 
 // ─── Incremental Snapshot State ────────────────────────────────────────
 class _ScreenState {
-  final Map<String, String> refMap;      // @eN → node signature
+  final Map<String, String> refMap; // @eN → node signature
   final String snapshot;
   final String activePackage;
   final DateTime timestamp;
@@ -138,12 +145,13 @@ class AgenticaEvent {
     data: {'status': status},
     timestampMs: DateTime.now().millisecondsSinceEpoch,
   );
-  factory AgenticaEvent.completed(String summary, int latencyMs) => AgenticaEvent._(
-    type: 'completed',
-    message: summary,
-    data: {'latency_ms': latencyMs},
-    timestampMs: DateTime.now().millisecondsSinceEpoch,
-  );
+  factory AgenticaEvent.completed(String summary, int latencyMs) =>
+      AgenticaEvent._(
+        type: 'completed',
+        message: summary,
+        data: {'latency_ms': latencyMs},
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      );
   factory AgenticaEvent.confirmation(String question) => AgenticaEvent._(
     type: 'confirmation',
     message: question,
@@ -166,16 +174,17 @@ class AgenticaEngine extends ChangeNotifier {
   String? _lastScreenshotBase64;
 
   // ── High-Performance Caches ─────────────────────────────────────────
-  final ListQueue<Map<String, String>> _context = ListQueue();  // O(1) append/remove
+  final ListQueue<Map<String, String>> _context =
+      ListQueue(); // O(1) append/remove
   final List<String> _executedTools = [];
   final List<String> _steerQueue = [];
-  
+
   // Semantic action cache: prompt embedding → tool sequence
   final Map<String, _CacheEntry> _semanticCache = {};
-  
+
   // Incremental screen state
   _ScreenState? _lastScreen;
-  
+
   // Package cache for instant app launch
   Map<String, String>? _packageCache;
 
@@ -211,11 +220,13 @@ class AgenticaEngine extends ChangeNotifier {
       final taskData = pending.first;
       await AgenticaMemory.markScheduledTaskCompleted(taskData['id'] as String);
       _emit(AgenticaEvent.log('⏰ Scheduled: "${taskData['prompt']}"'));
-      runTask(AgenticaTask(
-        id: taskData['id'] as String,
-        prompt: taskData['prompt'] as String,
-        createdAt: DateTime.now(),
-      ));
+      runTask(
+        AgenticaTask(
+          id: taskData['id'] as String,
+          prompt: taskData['prompt'] as String,
+          createdAt: DateTime.now(),
+        ),
+      );
     } catch (e) {
       debugPrint('[Agentica] Scheduler error: $e');
     }
@@ -226,22 +237,28 @@ class AgenticaEngine extends ChangeNotifier {
   // ═════════════════════════════════════════════════════════════════════
   Future<void> initialize() async {
     final stopwatch = Stopwatch()..start();
-    
+
     // Pre-load package cache
     await _warmPackageCache();
-    
+
     // Pre-load semantic cache from memory
     await _warmSemanticCache();
-    
+
     stopwatch.stop();
-    _emit(AgenticaEvent.log('⚡ Initialized in ${stopwatch.elapsedMilliseconds}ms'));
+    _emit(
+      AgenticaEvent.log('⚡ Initialized in ${stopwatch.elapsedMilliseconds}ms'),
+    );
   }
 
   Future<void> _warmPackageCache() async {
     try {
-      final result = await _ch.invokeMethod<Map<dynamic, dynamic>>('getAllPackages');
+      final result = await _ch.invokeMethod<Map<dynamic, dynamic>>(
+        'getAllPackages',
+      );
       _packageCache = result?.cast<String, String>();
-      _emit(AgenticaEvent.log('📦 Cached ${_packageCache?.length ?? 0} packages'));
+      _emit(
+        AgenticaEvent.log('📦 Cached ${_packageCache?.length ?? 0} packages'),
+      );
     } catch (_) {
       _packageCache = {};
     }
@@ -258,7 +275,11 @@ class AgenticaEngine extends ChangeNotifier {
           lastUsed: DateTime.now(),
         );
       }
-      _emit(AgenticaEvent.log('🧠 Loaded ${_semanticCache.length} semantic patterns'));
+      _emit(
+        AgenticaEvent.log(
+          '🧠 Loaded ${_semanticCache.length} semantic patterns',
+        ),
+      );
     } catch (_) {}
   }
 
@@ -270,7 +291,7 @@ class AgenticaEngine extends ChangeNotifier {
 
     final taskStopwatch = Stopwatch()..start();
     _resetState(task);
-    
+
     try {
       await _ch.invokeMethod('startForegroundMode', {'prompt': task.prompt});
     } catch (_) {}
@@ -299,7 +320,11 @@ class AgenticaEngine extends ChangeNotifier {
     if (hardwareResult != null) {
       taskStopwatch.stop();
       task.latencyMs = taskStopwatch.elapsedMilliseconds;
-      return _completeTask(task, hardwareResult, taskStopwatch.elapsedMilliseconds);
+      return _completeTask(
+        task,
+        hardwareResult,
+        taskStopwatch.elapsedMilliseconds,
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -308,15 +333,24 @@ class AgenticaEngine extends ChangeNotifier {
     final matchedSkill = _matchSkill(task.prompt);
     if (matchedSkill != null) {
       _emit(AgenticaEvent.log('🧠 Skill Triggered: ${matchedSkill.name}'));
-      if (matchedSkill.executableSteps != null && matchedSkill.executableSteps!.isNotEmpty) {
-         // Fast path via executable steps (skips LLM)
-         taskStopwatch.stop();
-         task.latencyMs = taskStopwatch.elapsedMilliseconds;
-         final scriptResult = await _executeScriptSequence(matchedSkill.executableSteps!, task);
-         return _completeTask(task, scriptResult, taskStopwatch.elapsedMilliseconds);
+      if (matchedSkill.executableSteps != null &&
+          matchedSkill.executableSteps!.isNotEmpty) {
+        // Fast path via executable steps (skips LLM)
+        taskStopwatch.stop();
+        task.latencyMs = taskStopwatch.elapsedMilliseconds;
+        final scriptResult = await _executeScriptSequence(
+          matchedSkill.executableSteps!,
+          task,
+        );
+        return _completeTask(
+          task,
+          scriptResult,
+          taskStopwatch.elapsedMilliseconds,
+        );
       } else {
-         // It's a prompt-based skill. Inject its instruction into the LLM context.
-         task.prompt = "[SKILL INSTRUCTION: ${matchedSkill.systemInstruction}]\n\nTask: ${task.prompt}";
+        // It's a prompt-based skill. Inject its instruction into the LLM context.
+        task.prompt =
+            "[SKILL INSTRUCTION: ${matchedSkill.systemInstruction}]\n\nTask: ${task.prompt}";
       }
     }
 
@@ -328,7 +362,11 @@ class AgenticaEngine extends ChangeNotifier {
     if (intentResult != null) {
       taskStopwatch.stop();
       task.latencyMs = taskStopwatch.elapsedMilliseconds;
-      return _completeTask(task, intentResult, taskStopwatch.elapsedMilliseconds);
+      return _completeTask(
+        task,
+        intentResult,
+        taskStopwatch.elapsedMilliseconds,
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -355,30 +393,31 @@ class AgenticaEngine extends ChangeNotifier {
   //  TIER 0: SEMANTIC CACHE — The OpenClaw Secret Weapon
   // ═════════════════════════════════════════════════════════════════════
   Future<_CacheEntry?> _checkSemanticCache(String prompt) async {
-    final embedding = _fastEmbed(prompt);  // O(n) hash-based embedding
-    
+    final embedding = _fastEmbed(prompt); // O(n) hash-based embedding
+
     // Exact match first
     if (_semanticCache.containsKey(embedding)) {
       return _semanticCache[embedding];
     }
-    
+
     // Fuzzy semantic match (hamming distance < 3)
     for (final entry in _semanticCache.values) {
       if (_hammingDistance(embedding, entry.embedding) < 3) {
         return entry;
       }
     }
-    
+
     return null;
   }
 
   String _fastEmbed(String text) {
     // Ultra-fast semantic hash: normalize + char-frequency fingerprint
-    final normalized = text.toLowerCase()
-      .replaceAll(RegExp(r'[^\w\s]'), '')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
-    
+    final normalized = text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
     // Simple but effective: first 3 chars of each word + length
     final words = normalized.split(' ');
     final buffer = StringBuffer();
@@ -398,7 +437,10 @@ class AgenticaEngine extends ChangeNotifier {
     return dist;
   }
 
-  Future<String> _executeCachedSequence(_CacheEntry cache, AgenticaTask task) async {
+  Future<String> _executeCachedSequence(
+    _CacheEntry cache,
+    AgenticaTask task,
+  ) async {
     for (final step in cache.sequence) {
       if (_shouldStop) {
         break;
@@ -410,7 +452,10 @@ class AgenticaEngine extends ChangeNotifier {
     return 'Completed from cache';
   }
 
-  Future<String> _executeScriptSequence(List<String> steps, AgenticaTask task) async {
+  Future<String> _executeScriptSequence(
+    List<String> steps,
+    AgenticaTask task,
+  ) async {
     for (final stepString in steps) {
       if (_shouldStop) break;
       final step = _parseStep(stepString);
@@ -419,7 +464,16 @@ class AgenticaEngine extends ChangeNotifier {
       _emit(AgenticaEvent.log('✓ Script: ${step.name}'));
 
       // If action mutated screen, delay and re-snapshot to avoid stale refs
-      const mutatingActions = ['open_app', 'click_ref', 'click_text', 'tap', 'scroll_down', 'scroll_up', 'press_back', 'press_home'];
+      const mutatingActions = [
+        'open_app',
+        'click_ref',
+        'click_text',
+        'tap',
+        'scroll_down',
+        'scroll_up',
+        'press_back',
+        'press_home',
+      ];
       if (mutatingActions.contains(step.name)) {
         await Future.delayed(const Duration(milliseconds: 1000));
         await _ch.invokeMethod<String>('takeRefSnapshot');
@@ -432,49 +486,54 @@ class AgenticaEngine extends ChangeNotifier {
     // Basic parser for script steps e.g. "OPEN whatsapp", "CLICK"
     final parts = stepString.trim().split(' ');
     final action = parts[0].toLowerCase();
-    
+
     String name = action;
     if (action == 'open') name = 'open_app';
     if (action == 'click') name = 'click_ref';
     if (action == 'type') name = 'type_ref';
-    
+
     final params = <String, String>{};
     if (parts.length > 1) {
-       final arg = stepString.substring(parts[0].length).trim();
-       
-       if (arg.startsWith('{') && arg.endsWith('}')) {
-         try {
-           final map = jsonDecode(arg) as Map;
-           params.addAll(map.map((k, v) => MapEntry(k.toString(), v.toString())));
-         } catch (_) {}
-       } else {
-         if (name == 'open_app') {
-            params['name'] = arg;
-            params['app'] = arg;
-         }
-         if (name == 'click_ref') params['ref'] = arg;
-         if (name == 'type_ref') params['text'] = arg;
-         if (name == 'click_text' || name == 'find_by_text') params['text'] = arg;
-         if (name == 'wait') params['ms'] = arg;
-         if (name == 'direct_call' || name == 'send_message') params['number'] = arg;
-       }
+      final arg = stepString.substring(parts[0].length).trim();
+
+      if (arg.startsWith('{') && arg.endsWith('}')) {
+        try {
+          final map = jsonDecode(arg) as Map;
+          params.addAll(
+            map.map((k, v) => MapEntry(k.toString(), v.toString())),
+          );
+        } catch (_) {}
+      } else {
+        if (name == 'open_app') {
+          params['name'] = arg;
+          params['app'] = arg;
+        }
+        if (name == 'click_ref') params['ref'] = arg;
+        if (name == 'type_ref') params['text'] = arg;
+        if (name == 'click_text' || name == 'find_by_text')
+          params['text'] = arg;
+        if (name == 'wait') params['ms'] = arg;
+        if (name == 'direct_call' || name == 'send_message')
+          params['number'] = arg;
+      }
     }
     return AgenticaToolCall(name: name, params: params);
   }
 
   JarvisSkill? _matchSkill(String prompt) {
     final allSkills = skillService.skills.where((s) => s.isActive).toList();
-    
-    final queryWords = prompt.toLowerCase()
+
+    final queryWords = prompt
+        .toLowerCase()
         .split(RegExp(r'[^a-zA-Z0-9]'))
         .where((w) => w.length > 2)
         .toSet();
-        
+
     if (queryWords.isEmpty) return null;
-    
+
     var bestScore = 0.0;
     JarvisSkill? bestSkill;
-    
+
     for (final s in allSkills) {
       if (s.id.startsWith('jarvis-dna-')) continue; // Skip DNA rules
       final kw = s.triggerKeywords.map((k) => k.toLowerCase()).toSet();
@@ -485,9 +544,9 @@ class AgenticaEngine extends ChangeNotifier {
         bestSkill = s;
       }
     }
-    
+
     if (bestScore > 0.3) {
-       return bestSkill;
+      return bestSkill;
     }
     return null;
   }
@@ -497,20 +556,20 @@ class AgenticaEngine extends ChangeNotifier {
   // ═════════════════════════════════════════════════════════════════════
   Future<String?> _tryHardwareDirect(String prompt) async {
     final p = prompt.toLowerCase();
-    
+
     // Torch — direct hardware control
     if (RegExp(r'\b(torch|flashlight)\b').hasMatch(p)) {
       final state = p.contains('off') ? 'off' : 'on';
       await _ch.invokeMethod('toggleTorch', {'state': state});
       return 'Torch $state';
     }
-    
+
     // Lock — direct system API
     if (p.contains('lock') || p.contains('screen off')) {
       await _ch.invokeMethod('lockScreen');
       return 'Screen locked';
     }
-    
+
     // Settings — direct intent
     final settingMap = {
       'wifi': 'android.settings.WIFI_SETTINGS',
@@ -520,14 +579,14 @@ class AgenticaEngine extends ChangeNotifier {
       'sound': 'android.settings.SOUND_SETTINGS',
       'battery': 'android.settings.BATTERY_SAVER_SETTINGS',
     };
-    
+
     for (final entry in settingMap.entries) {
       if (p.contains(entry.key)) {
         await _ch.invokeMethod('openSetting', {'action': entry.value});
         return 'Opened ${entry.key} settings';
       }
     }
-    
+
     return null;
   }
 
@@ -536,15 +595,16 @@ class AgenticaEngine extends ChangeNotifier {
   // ═════════════════════════════════════════════════════════════════════
   Future<String?> _tryIntentFastPath(AgenticaTask task) async {
     final p = task.prompt.toLowerCase();
-    
+
     // Call — search contact + direct intent
-    final callMatch = RegExp(r'^(?:call|phone|dial|ring)\s+(.+?)(?:\s+now)?$')
-      .firstMatch(task.prompt);
+    final callMatch = RegExp(
+      r'^(?:call|phone|dial|ring)\s+(.+?)(?:\s+now)?$',
+    ).firstMatch(task.prompt);
     if (callMatch != null && !p.contains('whatsapp')) {
       final name = callMatch.group(1)!.trim();
       return await _fastCall(name);
     }
-    
+
     // Message — search contact + intent (any app)
     final msgMatch = RegExp(
       r'(?:send|message|text)\s+(.+?)\s+(?:saying|that|with|:\s*)(.+)',
@@ -555,7 +615,7 @@ class AgenticaEngine extends ChangeNotifier {
       final text = msgMatch.group(2)!.trim();
       return await _fastMessage(name, text);
     }
-    
+
     // Open app — cached package lookup
     final openMatch = RegExp(
       r'^(?:open|launch|start)\s+(.+?)(?:\s+app)?$',
@@ -565,15 +625,17 @@ class AgenticaEngine extends ChangeNotifier {
       final appName = openMatch.group(1)!.trim();
       return await _fastOpenApp(appName);
     }
-    
+
     return null;
   }
 
   Future<String?> _fastCall(String name) async {
     final sw = Stopwatch()..start();
-    final contacts = await _ch.invokeMethod<String>('searchContacts', {'name': name});
+    final contacts = await _ch.invokeMethod<String>('searchContacts', {
+      'name': name,
+    });
     if (contacts == null || contacts.isEmpty) return null;
-    
+
     final lines = contacts.split('\n').where((l) => l.isNotEmpty).toList();
     if (lines.length == 1) {
       final number = lines.first.split('|').last.trim();
@@ -590,17 +652,16 @@ class AgenticaEngine extends ChangeNotifier {
 
   Future<String?> _fastMessage(String name, String text) async {
     final sw = Stopwatch()..start();
-    final contacts = await _ch.invokeMethod<String>('searchContacts', {'name': name});
+    final contacts = await _ch.invokeMethod<String>('searchContacts', {
+      'name': name,
+    });
     if (contacts == null || contacts.isEmpty) return null;
-    
+
     final lines = contacts.split('\n').where((l) => l.isNotEmpty).toList();
     if (lines.length == 1) {
       final number = lines.first.split('|').last.trim();
       // UNIVERSAL: Use SMS intent, not WhatsApp-specific
-      await _ch.invokeMethod('sendMessage', {
-        'number': number,
-        'text': text,
-      });
+      await _ch.invokeMethod('sendMessage', {'number': number, 'text': text});
       sw.stop();
       return 'Message to $name ready — ${sw.elapsedMilliseconds}ms';
     }
@@ -609,12 +670,12 @@ class AgenticaEngine extends ChangeNotifier {
 
   Future<String?> _fastOpenApp(String appName) async {
     final sw = Stopwatch()..start();
-    
+
     // Cache hit?
     if (_packageCache != null) {
       final query = appName.toLowerCase();
       for (final entry in _packageCache!.entries) {
-        if (entry.key.toLowerCase().contains(query) || 
+        if (entry.key.toLowerCase().contains(query) ||
             query.contains(entry.key.toLowerCase())) {
           await _ch.invokeMethod('launchApp', {'package': entry.value});
           sw.stop();
@@ -622,7 +683,7 @@ class AgenticaEngine extends ChangeNotifier {
         }
       }
     }
-    
+
     // Fallback to dynamic
     await _ch.invokeMethod('launchAppByName', {'name': appName});
     sw.stop();
@@ -638,7 +699,7 @@ class AgenticaEngine extends ChangeNotifier {
     _addCtx('system', initSnap);
 
     String lastResponse = '';
-    
+
     try {
       for (int turn = 1; turn <= _Speed.maxTurns && !_shouldStop; turn++) {
         task.turnsUsed = turn;
@@ -647,7 +708,7 @@ class AgenticaEngine extends ChangeNotifier {
         // Build ultra-compact context
         final context = _buildCompactContext();
         final prompt = '$_ultraCompactSystem\n$context\n→';
-        
+
         // LLM inference with streaming
         final response = await _inferBinary(prompt);
         if (response == null) continue;
@@ -665,7 +726,7 @@ class AgenticaEngine extends ChangeNotifier {
         // PARALLEL EXECUTION: Batch independent tools
         final batch = _batchParallel(tools);
         final results = await _executeParallelBatch(batch);
-        
+
         for (int i = 0; i < results.length; i++) {
           _executedTools.add(batch[i].name);
           _addCtx('t', '${batch[i].name}:${results[i]}');
@@ -677,7 +738,9 @@ class AgenticaEngine extends ChangeNotifier {
 
         // Check terminal
         if (response.contains('DONE:')) {
-          final summary = response.substring(response.indexOf('DONE:') + 5).trim();
+          final summary = response
+              .substring(response.indexOf('DONE:') + 5)
+              .trim();
           _learnToCache(task, sw.elapsedMilliseconds);
           sw.stop();
           return _completeTask(task, summary, sw.elapsedMilliseconds);
@@ -692,8 +755,11 @@ class AgenticaEngine extends ChangeNotifier {
 
       sw.stop();
       task.status = AgenticaTaskStatus.timedOut;
-      return _completeTask(task, 'Timed out: $lastResponse', sw.elapsedMilliseconds);
-      
+      return _completeTask(
+        task,
+        'Timed out: $lastResponse',
+        sw.elapsedMilliseconds,
+      );
     } catch (e) {
       sw.stop();
       task.status = AgenticaTaskStatus.failed;
@@ -701,7 +767,9 @@ class AgenticaEngine extends ChangeNotifier {
       _emit(AgenticaEvent.status('failed', '❌ $e'));
       return 'Failed: $e';
     } finally {
-      try { await _ch.invokeMethod('stopForegroundMode'); } catch (_) {}
+      try {
+        await _ch.invokeMethod('stopForegroundMode');
+      } catch (_) {}
       _isRunning = false;
       _currentTask = null;
       notifyListeners();
@@ -711,27 +779,27 @@ class AgenticaEngine extends ChangeNotifier {
   // ─── Incremental Snapshot (OpenClaw-style) ──────────────────────────
   Future<String> _incrementalSnapshot({bool forceFull = false}) async {
     final sw = Stopwatch()..start();
-    
+
     if (!forceFull && _lastScreen != null) {
       // Try incremental diff first
       try {
         final diff = await _ch.invokeMethod<String>('takeIncrementalSnapshot');
         if (diff != null && diff.isNotEmpty) {
           sw.stop();
-          return 'Δ$diff';  // Delta notation
+          return 'Δ$diff'; // Delta notation
         }
       } catch (_) {}
     }
-    
+
     // Full snapshot fallback
     final full = await _ch.invokeMethod<String>('takeRefSnapshot');
     _lastScreen = _ScreenState(
-      refMap: {},  // Parsed from full
+      refMap: {}, // Parsed from full
       snapshot: full ?? '',
       activePackage: '',
       timestamp: DateTime.now(),
     );
-    
+
     sw.stop();
     return full ?? 'EMPTY';
   }
@@ -740,22 +808,29 @@ class AgenticaEngine extends ChangeNotifier {
   List<AgenticaToolCall> _batchParallel(List<AgenticaToolCall> tools) {
     // Independent tools can run together
     final independent = [
-      'open_app', 'press_home', 'press_back', 'toggle_torch',
-      'lock_screen', 'direct_call', 'send_message',
+      'open_app',
+      'press_home',
+      'press_back',
+      'toggle_torch',
+      'lock_screen',
+      'direct_call',
+      'send_message',
     ];
-    
+
     final batch = <AgenticaToolCall>[];
     for (final t in tools) {
       if (independent.contains(t.name) || batch.isEmpty) {
         batch.add(t);
       } else {
-        break;  // Sequential for dependent ops
+        break; // Sequential for dependent ops
       }
     }
     return batch;
   }
 
-  Future<List<String>> _executeParallelBatch(List<AgenticaToolCall> batch) async {
+  Future<List<String>> _executeParallelBatch(
+    List<AgenticaToolCall> batch,
+  ) async {
     final futures = batch.map((t) => _executeTool(t)).toList();
     return await Future.wait(futures);
   }
@@ -770,7 +845,7 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
   // ─── Binary/Ultra-Fast Tool Parser ──────────────────────────────────
   List<AgenticaToolCall> _parseToolsUltraFast(String response) {
     final calls = <AgenticaToolCall>[];
-    
+
     // Binary format: \x02ref=@e3 (for high-speed local LLM)
     if (response.contains('\x00')) {
       // Parse binary protocol
@@ -781,7 +856,7 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
         if (token == ToolToken.DONE) {
           break;
         }
-        
+
         final name = _tokenToName(token);
         if (name != null) {
           final params = <String, String>{};
@@ -805,35 +880,52 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
       }
       return calls;
     }
-    
+
     // Text fallback (for cloud LLMs)
     final re = RegExp(r'(?:TOOL:)?([a-z_]+)(?::|\|)([^\n]*)');
     for (final m in re.allMatches(response)) {
-      calls.add(AgenticaToolCall(
-        name: m.group(1)!,
-        params: _parseParamsFast(m.group(2)!),
-      ));
+      calls.add(
+        AgenticaToolCall(
+          name: m.group(1)!,
+          params: _parseParamsFast(m.group(2)!),
+        ),
+      );
     }
     return calls;
   }
 
   String? _tokenToName(int token) {
     switch (token) {
-      case ToolToken.SNAP: return 'snapshot';
-      case ToolToken.CLICK: return 'click_ref';
-      case ToolToken.TYPE: return 'type_ref';
-      case ToolToken.TAP: return 'tap';
-      case ToolToken.SCROLL: return 'scroll_down';
-      case ToolToken.BACK: return 'press_back';
-      case ToolToken.HOME: return 'press_home';
-      case ToolToken.OPEN: return 'open_app';
-      case ToolToken.FIND: return 'find_by_text';
-      case ToolToken.WAIT: return 'wait';
-      case ToolToken.CALL: return 'direct_call';
-      case ToolToken.MSG: return 'send_message';
-      case ToolToken.LOCK: return 'lock_screen';
-      case ToolToken.TORCH: return 'toggle_torch';
-      default: return null;
+      case ToolToken.SNAP:
+        return 'snapshot';
+      case ToolToken.CLICK:
+        return 'click_ref';
+      case ToolToken.TYPE:
+        return 'type_ref';
+      case ToolToken.TAP:
+        return 'tap';
+      case ToolToken.SCROLL:
+        return 'scroll_down';
+      case ToolToken.BACK:
+        return 'press_back';
+      case ToolToken.HOME:
+        return 'press_home';
+      case ToolToken.OPEN:
+        return 'open_app';
+      case ToolToken.FIND:
+        return 'find_by_text';
+      case ToolToken.WAIT:
+        return 'wait';
+      case ToolToken.CALL:
+        return 'direct_call';
+      case ToolToken.MSG:
+        return 'send_message';
+      case ToolToken.LOCK:
+        return 'lock_screen';
+      case ToolToken.TORCH:
+        return 'toggle_torch';
+      default:
+        return null;
     }
   }
 
@@ -848,7 +940,8 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
 
   // ─── Ultra-Aggressive Context Guard ─────────────────────────────────
   void _guardContextUltraAggressive() {
-    while (_buildCompactContext().length > _Speed.maxContextChars && _context.length > 3) {
+    while (_buildCompactContext().length > _Speed.maxContextChars &&
+        _context.length > 3) {
       // Keep first (task) and last 2 (recent state)
       final first = _context.first;
       final last = _context.last;
@@ -884,18 +977,20 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
 
   // ─── Cache Learning ───────────────────────────────────────────────────
   void _learnToCache(AgenticaTask task, int latencyMs) {
-    if (task.turnsUsed > 3) return;  // Only cache simple patterns
-    
+    if (task.turnsUsed > 3) return; // Only cache simple patterns
+
     final embedding = _fastEmbed(task.prompt);
-    final sequence = _executedTools.map((t) => AgenticaToolCall(name: t, params: {})).toList();
-    
+    final sequence = _executedTools
+        .map((t) => AgenticaToolCall(name: t, params: {}))
+        .toList();
+
     _semanticCache[embedding] = _CacheEntry(
       embedding: embedding,
       sequence: sequence,
       avgLatencyMs: latencyMs,
       lastUsed: DateTime.now(),
     );
-    
+
     // Async persist
     AgenticaMemory.learnPattern(
       prompt: task.prompt,
@@ -908,10 +1003,14 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
     // Parse from JSON storage
     try {
       final list = jsonDecode(json) as List;
-      return list.map((t) => AgenticaToolCall(
-        name: t['name'],
-        params: (t['params'] as Map).cast<String, String>(),
-      )).toList();
+      return list
+          .map(
+            (t) => AgenticaToolCall(
+              name: t['name'],
+              params: (t['params'] as Map).cast<String, String>(),
+            ),
+          )
+          .toList();
     } catch (_) {
       return [];
     }
@@ -925,9 +1024,13 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
         case 'snapshot':
           result = await _ch.invokeMethod<String>('takeRefSnapshot');
         case 'click_ref':
-          result = await _ch.invokeMethod<String>('clickRef', {'ref': call.params['ref']});
+          result = await _ch.invokeMethod<String>('clickRef', {
+            'ref': call.params['ref'],
+          });
         case 'type_ref':
-          final clearFirst = call.params['clear'] == 'true' || call.params['clearFirst'] == 'true';
+          final clearFirst =
+              call.params['clear'] == 'true' ||
+              call.params['clearFirst'] == 'true';
           if (call.params['ref'] == null || call.params['ref']!.isEmpty) {
             result = await _ch.invokeMethod<String>('typeFocused', {
               'text': call.params['text'],
@@ -954,24 +1057,34 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
         case 'press_home':
           result = await _ch.invokeMethod<String>('pressHome');
         case 'open_app':
-          result = await _fastOpenApp(call.params['name'] ?? call.params['app'] ?? '');
+          result = await _fastOpenApp(
+            call.params['name'] ?? call.params['app'] ?? '',
+          );
         case 'find_by_text':
-          result = await _ch.invokeMethod<String>('findRefByText', {'text': call.params['text']});
+          result = await _ch.invokeMethod<String>('findRefByText', {
+            'text': call.params['text'],
+          });
         case 'click_text':
-          result = await _ch.invokeMethod<String>('clickNodeByText', {'text': call.params['text']});
+          result = await _ch.invokeMethod<String>('clickNodeByText', {
+            'text': call.params['text'],
+          });
         case 'wait':
           final ms = (int.parse(call.params['ms'] ?? '100')).clamp(0, 500);
           await Future.delayed(Duration(milliseconds: ms));
           result = 'wait:$ms';
         case 'direct_call':
-          result = await _ch.invokeMethod<String>('directCall', {'number': call.params['number']});
+          result = await _ch.invokeMethod<String>('directCall', {
+            'number': call.params['number'],
+          });
         case 'send_message':
           result = await _ch.invokeMethod<String>('sendMessage', {
             'number': call.params['number'],
             'text': call.params['text'],
           });
         case 'toggle_torch':
-          result = await _ch.invokeMethod<String>('toggleTorch', {'state': call.params['state']});
+          result = await _ch.invokeMethod<String>('toggleTorch', {
+            'state': call.params['state'],
+          });
         case 'lock_screen':
           result = await _ch.invokeMethod<String>('lockScreen');
         case 'take_screenshot':
@@ -981,7 +1094,9 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
         case 'read_screen':
           result = await _ch.invokeMethod<String>('getScreenContext');
         case 'search_contacts':
-          result = await _ch.invokeMethod<String>('searchContacts', {'name': call.params['name']});
+          result = await _ch.invokeMethod<String>('searchContacts', {
+            'name': call.params['name'],
+          });
         default:
           result = 'unknown:${call.name}';
       }
@@ -1065,18 +1180,20 @@ class AgenticaQueueManager extends ChangeNotifier {
 
   Future<void> _processNext() async {
     if (_processing) return;
-    final pending = _queue.where((t) => t.status == AgenticaTaskStatus.queued).toList();
+    final pending = _queue
+        .where((t) => t.status == AgenticaTaskStatus.queued)
+        .toList();
     if (pending.isEmpty) return;
-    
+
     _processing = true;
     final task = pending.first;
-    
+
     try {
       await engine.runTask(task);
     } finally {
       _processing = false;
       notifyListeners();
-      
+
       if (task.status == AgenticaTaskStatus.failed && task.retryCount < 1) {
         task.retryCount++;
         Future.delayed(const Duration(seconds: 1), () {

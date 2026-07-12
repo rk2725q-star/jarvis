@@ -16,8 +16,8 @@ class ChatMessage {
 
 class NetlessContextManager {
   static const int gemmaMaxTokens = 1024;
-  static const int safeLimit = 800;        // leave room for response
-  static const int charsPerToken = 3;     // Tamil+English mixed = ~3 chars/token
+  static const int safeLimit = 800; // leave room for response
+  static const int charsPerToken = 3; // Tamil+English mixed = ~3 chars/token
   static const int summaryMaxChars = 400; // summary budget
 
   final List<ChatMessage> _history = [];
@@ -34,12 +34,14 @@ class NetlessContextManager {
     _messageCounter++;
 
     // Tag message with index for direct access
-    _history.add(ChatMessage(
-      index: _messageCounter,
-      role: 'user',
-      content: newUserMessage,
-      timestamp: DateTime.now(),
-    ));
+    _history.add(
+      ChatMessage(
+        index: _messageCounter,
+        role: 'user',
+        content: newUserMessage,
+        timestamp: DateTime.now(),
+      ),
+    );
 
     // Compress if needed
     if (_estimatedTokens() > safeLimit) {
@@ -51,12 +53,14 @@ class NetlessContextManager {
 
   /// Add assistant response to history
   void addAssistantResponse(String content) {
-    _history.add(ChatMessage(
-      index: _messageCounter,
-      role: 'assistant',
-      content: content,
-      timestamp: DateTime.now(),
-    ));
+    _history.add(
+      ChatMessage(
+        index: _messageCounter,
+        role: 'assistant',
+        content: content,
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 
   /// Direct access by message index (e.g. "refer to message 3")
@@ -73,14 +77,18 @@ class NetlessContextManager {
     // Pattern: "message 3", "#3", "response 3", "third message"
     final numericPattern = RegExp(r'message\s+(\d+)|#(\d+)|response\s+(\d+)');
     final ordinalMap = {
-      'first': 1, 'second': 2, 'third': 3,
-      'fourth': 4, 'fifth': 5, 'last': _messageCounter,
+      'first': 1,
+      'second': 2,
+      'third': 3,
+      'fourth': 4,
+      'fifth': 5,
+      'last': _messageCounter,
     };
 
     final numMatch = numericPattern.firstMatch(userMessage.toLowerCase());
     if (numMatch != null) {
       final idx = int.tryParse(
-        numMatch.group(1) ?? numMatch.group(2) ?? numMatch.group(3) ?? ''
+        numMatch.group(1) ?? numMatch.group(2) ?? numMatch.group(3) ?? '',
       );
       if (idx != null) return getByIndex(idx);
     }
@@ -115,8 +123,7 @@ class NetlessContextManager {
         .join('\n');
 
     // Use a TINY summarization prompt — must fit in tokens itself!
-    final summaryPrompt =
-        'Summarize in 2 sentences:\n$block';
+    final summaryPrompt = 'Summarize in 2 sentences:\n$block';
 
     try {
       final newSummary = await netless.generate(summaryPrompt);

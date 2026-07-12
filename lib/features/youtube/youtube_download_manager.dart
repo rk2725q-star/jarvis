@@ -21,12 +21,13 @@ class YTNotificationService {
   static Future<void> init() async {
     if (_initialized) return;
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    await _plugin.initialize(settings: const InitializationSettings(android: android));
+    await _plugin.initialize(
+      settings: const InitializationSettings(android: android),
+    );
     _initialized = true;
   }
 
-  static Future<void> showProgress(
-      int id, String title, int progress) async {
+  static Future<void> showProgress(int id, String title, int progress) async {
     await init();
     await _plugin.show(
       id: id,
@@ -75,20 +76,33 @@ class YTNotificationService {
 // ─────────────────────────────────────────────
 // MODELS
 // ─────────────────────────────────────────────
-enum DownloadStatus { pending, fetching, downloading, completed, failed, cancelled }
+enum DownloadStatus {
+  pending,
+  fetching,
+  downloading,
+  completed,
+  failed,
+  cancelled,
+}
 
 enum VideoQuality { p1080, p720, p480, p360, audioOnly }
 
 extension VideoQualityLabel on VideoQuality {
   String get label {
     switch (this) {
-      case VideoQuality.p1080: return '1080p HD';
-      case VideoQuality.p720:  return '720p HD';
-      case VideoQuality.p480:  return '480p';
-      case VideoQuality.p360:  return '360p';
-      case VideoQuality.audioOnly: return 'Audio MP3';
+      case VideoQuality.p1080:
+        return '1080p HD';
+      case VideoQuality.p720:
+        return '720p HD';
+      case VideoQuality.p480:
+        return '480p';
+      case VideoQuality.p360:
+        return '360p';
+      case VideoQuality.audioOnly:
+        return 'Audio MP3';
     }
   }
+
   String get ext => this == VideoQuality.audioOnly ? 'mp3' : 'mp4';
   IconData get icon => this == VideoQuality.audioOnly
       ? Icons.music_note_rounded
@@ -130,23 +144,35 @@ class DownloadItem {
 
   String get statusText {
     switch (status) {
-      case DownloadStatus.pending:     return 'Waiting';
-      case DownloadStatus.fetching:    return 'Fetching info...';
-      case DownloadStatus.downloading: return '${(progress * 100).toStringAsFixed(1)}%';
-      case DownloadStatus.completed:   return 'Completed';
-      case DownloadStatus.failed:      return 'Failed';
-      case DownloadStatus.cancelled:   return 'Cancelled';
+      case DownloadStatus.pending:
+        return 'Waiting';
+      case DownloadStatus.fetching:
+        return 'Fetching info...';
+      case DownloadStatus.downloading:
+        return '${(progress * 100).toStringAsFixed(1)}%';
+      case DownloadStatus.completed:
+        return 'Completed';
+      case DownloadStatus.failed:
+        return 'Failed';
+      case DownloadStatus.cancelled:
+        return 'Cancelled';
     }
   }
 
   Color get statusColor {
     switch (status) {
-      case DownloadStatus.pending:     return Colors.grey;
-      case DownloadStatus.fetching:    return const Color(0xFFFFB347);
-      case DownloadStatus.downloading: return const Color(0xFF00D4FF);
-      case DownloadStatus.completed:   return const Color(0xFF00E676);
-      case DownloadStatus.failed:      return const Color(0xFFFF4444);
-      case DownloadStatus.cancelled:   return Colors.grey;
+      case DownloadStatus.pending:
+        return Colors.grey;
+      case DownloadStatus.fetching:
+        return const Color(0xFFFFB347);
+      case DownloadStatus.downloading:
+        return const Color(0xFF00D4FF);
+      case DownloadStatus.completed:
+        return const Color(0xFF00E676);
+      case DownloadStatus.failed:
+        return const Color(0xFFFF4444);
+      case DownloadStatus.cancelled:
+        return Colors.grey;
     }
   }
 }
@@ -161,11 +187,15 @@ class YTDownloadProvider extends ChangeNotifier {
 
   List<DownloadItem> get items => List.unmodifiable(_items);
   int get activeCount => _items
-      .where((i) => i.status == DownloadStatus.downloading ||
-                    i.status == DownloadStatus.fetching)
+      .where(
+        (i) =>
+            i.status == DownloadStatus.downloading ||
+            i.status == DownloadStatus.fetching,
+      )
       .length;
 
-  static const String _downloadFolder = '/storage/emulated/0/Download/YouTubeDL';
+  static const String _downloadFolder =
+      '/storage/emulated/0/Download/YouTubeDL';
 
   Future<void> addDownload(String rawUrl, VideoQuality quality) async {
     final cleanUrl = _sanitizeUrl(rawUrl);
@@ -210,10 +240,11 @@ class YTDownloadProvider extends ChangeNotifier {
           .substring(0, math.min(video.title.length, 60));
 
       if (item.quality == VideoQuality.audioOnly) {
-        final audioStream = manifest.audioOnly
-            .where((s) => s.codec.mimeType.contains('mp4'))
-            .toList()
-          ..sort((a, b) => b.bitrate.compareTo(a.bitrate));
+        final audioStream =
+            manifest.audioOnly
+                .where((s) => s.codec.mimeType.contains('mp4'))
+                .toList()
+              ..sort((a, b) => b.bitrate.compareTo(a.bitrate));
 
         if (audioStream.isEmpty) throw Exception('No audio stream found');
 
@@ -224,7 +255,10 @@ class YTDownloadProvider extends ChangeNotifier {
 
         // Sort muxed streams from highest to lowest resolution
         final muxed = manifest.muxed.toList()
-          ..sort((a, b) => b.videoResolution.height.compareTo(a.videoResolution.height));
+          ..sort(
+            (a, b) =>
+                b.videoResolution.height.compareTo(a.videoResolution.height),
+          );
 
         // Prefer exact match, then closest below target, then closest above target
         MuxedStreamInfo? chosen;
@@ -245,7 +279,8 @@ class YTDownloadProvider extends ChangeNotifier {
           chosen = manifest.muxed.withHighestBitrate();
         }
 
-        if (chosen == null) throw Exception('No video stream found for ${item.quality.label}');
+        if (chosen == null)
+          throw Exception('No video stream found for ${item.quality.label}');
 
         downloadUrl = chosen.url.toString();
         fileName = '${safeTitle}_${item.quality.label}.mp4';
@@ -278,10 +313,7 @@ class YTDownloadProvider extends ChangeNotifier {
           }
         },
         options: Options(
-          headers: {
-            'User-Agent': 'Mozilla/5.0',
-            'Accept': '*/*',
-          },
+          headers: {'User-Agent': 'Mozilla/5.0', 'Accept': '*/*'},
           receiveTimeout: const Duration(minutes: 30),
         ),
       );
@@ -295,7 +327,6 @@ class YTDownloadProvider extends ChangeNotifier {
       final notifId = int.parse(item.id.substring(item.id.length - 6));
       await YTNotificationService.cancel(notifId);
       await YTNotificationService.showComplete(notifId, item.title);
-
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) {
         item.status = DownloadStatus.cancelled;
@@ -362,11 +393,16 @@ class YTDownloadProvider extends ChangeNotifier {
 
   int _qualityToHeight(VideoQuality q) {
     switch (q) {
-      case VideoQuality.p1080: return 1080;
-      case VideoQuality.p720:  return 720;
-      case VideoQuality.p480:  return 480;
-      case VideoQuality.p360:  return 360;
-      default: return 720;
+      case VideoQuality.p1080:
+        return 1080;
+      case VideoQuality.p720:
+        return 720;
+      case VideoQuality.p480:
+        return 480;
+      case VideoQuality.p360:
+        return 360;
+      default:
+        return 720;
     }
   }
 
@@ -375,8 +411,9 @@ class YTDownloadProvider extends ChangeNotifier {
     final h = d.inHours;
     final m = d.inMinutes.remainder(60);
     final s = d.inSeconds.remainder(60);
-    if (h > 0) return '$h:${m.toString().padLeft(2,'0')}:${s.toString().padLeft(2,'0')}';
-    return '$m:${s.toString().padLeft(2,'0')}';
+    if (h > 0)
+      return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    return '$m:${s.toString().padLeft(2, '0')}';
   }
 
   String _friendlyError(String e) {
@@ -400,8 +437,10 @@ class YTDownloadProvider extends ChangeNotifier {
       try {
         final result = await Process.run('am', [
           'broadcast',
-          '-a', 'android.intent.action.MEDIA_SCANNER_SCAN_FILE',
-          '-d', 'file://$path',
+          '-a',
+          'android.intent.action.MEDIA_SCANNER_SCAN_FILE',
+          '-d',
+          'file://$path',
         ]);
         debugPrint('MediaScanner: ${result.stdout}');
       } catch (_) {}
@@ -487,12 +526,18 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
     });
 
     try {
-      await context.read<YTDownloadProvider>().addDownload(url, _selectedQuality);
+      await context.read<YTDownloadProvider>().addDownload(
+        url,
+        _selectedQuality,
+      );
       _urlController.clear();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Download started!', style: GoogleFonts.spaceGrotesk()),
+            content: Text(
+              'Download started!',
+              style: GoogleFonts.spaceGrotesk(),
+            ),
             backgroundColor: const Color(0xFF00E676),
             behavior: SnackBarBehavior.floating,
           ),
@@ -520,7 +565,10 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A0000),
         elevation: 0,
-        title: Text('YouTube Downloads', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold)),
+        title: Text(
+          'YouTube Downloads',
+          style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold),
+        ),
       ),
       body: CustomScrollView(
         slivers: [
@@ -547,24 +595,31 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                               color: const Color(0xFFFF0000),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.download_rounded,
-                                color: Colors.white, size: 24),
+                            child: const Icon(
+                              Icons.download_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('YT Downloader',
-                                  style: GoogleFonts.spaceGrotesk(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  )),
-                              Text('Save to Downloads folder',
-                                  style: GoogleFonts.spaceGrotesk(
-                                    fontSize: 12,
-                                    color: Colors.white38,
-                                  )),
+                              Text(
+                                'YT Downloader',
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                'Save to Downloads folder',
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 12,
+                                  color: Colors.white38,
+                                ),
+                              ),
                             ],
                           ),
                           const Spacer(),
@@ -572,14 +627,18 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                             builder: (_, p, child) => p.activeCount > 0
                                 ? Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF00D4FF)
-                                          .withValues(alpha: 0.2),
+                                      color: const Color(
+                                        0xFF00D4FF,
+                                      ).withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                          color: const Color(0xFF00D4FF),
-                                          width: 1),
+                                        color: const Color(0xFF00D4FF),
+                                        width: 1,
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
@@ -592,12 +651,14 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        Text('${p.activeCount} active',
-                                            style: GoogleFonts.spaceGrotesk(
-                                              fontSize: 11,
-                                              color: const Color(0xFF00D4FF),
-                                              fontWeight: FontWeight.w600,
-                                            )),
+                                        Text(
+                                          '${p.activeCount} active',
+                                          style: GoogleFonts.spaceGrotesk(
+                                            fontSize: 11,
+                                            color: const Color(0xFF00D4FF),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ).animate().fadeIn()
@@ -622,8 +683,11 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                             Row(
                               children: [
                                 const SizedBox(width: 16),
-                                const Icon(Icons.link_rounded,
-                                    color: Colors.white38, size: 20),
+                                const Icon(
+                                  Icons.link_rounded,
+                                  color: Colors.white38,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: TextField(
@@ -639,8 +703,10 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                                         fontSize: 14,
                                       ),
                                       border: InputBorder.none,
-                                      contentPadding: const EdgeInsets.symmetric(
-                                          vertical: 16),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 16,
+                                          ),
                                     ),
                                     onChanged: (_) =>
                                         setState(() => _urlError = null),
@@ -651,35 +717,51 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                                   child: Container(
                                     margin: const EdgeInsets.all(8),
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.08),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.08,
+                                      ),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Text('PASTE',
-                                        style: GoogleFonts.spaceGrotesk(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white54,
-                                        )),
+                                    child: Text(
+                                      'PASTE',
+                                      style: GoogleFonts.spaceGrotesk(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white54,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                             if (_urlError != null)
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  0,
+                                  16,
+                                  12,
+                                ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.error_outline,
-                                        color: Color(0xFFFF4444), size: 14),
+                                    const Icon(
+                                      Icons.error_outline,
+                                      color: Color(0xFFFF4444),
+                                      size: 14,
+                                    ),
                                     const SizedBox(width: 6),
                                     Expanded(
-                                      child: Text(_urlError!,
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: const Color(0xFFFF4444),
-                                            fontSize: 12,
-                                          )),
+                                      child: Text(
+                                        _urlError!,
+                                        style: GoogleFonts.spaceGrotesk(
+                                          color: const Color(0xFFFF4444),
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -695,13 +777,14 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                           children: VideoQuality.values.map((q) {
                             final selected = _selectedQuality == q;
                             return GestureDetector(
-                              onTap: () =>
-                                  setState(() => _selectedQuality = q),
+                              onTap: () => setState(() => _selectedQuality = q),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
                                 margin: const EdgeInsets.only(right: 8),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 0),
+                                  horizontal: 14,
+                                  vertical: 0,
+                                ),
                                 decoration: BoxDecoration(
                                   color: selected
                                       ? const Color(0xFFFF0000)
@@ -715,20 +798,24 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(q.icon,
-                                        size: 14,
+                                    Icon(
+                                      q.icon,
+                                      size: 14,
+                                      color: selected
+                                          ? Colors.white
+                                          : Colors.white38,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      q.label,
+                                      style: GoogleFonts.spaceGrotesk(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
                                         color: selected
                                             ? Colors.white
-                                            : Colors.white38),
-                                    const SizedBox(width: 6),
-                                    Text(q.label,
-                                        style: GoogleFonts.spaceGrotesk(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: selected
-                                              ? Colors.white
-                                              : Colors.white38,
-                                        )),
+                                            : Colors.white38,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -744,10 +831,12 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                           onPressed: _isAdding ? null : _addDownload,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFFF0000),
-                            disabledBackgroundColor:
-                                const Color(0xFFFF0000).withValues(alpha: 0.4),
+                            disabledBackgroundColor: const Color(
+                              0xFFFF0000,
+                            ).withValues(alpha: 0.4),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                             elevation: 0,
                           ),
                           child: _isAdding
@@ -755,21 +844,28 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white),
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(Icons.download_rounded,
-                                        color: Colors.white, size: 20),
+                                    const Icon(
+                                      Icons.download_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
                                     const SizedBox(width: 8),
-                                    Text('DOWNLOAD NOW',
-                                        style: GoogleFonts.spaceGrotesk(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                          letterSpacing: 1,
-                                        )),
+                                    Text(
+                                      'DOWNLOAD NOW',
+                                      style: GoogleFonts.spaceGrotesk(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
                                   ],
                                 ),
                         ),
@@ -785,13 +881,15 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
               child: Row(
                 children: [
-                  Text('DOWNLOADS',
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white24,
-                        letterSpacing: 2,
-                      )),
+                  Text(
+                    'DOWNLOADS',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white24,
+                      letterSpacing: 2,
+                    ),
+                  ),
                   const Spacer(),
                   Consumer<YTDownloadProvider>(
                     builder: (_, p, child) => Text(
@@ -815,21 +913,28 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                       padding: const EdgeInsets.all(60),
                       child: Column(
                         children: [
-                          const Icon(Icons.download_rounded,
-                              size: 64, color: Colors.white12),
+                          const Icon(
+                            Icons.download_rounded,
+                            size: 64,
+                            color: Colors.white12,
+                          ),
                           const SizedBox(height: 16),
-                          Text('No downloads yet',
-                              style: GoogleFonts.spaceGrotesk(
-                                color: Colors.white24,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              )),
+                          Text(
+                            'No downloads yet',
+                            style: GoogleFonts.spaceGrotesk(
+                              color: Colors.white24,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           const SizedBox(height: 8),
-                          Text('Paste a YouTube URL above to start',
-                              style: GoogleFonts.spaceGrotesk(
-                                color: Colors.white12,
-                                fontSize: 13,
-                              )),
+                          Text(
+                            'Paste a YouTube URL above to start',
+                            style: GoogleFonts.spaceGrotesk(
+                              color: Colors.white12,
+                              fontSize: 13,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -840,9 +945,11 @@ class _YTDownloaderScreenState extends State<YTDownloaderScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (ctx, i) => _YTDownloadCard(
                     item: provider.items[i],
-                    onCancel: () => provider.cancelDownload(provider.items[i].id),
+                    onCancel: () =>
+                        provider.cancelDownload(provider.items[i].id),
                     onRetry: () => provider.retryDownload(provider.items[i].id),
-                    onRemove: () => provider.removeDownload(provider.items[i].id),
+                    onRemove: () =>
+                        provider.removeDownload(provider.items[i].id),
                   ).animate().fadeIn(delay: Duration(milliseconds: i * 50)),
                   childCount: provider.items.length,
                 ),
@@ -871,14 +978,18 @@ class _YTDownloadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = item.status == DownloadStatus.downloading || item.status == DownloadStatus.fetching;
+    final isActive =
+        item.status == DownloadStatus.downloading ||
+        item.status == DownloadStatus.fetching;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
         color: const Color(0xFF13131A),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isActive ? item.statusColor.withValues(alpha: 0.3) : const Color(0xFF1E1E2A),
+          color: isActive
+              ? item.statusColor.withValues(alpha: 0.3)
+              : const Color(0xFF1E1E2A),
           width: 1.5,
         ),
       ),
@@ -897,7 +1008,8 @@ class _YTDownloadCard extends StatelessWidget {
                           width: 80,
                           height: 56,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => _placeholderThumb(),
+                          errorBuilder: (context, error, stackTrace) =>
+                              _placeholderThumb(),
                         )
                       : _placeholderThumb(),
                 ),
@@ -906,9 +1018,15 @@ class _YTDownloadCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item.title,
-                        style: GoogleFonts.spaceGrotesk(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
-                        maxLines: 2, overflow: TextOverflow.ellipsis,
+                      Text(
+                        item.title,
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Row(
@@ -926,13 +1044,39 @@ class _YTDownloadCard extends StatelessWidget {
                 Column(
                   children: [
                     if (isActive)
-                      GestureDetector(onTap: onCancel, child: const Icon(Icons.stop_circle_rounded, color: Color(0xFFFF4444), size: 24))
-                    else if (item.status == DownloadStatus.failed || item.status == DownloadStatus.cancelled)
-                      GestureDetector(onTap: onRetry, child: const Icon(Icons.refresh_rounded, color: Color(0xFF00D4FF), size: 24))
+                      GestureDetector(
+                        onTap: onCancel,
+                        child: const Icon(
+                          Icons.stop_circle_rounded,
+                          color: Color(0xFFFF4444),
+                          size: 24,
+                        ),
+                      )
+                    else if (item.status == DownloadStatus.failed ||
+                        item.status == DownloadStatus.cancelled)
+                      GestureDetector(
+                        onTap: onRetry,
+                        child: const Icon(
+                          Icons.refresh_rounded,
+                          color: Color(0xFF00D4FF),
+                          size: 24,
+                        ),
+                      )
                     else if (item.status == DownloadStatus.completed)
-                      const Icon(Icons.check_circle_rounded, color: Color(0xFF00E676), size: 24),
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        color: Color(0xFF00E676),
+                        size: 24,
+                      ),
                     const SizedBox(height: 8),
-                    GestureDetector(onTap: onRemove, child: const Icon(Icons.close_rounded, color: Colors.white24, size: 18)),
+                    GestureDetector(
+                      onTap: onRemove,
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white24,
+                        size: 18,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -955,21 +1099,48 @@ class _YTDownloadCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             child: Row(
               children: [
-                Container(width: 6, height: 6, decoration: BoxDecoration(color: item.statusColor, shape: BoxShape.circle)),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: item.statusColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
                 const SizedBox(width: 6),
                 Text(
-                  item.status == DownloadStatus.failed && item.errorMessage != null ? item.errorMessage! : item.statusText,
-                  style: GoogleFonts.spaceGrotesk(fontSize: 11, color: item.status == DownloadStatus.failed ? const Color(0xFFFF4444) : Colors.white38),
+                  item.status == DownloadStatus.failed &&
+                          item.errorMessage != null
+                      ? item.errorMessage!
+                      : item.statusText,
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 11,
+                    color: item.status == DownloadStatus.failed
+                        ? const Color(0xFFFF4444)
+                        : Colors.white38,
+                  ),
                 ),
-                if (item.status == DownloadStatus.completed && item.filePath != null) ...[
+                if (item.status == DownloadStatus.completed &&
+                    item.filePath != null) ...[
                   const Spacer(),
                   GestureDetector(
                     onTap: () => _openFile(item.filePath!),
                     child: Row(
                       children: [
-                        Text('Open folder', style: GoogleFonts.spaceGrotesk(fontSize: 11, color: const Color(0xFF00D4FF), fontWeight: FontWeight.w600)),
+                        Text(
+                          'Open folder',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 11,
+                            color: const Color(0xFF00D4FF),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         const SizedBox(width: 4),
-                        const Icon(Icons.folder_open_rounded, size: 14, color: Color(0xFF00D4FF)),
+                        const Icon(
+                          Icons.folder_open_rounded,
+                          size: 14,
+                          color: Color(0xFF00D4FF),
+                        ),
                       ],
                     ),
                   ),
@@ -983,14 +1154,22 @@ class _YTDownloadCard extends StatelessWidget {
   }
 
   Widget _placeholderThumb() => Container(
-        width: 80, height: 56, color: const Color(0xFF1E1E2A),
-        child: const Icon(Icons.play_circle_outline_rounded, color: Colors.white24, size: 28),
-      );
+    width: 80,
+    height: 56,
+    color: const Color(0xFF1E1E2A),
+    child: const Icon(
+      Icons.play_circle_outline_rounded,
+      color: Colors.white24,
+      size: 28,
+    ),
+  );
 
   Future<void> _openFile(String path) async {
     try {
       const platform = MethodChannel('jarvis.ai.os/file_open');
-      await platform.invokeMethod('openFolder', {'path': '/storage/emulated/0/Download/YouTubeDL'});
+      await platform.invokeMethod('openFolder', {
+        'path': '/storage/emulated/0/Download/YouTubeDL',
+      });
     } catch (_) {}
   }
 }
@@ -1004,8 +1183,18 @@ class _Tag extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
-      child: Text(text, style: GoogleFonts.spaceGrotesk(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w600)),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.spaceGrotesk(
+          fontSize: 10,
+          color: Colors.white54,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

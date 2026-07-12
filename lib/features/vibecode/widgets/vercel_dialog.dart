@@ -43,7 +43,11 @@ class _VercelDialogState extends State<VercelDialog> {
                 SizedBox(width: 12),
                 Text(
                   'Deploy to Vercel',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -74,10 +78,15 @@ class _VercelDialogState extends State<VercelDialog> {
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,
                   minimumSize: const Size(double.infinity, 44),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 onPressed: () => vc.connectVercel(_tokenController.text.trim()),
-                child: const Text('▲ Connect Vercel', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  '▲ Connect Vercel',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ] else ...[
               const Text(
@@ -85,7 +94,10 @@ class _VercelDialogState extends State<VercelDialog> {
                 style: TextStyle(color: Colors.greenAccent, fontSize: 13),
               ),
               const SizedBox(height: 16),
-              _buildTextField(_projectNameController, 'Project Name (URL-friendly)'),
+              _buildTextField(
+                _projectNameController,
+                'Project Name (URL-friendly)',
+              ),
               const SizedBox(height: 12),
 
               if (vc.currentProject?.vercelUrl != null)
@@ -99,12 +111,19 @@ class _VercelDialogState extends State<VercelDialog> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.open_in_new, color: Colors.greenAccent, size: 14),
+                      const Icon(
+                        Icons.open_in_new,
+                        color: Colors.greenAccent,
+                        size: 14,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           vc.currentProject!.vercelUrl!,
-                          style: const TextStyle(color: Colors.greenAccent, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.greenAccent,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ],
@@ -127,7 +146,9 @@ class _VercelDialogState extends State<VercelDialog> {
                   child: Text(
                     _resultMessage!,
                     style: TextStyle(
-                      color: _resultSuccess ? Colors.greenAccent : Colors.redAccent,
+                      color: _resultSuccess
+                          ? Colors.greenAccent
+                          : Colors.redAccent,
                       fontSize: 12,
                     ),
                   ),
@@ -138,28 +159,37 @@ class _VercelDialogState extends State<VercelDialog> {
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,
                   minimumSize: const Size(double.infinity, 44),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                onPressed: _isDeploying ? null : () async {
-                  final name = _projectNameController.text.trim();
-                  if (name.isEmpty) return;
-                  setState(() => _isDeploying = true);
-                  final result = await vc.deployToVercel(projectName: name);
-                  setState(() {
-                    _isDeploying = false;
-                    _resultSuccess = result['success'] == true;
-                    _resultMessage = _resultSuccess
-                        ? '🚀 Live at: ${result['url']}'
-                        : '❌ ${result['error']}';
-                  });
-                },
+                onPressed: _isDeploying
+                    ? null
+                    : () async {
+                        final name = _projectNameController.text.trim();
+                        if (name.isEmpty) return;
+                        setState(() => _isDeploying = true);
+                        final result = await vc.deployToVercel(
+                          projectName: name,
+                        );
+                        setState(() {
+                          _isDeploying = false;
+                          _resultSuccess = result['success'] == true;
+                          _resultMessage = _resultSuccess
+                              ? '🚀 Live at: ${result['url']}'
+                              : '❌ ${result['error']}';
+                        });
+                      },
                 child: _isDeploying
                     ? const SizedBox(
                         height: 18,
                         width: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('▲ Deploy Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                    : const Text(
+                        '▲ Deploy Now',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
               ),
             ],
             const SizedBox(height: 8),
@@ -173,7 +203,11 @@ class _VercelDialogState extends State<VercelDialog> {
     );
   }
 
-  Widget _buildTextField(TextEditingController ctrl, String label, {bool obscure = false}) {
+  Widget _buildTextField(
+    TextEditingController ctrl,
+    String label, {
+    bool obscure = false,
+  }) {
     return TextField(
       controller: ctrl,
       obscureText: obscure,

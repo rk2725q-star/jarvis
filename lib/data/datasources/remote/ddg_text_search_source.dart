@@ -8,7 +8,7 @@ class DDGTextSearchSource {
   Future<List<AriaSearchResult>> search({
     required String query,
     required String category,
-    String region   = 'wt-wt',
+    String region = 'wt-wt',
     String? timelimit,
     int maxResults = 20,
     double sourceTrustScore = 0.60,
@@ -18,10 +18,10 @@ class DDGTextSearchSource {
     try {
       final rawResults = await _search.text(
         query,
-        region:      region,
-        safesearch:  ApiConstants.defaultSafeSearch,
-        timelimit:   timelimit,
-        maxResults:  maxResults,
+        region: region,
+        safesearch: ApiConstants.defaultSafeSearch,
+        timelimit: timelimit,
+        maxResults: maxResults,
       );
 
       for (final item in rawResults) {
@@ -52,10 +52,10 @@ class DDGTextSearchSource {
 
     for (final query in queries) {
       final results = await search(
-        query:        query,
-        category:     category,
-        maxResults:   maxPerQuery,
-        timelimit:    timelimit,
+        query: query,
+        category: category,
+        maxResults: maxPerQuery,
+        timelimit: timelimit,
       );
 
       for (final r in results) {

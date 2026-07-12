@@ -59,7 +59,9 @@ class _ChatInputBarState extends State<ChatInputBar>
   String _imagiyaStyle = 'realistic';
   String _codesignType = 'landing';
 
-  bool get _isCreativeMode => _inputMode == ChatInputMode.imagiya || _inputMode == ChatInputMode.codesign;
+  bool get _isCreativeMode =>
+      _inputMode == ChatInputMode.imagiya ||
+      _inputMode == ChatInputMode.codesign;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -235,9 +237,10 @@ class _ChatInputBarState extends State<ChatInputBar>
         // Switch router to netless provider
         chatProvider.router.setLastSelectedProvider(AIProvider.netless);
         final netless = NetlessService();
-        
+
         // Show dialog if not loaded, OR if it's already the selected mode (allows management)
-        if (!netless.isLoading && !netless.isDownloading && 
+        if (!netless.isLoading &&
+            !netless.isDownloading &&
             (!netless.isLoaded || _selectedMode == 'netless')) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _showNetlessActionDialog(this.context, netless);
@@ -250,10 +253,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     });
   }
 
-  void _showNetlessActionDialog(
-    BuildContext context,
-    NetlessService netless,
-  ) {
+  void _showNetlessActionDialog(BuildContext context, NetlessService netless) {
     final hasFile = netless.hasFile;
     final isLoaded = netless.isLoaded;
 
@@ -277,12 +277,16 @@ class _ChatInputBarState extends State<ChatInputBar>
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isLoaded ? const Color(0xFFFF9800).withValues(alpha: 0.15) : const Color(0xFF00E676).withValues(alpha: 0.15),
+                color: isLoaded
+                    ? const Color(0xFFFF9800).withValues(alpha: 0.15)
+                    : const Color(0xFF00E676).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 isLoaded ? Icons.stop_circle_rounded : Icons.wifi_off_rounded,
-                color: isLoaded ? const Color(0xFFFF9800) : const Color(0xFF00E676),
+                color: isLoaded
+                    ? const Color(0xFFFF9800)
+                    : const Color(0xFF00E676),
                 size: 22,
               ),
             ),
@@ -302,7 +306,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isLoaded 
+              isLoaded
                   ? 'Gemma 4 is currently loaded in RAM. Unload it to free up memory?'
                   : 'Netless runs Google Gemma 4 E2B-it entirely on your device — no internet needed.',
               style: const TextStyle(color: Color(0xFFB0B0C8), fontSize: 14),
@@ -317,11 +321,24 @@ class _ChatInputBarState extends State<ChatInputBar>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _InfoRow(icon: Icons.storage_rounded, text: hasFile ? 'Status: Downloaded (~2.5 GB)' : 'Size: ~2.5 GB'),
+                  _InfoRow(
+                    icon: Icons.storage_rounded,
+                    text: hasFile
+                        ? 'Status: Downloaded (~2.5 GB)'
+                        : 'Size: ~2.5 GB',
+                  ),
                   const SizedBox(height: 6),
-                  _InfoRow(icon: Icons.memory_rounded, text: isLoaded ? 'Status: Active in RAM' : 'Model: Gemma 4 E2B-it'),
+                  _InfoRow(
+                    icon: Icons.memory_rounded,
+                    text: isLoaded
+                        ? 'Status: Active in RAM'
+                        : 'Model: Gemma 4 E2B-it',
+                  ),
                   const SizedBox(height: 6),
-                  const _InfoRow(icon: Icons.wifi_off_rounded, text: 'Works 100% offline'),
+                  const _InfoRow(
+                    icon: Icons.wifi_off_rounded,
+                    text: 'Works 100% offline',
+                  ),
                 ],
               ),
             ),
@@ -330,11 +347,16 @@ class _ChatInputBarState extends State<ChatInputBar>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF7070A0))),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF7070A0)),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: isLoaded ? const Color(0xFFFF9800) : const Color(0xFF00E676),
+              backgroundColor: isLoaded
+                  ? const Color(0xFFFF9800)
+                  : const Color(0xFF00E676),
               foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -350,7 +372,10 @@ class _ChatInputBarState extends State<ChatInputBar>
                 netless.downloadAndLoad();
               }
             },
-            child: Text(actionLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(
+              actionLabel,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -395,10 +420,26 @@ class _ChatInputBarState extends State<ChatInputBar>
     String? selectedPreset;
 
     final presets = <String, Map<String, dynamic>>{
-      'Pixelcut': {'url': 'https://mcp.pixelcut.ai/mcp', 'icon': Icons.image_rounded, 'auth': false},
-      'Vercel':   {'url': 'https://mcp.vercel.com/', 'icon': Icons.cloud_rounded, 'auth': true},
-      'Canva':    {'url': 'https://mcp.canva.com/mcp', 'icon': Icons.brush_rounded, 'auth': true},
-      'Copilot':  {'url': 'https://api.githubcopilot.com/mcp/x/all', 'icon': Icons.code_rounded, 'auth': true},
+      'Pixelcut': {
+        'url': 'https://mcp.pixelcut.ai/mcp',
+        'icon': Icons.image_rounded,
+        'auth': false,
+      },
+      'Vercel': {
+        'url': 'https://mcp.vercel.com/',
+        'icon': Icons.cloud_rounded,
+        'auth': true,
+      },
+      'Canva': {
+        'url': 'https://mcp.canva.com/mcp',
+        'icon': Icons.brush_rounded,
+        'auth': true,
+      },
+      'Copilot': {
+        'url': 'https://api.githubcopilot.com/mcp/x/all',
+        'icon': Icons.code_rounded,
+        'auth': true,
+      },
     };
 
     showDialog(
@@ -413,196 +454,390 @@ class _ChatInputBarState extends State<ChatInputBar>
               color: const Color(0xFF15151F),
               borderRadius: BorderRadius.circular(28),
               border: Border.all(color: Colors.white.withOpacity(0.08)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 40, offset: const Offset(0, 20))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.4),
+                  blurRadius: 40,
+                  offset: const Offset(0, 20),
+                ),
+              ],
             ),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: JarvisColors.accentPrimary.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.electrical_services_rounded, color: JarvisColors.accentPrimary, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Connect MCP Server', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                const Padding(
-                  padding: EdgeInsets.only(left: 52),
-                  child: Text('Choose a tool provider', style: TextStyle(color: Color(0xFF8888A0), fontSize: 13)),
-                ),
-                const SizedBox(height: 20),
-
-                // Provider grid — card style, not chips
-                ...presets.entries.map((entry) {
-                  final name = entry.key;
-                  final data = entry.value;
-                  final isSelected = selectedPreset == name && !showCustom;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => setDialogState(() { selectedPreset = name; showCustom = false; error = null; }),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: isSelected ? JarvisColors.accentPrimary.withOpacity(0.12) : Colors.white.withOpacity(0.03),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isSelected ? JarvisColors.accentPrimary : Colors.white.withOpacity(0.06)),
+                          color: JarvisColors.accentPrimary.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(data['icon'] as IconData, color: isSelected ? JarvisColors.accentPrimary : Colors.white70, size: 20),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(name, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500))),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: (data['auth'] as bool) ? Colors.orangeAccent.withOpacity(0.12) : Colors.greenAccent.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(8),
+                        child: const Icon(
+                          Icons.electrical_services_rounded,
+                          color: JarvisColors.accentPrimary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Connect MCP Server',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 52),
+                    child: Text(
+                      'Choose a tool provider',
+                      style: TextStyle(color: Color(0xFF8888A0), fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Provider grid — card style, not chips
+                  ...presets.entries.map((entry) {
+                    final name = entry.key;
+                    final data = entry.value;
+                    final isSelected = selectedPreset == name && !showCustom;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => setDialogState(() {
+                          selectedPreset = name;
+                          showCustom = false;
+                          error = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? JarvisColors.accentPrimary.withOpacity(0.12)
+                                : Colors.white.withOpacity(0.03),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isSelected
+                                  ? JarvisColors.accentPrimary
+                                  : Colors.white.withOpacity(0.06),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                data['icon'] as IconData,
+                                color: isSelected
+                                    ? JarvisColors.accentPrimary
+                                    : Colors.white70,
+                                size: 20,
                               ),
-                              child: Text(
-                                (data['auth'] as bool) ? 'Sign-in' : 'No login',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: (data['auth'] as bool) ? Colors.orangeAccent : Colors.greenAccent),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: (data['auth'] as bool)
+                                      ? Colors.orangeAccent.withOpacity(0.12)
+                                      : Colors.greenAccent.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  (data['auth'] as bool)
+                                      ? 'Sign-in'
+                                      : 'No login',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: (data['auth'] as bool)
+                                        ? Colors.orangeAccent
+                                        : Colors.greenAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+
+                  // Custom option
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => setDialogState(() {
+                      showCustom = true;
+                      selectedPreset = null;
+                      error = null;
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: showCustom
+                            ? JarvisColors.accentPrimary.withOpacity(0.12)
+                            : Colors.white.withOpacity(0.03),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: showCustom
+                              ? JarvisColors.accentPrimary
+                              : Colors.white.withOpacity(0.06),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.add_link_rounded,
+                            color: showCustom
+                                ? JarvisColors.accentPrimary
+                                : Colors.white70,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Custom URL',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  if (showCustom) ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: mcpUrlController,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        labelText: 'MCP Server URL',
+                        labelStyle: const TextStyle(
+                          color: Color(0xFF8888A0),
+                          fontSize: 13,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.04),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: JarvisColors.accentPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: mcpTokenController,
+                      obscureText: true,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        labelText: 'Auth Token (optional)',
+                        labelStyle: const TextStyle(
+                          color: Color(0xFF8888A0),
+                          fontSize: 13,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.04),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: JarvisColors.accentPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  if (error != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.redAccent.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.error_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              error!,
+                              style: const TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 13,
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-
-                // Custom option
-                InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => setDialogState(() { showCustom = true; selectedPreset = null; error = null; }),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: showCustom ? JarvisColors.accentPrimary.withOpacity(0.12) : Colors.white.withOpacity(0.03),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: showCustom ? JarvisColors.accentPrimary : Colors.white.withOpacity(0.06)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.add_link_rounded, color: showCustom ? JarvisColors.accentPrimary : Colors.white70, size: 20),
-                        const SizedBox(width: 12),
-                        const Text('Custom URL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ),
-                ),
-
-                if (showCustom) ...[
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: mcpUrlController,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: InputDecoration(
-                      labelText: 'MCP Server URL',
-                      labelStyle: const TextStyle(color: Color(0xFF8888A0), fontSize: 13),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.04),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: JarvisColors.accentPrimary)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: mcpTokenController,
-                    obscureText: true,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: InputDecoration(
-                      labelText: 'Auth Token (optional)',
-                      labelStyle: const TextStyle(color: Color(0xFF8888A0), fontSize: 13),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.04),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: JarvisColors.accentPrimary)),
-                    ),
-                  ),
-                ],
-
-                if (error != null) ...[
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.redAccent.withOpacity(0.3))),
-                    child: Row(children: [
-                      const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13))),
-                    ]),
-                  ),
-                ],
-
-                const SizedBox(height: 22),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: isLoading ? null : () => Navigator.pop(ctx),
-                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                        child: const Text('Cancel', style: TextStyle(color: Color(0xFF8888A0), fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: JarvisColors.accentPrimary,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          elevation: 0,
-                        ),
-                        onPressed: (isLoading || (!showCustom && selectedPreset == null)) ? null : () async {
-                          setDialogState(() { isLoading = true; error = null; });
-                          final scaffoldMessenger = ScaffoldMessenger.of(context);
-                          final navigator = Navigator.of(ctx);
-                          try {
-                            final url = showCustom ? mcpUrlController.text.trim() : presets[selectedPreset]!['url'] as String;
-                            final token = showCustom && mcpTokenController.text.trim().isNotEmpty ? mcpTokenController.text.trim() : null;
-                            await provider.connectMcpServer(url, token: token);
-                            navigator.pop();
-                            scaffoldMessenger.showSnackBar(SnackBar(
-                              content: Text('${showCustom ? "Server" : selectedPreset} connected'),
-                              backgroundColor: JarvisColors.accentPrimary,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ));
-                          } catch (e) {
-                            setDialogState(() {
-                              isLoading = false;
-                              final msg = e.toString();
-                              error = (msg.contains('McpAuthError') || msg.contains('401') || msg.contains('Unauthorized'))
-                                  ? "Couldn't sign in — try again"
-                                  : 'Connection failed — check the URL';
-                            });
-                          }
-                        },
-                        child: isLoading
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                            : Text(showCustom ? 'Connect' : ((presets[selectedPreset]?['auth'] as bool?) == true ? 'Sign in' : 'Connect'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-              ],
+
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: isLoading
+                              ? null
+                              : () => Navigator.pop(ctx),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: Color(0xFF8888A0),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: JarvisColors.accentPrimary,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed:
+                              (isLoading ||
+                                  (!showCustom && selectedPreset == null))
+                              ? null
+                              : () async {
+                                  setDialogState(() {
+                                    isLoading = true;
+                                    error = null;
+                                  });
+                                  final scaffoldMessenger =
+                                      ScaffoldMessenger.of(context);
+                                  final navigator = Navigator.of(ctx);
+                                  try {
+                                    final url = showCustom
+                                        ? mcpUrlController.text.trim()
+                                        : presets[selectedPreset]!['url']
+                                              as String;
+                                    final token =
+                                        showCustom &&
+                                            mcpTokenController.text
+                                                .trim()
+                                                .isNotEmpty
+                                        ? mcpTokenController.text.trim()
+                                        : null;
+                                    await provider.connectMcpServer(
+                                      url,
+                                      token: token,
+                                    );
+                                    navigator.pop();
+                                    scaffoldMessenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '${showCustom ? "Server" : selectedPreset} connected',
+                                        ),
+                                        backgroundColor:
+                                            JarvisColors.accentPrimary,
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  } catch (e) {
+                                    setDialogState(() {
+                                      isLoading = false;
+                                      final msg = e.toString();
+                                      error =
+                                          (msg.contains('McpAuthError') ||
+                                              msg.contains('401') ||
+                                              msg.contains('Unauthorized'))
+                                          ? "Couldn't sign in — try again"
+                                          : 'Connection failed — check the URL';
+                                    });
+                                  }
+                                },
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.black,
+                                  ),
+                                )
+                              : Text(
+                                  showCustom
+                                      ? 'Connect'
+                                      : ((presets[selectedPreset]?['auth']
+                                                    as bool?) ==
+                                                true
+                                            ? 'Sign in'
+                                            : 'Connect'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildMainView(ChatProvider provider, VoidCallback onToolsClick) {
     return Column(
@@ -734,7 +969,9 @@ class _ChatInputBarState extends State<ChatInputBar>
             Navigator.pop(context);
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const ImagiyaScreen(initialTabIndex: 3)),
+              MaterialPageRoute(
+                builder: (_) => const ImagiyaScreen(initialTabIndex: 3),
+              ),
             );
           },
         ),
@@ -909,9 +1146,15 @@ class _ChatInputBarState extends State<ChatInputBar>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? JarvisColors.accentPrimary.withValues(alpha: 0.15) : JarvisColors.surfaceElevated,
+          color: isSelected
+              ? JarvisColors.accentPrimary.withValues(alpha: 0.15)
+              : JarvisColors.surfaceElevated,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? JarvisColors.accentPrimary : JarvisColors.border.withValues(alpha: 0.5)),
+          border: Border.all(
+            color: isSelected
+                ? JarvisColors.accentPrimary
+                : JarvisColors.border.withValues(alpha: 0.5),
+          ),
         ),
         child: Text(
           label,
@@ -939,11 +1182,23 @@ class _ChatInputBarState extends State<ChatInputBar>
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
-                _buildChip('★ Standard', _imagiyaQuality == 'standard', () => setState(() => _imagiyaQuality = 'standard')),
+                _buildChip(
+                  '★ Standard',
+                  _imagiyaQuality == 'standard',
+                  () => setState(() => _imagiyaQuality = 'standard'),
+                ),
                 const SizedBox(width: 8),
-                _buildChip('✨ HD', _imagiyaQuality == 'hd', () => setState(() => _imagiyaQuality = 'hd')),
+                _buildChip(
+                  '✨ HD',
+                  _imagiyaQuality == 'hd',
+                  () => setState(() => _imagiyaQuality = 'hd'),
+                ),
                 const SizedBox(width: 8),
-                _buildChip('💎 Ultra HD', _imagiyaQuality == 'uhd', () => setState(() => _imagiyaQuality = 'uhd')),
+                _buildChip(
+                  '💎 Ultra HD',
+                  _imagiyaQuality == 'uhd',
+                  () => setState(() => _imagiyaQuality = 'uhd'),
+                ),
               ],
             ),
           ),
@@ -954,15 +1209,35 @@ class _ChatInputBarState extends State<ChatInputBar>
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
-                _buildChip('📷 Realistic', _imagiyaStyle == 'realistic', () => setState(() => _imagiyaStyle = 'realistic')),
+                _buildChip(
+                  '📷 Realistic',
+                  _imagiyaStyle == 'realistic',
+                  () => setState(() => _imagiyaStyle = 'realistic'),
+                ),
                 const SizedBox(width: 8),
-                _buildChip('🎨 Artistic', _imagiyaStyle == 'artistic', () => setState(() => _imagiyaStyle = 'artistic')),
+                _buildChip(
+                  '🎨 Artistic',
+                  _imagiyaStyle == 'artistic',
+                  () => setState(() => _imagiyaStyle = 'artistic'),
+                ),
                 const SizedBox(width: 8),
-                _buildChip('🌟 Anime', _imagiyaStyle == 'anime', () => setState(() => _imagiyaStyle = 'anime')),
+                _buildChip(
+                  '🌟 Anime',
+                  _imagiyaStyle == 'anime',
+                  () => setState(() => _imagiyaStyle = 'anime'),
+                ),
                 const SizedBox(width: 8),
-                _buildChip('🎥 Cinematic', _imagiyaStyle == 'cinematic', () => setState(() => _imagiyaStyle = 'cinematic')),
+                _buildChip(
+                  '🎥 Cinematic',
+                  _imagiyaStyle == 'cinematic',
+                  () => setState(() => _imagiyaStyle = 'cinematic'),
+                ),
                 const SizedBox(width: 8),
-                _buildChip('🌀 Abstract', _imagiyaStyle == 'abstract', () => setState(() => _imagiyaStyle = 'abstract')),
+                _buildChip(
+                  '🌀 Abstract',
+                  _imagiyaStyle == 'abstract',
+                  () => setState(() => _imagiyaStyle = 'abstract'),
+                ),
               ],
             ),
           ),
@@ -1023,7 +1298,10 @@ class _ChatInputBarState extends State<ChatInputBar>
                 onTap: () => setState(() => _codesignType = value),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: isSelected
                         ? const Color(0xFF4DD0E1).withValues(alpha: 0.18)
@@ -1035,12 +1313,16 @@ class _ChatInputBarState extends State<ChatInputBar>
                           : Colors.white.withValues(alpha: 0.12),
                       width: isSelected ? 1.2 : 0.8,
                     ),
-                    boxShadow: isSelected ? [
-                      BoxShadow(
-                        color: const Color(0xFF4DD0E1).withValues(alpha: 0.15),
-                        blurRadius: 8,
-                      ),
-                    ] : null,
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: const Color(
+                                0xFF4DD0E1,
+                              ).withValues(alpha: 0.15),
+                              blurRadius: 8,
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1050,9 +1332,13 @@ class _ChatInputBarState extends State<ChatInputBar>
                       Text(
                         label,
                         style: TextStyle(
-                          color: isSelected ? const Color(0xFF4DD0E1) : Colors.white60,
+                          color: isSelected
+                              ? const Color(0xFF4DD0E1)
+                              : Colors.white60,
                           fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                         ),
                       ),
                     ],
@@ -1107,8 +1393,12 @@ class _ChatInputBarState extends State<ChatInputBar>
   /// Build the / skill picker overlay
   Widget _buildSlashPicker(SkillService skillService) {
     final allSkills = skillService.skills.where((s) => s.isActive).toList();
-    final dnaSkills = allSkills.where((s) => s.id.startsWith('jarvis-dna-')).toList();
-    final otherSkills = allSkills.where((s) => !s.id.startsWith('jarvis-dna-')).toList();
+    final dnaSkills = allSkills
+        .where((s) => s.id.startsWith('jarvis-dna-'))
+        .toList();
+    final otherSkills = allSkills
+        .where((s) => !s.id.startsWith('jarvis-dna-'))
+        .toList();
 
     // Filter by search query
     bool matchesQuery(JarvisSkill s) {
@@ -1164,11 +1454,16 @@ class _ChatInputBarState extends State<ChatInputBar>
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF7C3AED).withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: const Color(0xFF7C3AED).withValues(alpha: 0.4),
+                    ),
                   ),
                   child: const Text(
                     '/ SKILLS',
@@ -1199,7 +1494,10 @@ class _ChatInputBarState extends State<ChatInputBar>
                     );
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(8),
@@ -1246,7 +1544,11 @@ class _ChatInputBarState extends State<ChatInputBar>
                       color: const Color(0xFF7C3AED).withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.add_rounded, size: 16, color: Color(0xFFA78BFA)),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      size: 16,
+                      color: Color(0xFFA78BFA),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   const Expanded(
@@ -1263,15 +1565,16 @@ class _ChatInputBarState extends State<ChatInputBar>
                         ),
                         Text(
                           'Build a custom AI capability for JARVIS',
-                          style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 10,
-                          ),
+                          style: TextStyle(color: Colors.white38, fontSize: 10),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF7C3AED)),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: Color(0xFF7C3AED),
+                  ),
                 ],
               ),
             ),
@@ -1300,13 +1603,15 @@ class _ChatInputBarState extends State<ChatInputBar>
                       ],
                     ),
                   ),
-                  ...filteredDna.map((skill) => _buildSkillTile(
-                    skill,
-                    emoji: dnaEmoji(skill),
-                    accentColor: const Color(0xFFFFD700),
-                    badge: 'ALWAYS ON',
-                    badgeColor: const Color(0xFFFFD700),
-                  )),
+                  ...filteredDna.map(
+                    (skill) => _buildSkillTile(
+                      skill,
+                      emoji: dnaEmoji(skill),
+                      accentColor: const Color(0xFFFFD700),
+                      badge: 'ALWAYS ON',
+                      badgeColor: const Color(0xFFFFD700),
+                    ),
+                  ),
                   const SizedBox(height: 4),
                 ],
                 // ── Contextual skills section ──
@@ -1323,18 +1628,23 @@ class _ChatInputBarState extends State<ChatInputBar>
                       ),
                     ),
                   ),
-                  ...filteredOther.map((skill) => _buildSkillTile(
-                    skill,
-                    emoji: '🧠',
-                    accentColor: const Color(0xFF7C3AED),
-                  )),
+                  ...filteredOther.map(
+                    (skill) => _buildSkillTile(
+                      skill,
+                      emoji: '🧠',
+                      accentColor: const Color(0xFF7C3AED),
+                    ),
+                  ),
                 ],
                 if (filteredDna.isEmpty && filteredOther.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(
                       'No skills match " $_slashQuery "',
-                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 12,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -1714,22 +2024,31 @@ class _ChatInputBarState extends State<ChatInputBar>
                     Padding(
                       padding: const EdgeInsets.only(left: 6, bottom: 8),
                       child: PopupMenuButton<String>(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                         color: const Color(0xFF1A1A2E),
                         offset: const Offset(0, -130),
                         tooltip: 'Switch Mode',
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: _inputMode == ChatInputMode.chat
                                 ? Colors.white.withValues(alpha: 0.06)
-                                : Colors.deepPurpleAccent.withValues(alpha: 0.15),
+                                : Colors.deepPurpleAccent.withValues(
+                                    alpha: 0.15,
+                                  ),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: _inputMode == ChatInputMode.chat
                                   ? Colors.white12
-                                  : Colors.deepPurpleAccent.withValues(alpha: 0.45),
+                                  : Colors.deepPurpleAccent.withValues(
+                                      alpha: 0.45,
+                                    ),
                             ),
                           ),
                           child: Row(
@@ -1739,8 +2058,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 _inputMode == ChatInputMode.chat
                                     ? Icons.chat_bubble_outline_rounded
                                     : _inputMode == ChatInputMode.imagiya
-                                        ? Icons.auto_awesome_rounded
-                                        : Icons.design_services_rounded,
+                                    ? Icons.auto_awesome_rounded
+                                    : Icons.design_services_rounded,
                                 size: 14,
                                 color: _inputMode == ChatInputMode.chat
                                     ? Colors.white54
@@ -1751,8 +2070,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 _inputMode == ChatInputMode.chat
                                     ? 'Chat'
                                     : _inputMode == ChatInputMode.imagiya
-                                        ? 'Imagiya'
-                                        : 'CoDesign',
+                                    ? 'Imagiya'
+                                    : 'CoDesign',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -1767,7 +2086,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 size: 14,
                                 color: _inputMode == ChatInputMode.chat
                                     ? Colors.white30
-                                    : Colors.deepPurpleAccent.withValues(alpha: 0.6),
+                                    : Colors.deepPurpleAccent.withValues(
+                                        alpha: 0.6,
+                                      ),
                               ),
                             ],
                           ),
@@ -1776,47 +2097,100 @@ class _ChatInputBarState extends State<ChatInputBar>
                           if (value == 'agentica') {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const AgenticaScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => const AgenticaScreen(),
+                              ),
                             );
                           } else {
-                            setState(() => _inputMode = ChatInputMode.values.firstWhere(
-                              (m) => m.name == value,
-                              orElse: () => ChatInputMode.chat,
-                            ));
+                            setState(
+                              () =>
+                                  _inputMode = ChatInputMode.values.firstWhere(
+                                    (m) => m.name == value,
+                                    orElse: () => ChatInputMode.chat,
+                                  ),
+                            );
                           }
                         },
                         itemBuilder: (context) => [
                           const PopupMenuItem(
                             value: 'chat',
-                            child: Row(children: [
-                              Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 18),
-                              SizedBox(width: 12),
-                              Text('JARVIS Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                            ]),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  color: Colors.white70,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  'JARVIS Chat',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const PopupMenuItem(
                             value: 'imagiya',
-                            child: Row(children: [
-                              Icon(Icons.auto_awesome_rounded, color: Colors.deepPurpleAccent, size: 18),
-                              SizedBox(width: 12),
-                              Text('Imagiya · Image', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                            ]),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome_rounded,
+                                  color: Colors.deepPurpleAccent,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Imagiya · Image',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const PopupMenuItem(
                             value: 'codesign',
-                            child: Row(children: [
-                              Icon(Icons.design_services_rounded, color: Colors.indigoAccent, size: 18),
-                              SizedBox(width: 12),
-                              Text('CoDesign · UI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                            ]),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.design_services_rounded,
+                                  color: Colors.indigoAccent,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  'CoDesign · UI',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const PopupMenuItem(
                             value: 'agentica',
-                            child: Row(children: [
-                              Icon(Icons.bolt_rounded, color: Colors.amber, size: 18),
-                              SizedBox(width: 12),
-                              Text('Agentica OS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                            ]),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.bolt_rounded,
+                                  color: Colors.amber,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Agentica OS',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -1830,19 +2204,24 @@ class _ChatInputBarState extends State<ChatInputBar>
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
                           color: _inputMode != ChatInputMode.chat
-                              ? Colors.deepPurpleAccent.withValues(alpha: _focusNode.hasFocus ? 0.7 : 0.35)
+                              ? Colors.deepPurpleAccent.withValues(
+                                  alpha: _focusNode.hasFocus ? 0.7 : 0.35,
+                                )
                               : _focusNode.hasFocus
-                                  ? JarvisColors.accentPrimary.withValues(alpha: 0.55)
-                                  : JarvisColors.border.withValues(alpha: 0.4),
+                              ? JarvisColors.accentPrimary.withValues(
+                                  alpha: 0.55,
+                                )
+                              : JarvisColors.border.withValues(alpha: 0.4),
                           width: 1.2,
                         ),
                         boxShadow: _focusNode.hasFocus
                             ? [
                                 BoxShadow(
-                                  color: (_inputMode != ChatInputMode.chat
-                                          ? Colors.deepPurpleAccent
-                                          : JarvisColors.accentPrimary)
-                                      .withValues(alpha: 0.14),
+                                  color:
+                                      (_inputMode != ChatInputMode.chat
+                                              ? Colors.deepPurpleAccent
+                                              : JarvisColors.accentPrimary)
+                                          .withValues(alpha: 0.14),
                                   blurRadius: 24,
                                   spreadRadius: 0,
                                 ),
@@ -1861,13 +2240,21 @@ class _ChatInputBarState extends State<ChatInputBar>
                               margin: const EdgeInsets.only(left: 6, bottom: 6),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: JarvisColors.accentPrimary.withValues(alpha: 0.10),
+                                color: JarvisColors.accentPrimary.withValues(
+                                  alpha: 0.10,
+                                ),
                                 border: Border.all(
-                                  color: JarvisColors.accentPrimary.withValues(alpha: 0.28),
+                                  color: JarvisColors.accentPrimary.withValues(
+                                    alpha: 0.28,
+                                  ),
                                   width: 1,
                                 ),
                               ),
-                              child: const Icon(Icons.add_rounded, color: JarvisColors.accentPrimary, size: 18),
+                              child: const Icon(
+                                Icons.add_rounded,
+                                color: JarvisColors.accentPrimary,
+                                size: 18,
+                              ),
                             ),
                           ),
                           // Text field — fills all available space
@@ -1887,17 +2274,22 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 hintText: _inputMode == ChatInputMode.chat
                                     ? 'Message JARVIS...'
                                     : _inputMode == ChatInputMode.imagiya
-                                        ? '✨ Describe your image...'
-                                        : '🎨 Describe your UI...',
+                                    ? '✨ Describe your image...'
+                                    : '🎨 Describe your UI...',
                                 hintStyle: TextStyle(
-                                  color: JarvisColors.textMuted.withValues(alpha: 0.55),
+                                  color: JarvisColors.textMuted.withValues(
+                                    alpha: 0.55,
+                                  ),
                                   fontSize: 14.5,
                                 ),
                                 border: InputBorder.none,
                                 focusedBorder: InputBorder.none,
                                 enabledBorder: InputBorder.none,
                                 filled: false,
-                                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 6,
+                                ),
                                 isDense: true,
                               ),
                               onSubmitted: (_) => _send(),
@@ -1914,21 +2306,32 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 if (_speechAvailable)
                                   Builder(
                                     builder: (btnCtx) => GestureDetector(
-                                      onTap: () => _showModelPicker(btnCtx, chatProvider),
+                                      onTap: () => _showModelPicker(
+                                        btnCtx,
+                                        chatProvider,
+                                      ),
                                       child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 220),
+                                        duration: const Duration(
+                                          milliseconds: 220,
+                                        ),
                                         width: 32,
                                         height: 32,
                                         margin: const EdgeInsets.only(right: 5),
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           color: _selectedMode == 'netless'
-                                              ? const Color(0xFF00E676).withValues(alpha: 0.13)
-                                              : JarvisColors.accentPrimary.withValues(alpha: 0.10),
+                                              ? const Color(
+                                                  0xFF00E676,
+                                                ).withValues(alpha: 0.13)
+                                              : JarvisColors.accentPrimary
+                                                    .withValues(alpha: 0.10),
                                           border: Border.all(
                                             color: _selectedMode == 'netless'
-                                                ? const Color(0xFF00E676).withValues(alpha: 0.45)
-                                                : JarvisColors.accentPrimary.withValues(alpha: 0.28),
+                                                ? const Color(
+                                                    0xFF00E676,
+                                                  ).withValues(alpha: 0.45)
+                                                : JarvisColors.accentPrimary
+                                                      .withValues(alpha: 0.28),
                                             width: 1,
                                           ),
                                         ),
@@ -1953,26 +2356,40 @@ class _ChatInputBarState extends State<ChatInputBar>
                                     builder: (ctx, child) => GestureDetector(
                                       onTap: _toggleListening,
                                       child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 200),
+                                        duration: const Duration(
+                                          milliseconds: 200,
+                                        ),
                                         width: 32,
                                         height: 32,
                                         margin: const EdgeInsets.only(right: 5),
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           color: _isListening
-                                              ? JarvisColors.accentPrimary.withValues(alpha: 0.20)
+                                              ? JarvisColors.accentPrimary
+                                                    .withValues(alpha: 0.20)
                                               : JarvisColors.surfaceElevated,
                                           border: Border.all(
                                             color: _isListening
-                                                ? JarvisColors.accentPrimary.withValues(alpha: 0.6 * _pulseAnimation.value)
-                                                : JarvisColors.border.withValues(alpha: 0.3),
+                                                ? JarvisColors.accentPrimary
+                                                      .withValues(
+                                                        alpha:
+                                                            0.6 *
+                                                            _pulseAnimation
+                                                                .value,
+                                                      )
+                                                : JarvisColors.border
+                                                      .withValues(alpha: 0.3),
                                             width: 1,
                                           ),
                                         ),
                                         child: Center(
                                           child: Icon(
-                                            _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                                            color: _isListening ? JarvisColors.accentPrimary : JarvisColors.textMuted,
+                                            _isListening
+                                                ? Icons.mic_rounded
+                                                : Icons.mic_none_rounded,
+                                            color: _isListening
+                                                ? JarvisColors.accentPrimary
+                                                : JarvisColors.textMuted,
                                             size: 16,
                                           ),
                                         ),
@@ -1981,50 +2398,79 @@ class _ChatInputBarState extends State<ChatInputBar>
                                   ),
                                 // Send button
                                 GestureDetector(
-                                  onTap: (widget.isGenerating && !_isCreativeMode) ? null : _send,
+                                  onTap:
+                                      (widget.isGenerating && !_isCreativeMode)
+                                      ? null
+                                      : _send,
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
                                     width: 38,
                                     height: 38,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      gradient: (!(widget.isGenerating && !_isCreativeMode) && _hasText)
+                                      gradient:
+                                          (!(widget.isGenerating &&
+                                                  !_isCreativeMode) &&
+                                              _hasText)
                                           ? const LinearGradient(
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
-                                              colors: [Color(0xFF7B5FFF), Color(0xFF9B88FF)],
+                                              colors: [
+                                                Color(0xFF7B5FFF),
+                                                Color(0xFF9B88FF),
+                                              ],
                                             )
                                           : null,
-                                      color: (!(widget.isGenerating && !_isCreativeMode) && _hasText)
+                                      color:
+                                          (!(widget.isGenerating &&
+                                                  !_isCreativeMode) &&
+                                              _hasText)
                                           ? null
                                           : JarvisColors.surfaceElevated,
                                       border: Border.all(
-                                        color: (!(widget.isGenerating && !_isCreativeMode) && _hasText)
+                                        color:
+                                            (!(widget.isGenerating &&
+                                                    !_isCreativeMode) &&
+                                                _hasText)
                                             ? Colors.transparent
-                                            : JarvisColors.border.withValues(alpha: 0.4),
+                                            : JarvisColors.border.withValues(
+                                                alpha: 0.4,
+                                              ),
                                         width: 1,
                                       ),
-                                      boxShadow: (!(widget.isGenerating && !_isCreativeMode) && _hasText)
+                                      boxShadow:
+                                          (!(widget.isGenerating &&
+                                                  !_isCreativeMode) &&
+                                              _hasText)
                                           ? [
                                               BoxShadow(
-                                                color: const Color(0xFF7B5FFF).withValues(alpha: 0.5),
+                                                color: const Color(
+                                                  0xFF7B5FFF,
+                                                ).withValues(alpha: 0.5),
                                                 blurRadius: 14,
                                                 offset: const Offset(0, 3),
                                               ),
                                             ]
                                           : null,
                                     ),
-                                    child: (widget.isGenerating && !_isCreativeMode)
+                                    child:
+                                        (widget.isGenerating &&
+                                            !_isCreativeMode)
                                         ? const Padding(
                                             padding: EdgeInsets.all(10),
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation(JarvisColors.accentPrimary),
+                                              valueColor:
+                                                  AlwaysStoppedAnimation(
+                                                    JarvisColors.accentPrimary,
+                                                  ),
                                             ),
                                           )
                                         : Icon(
                                             Icons.arrow_upward_rounded,
-                                            color: _hasText ? Colors.white : JarvisColors.textMuted,
+                                            color: _hasText
+                                                ? Colors.white
+                                                : JarvisColors.textMuted,
                                             size: 19,
                                           ),
                                   ),
@@ -2045,7 +2491,6 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
   }
 }
-
 
 // ── Small button inside the input bar ────────────────────────────────────────
 class _InBarButton extends StatelessWidget {
@@ -2197,10 +2642,7 @@ class _ModelOption extends StatelessWidget {
               ),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  color: Color(0xFF7070A0),
-                  fontSize: 11,
-                ),
+                style: const TextStyle(color: Color(0xFF7070A0), fontSize: 11),
               ),
             ],
           ),
@@ -2211,7 +2653,10 @@ class _ModelOption extends StatelessWidget {
           decoration: BoxDecoration(
             color: badgeColor.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: badgeColor.withValues(alpha: 0.4), width: 0.8),
+            border: Border.all(
+              color: badgeColor.withValues(alpha: 0.4),
+              width: 0.8,
+            ),
           ),
           child: Text(
             badge,
@@ -2246,7 +2691,10 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, color: const Color(0xFF7B5FFF), size: 14),
         const SizedBox(width: 8),
-        Text(text, style: const TextStyle(color: Color(0xFFB0B0C8), fontSize: 13)),
+        Text(
+          text,
+          style: const TextStyle(color: Color(0xFFB0B0C8), fontSize: 13),
+        ),
       ],
     );
   }

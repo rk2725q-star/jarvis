@@ -35,7 +35,10 @@ class _DiagramScreenState extends State<DiagramScreen> {
 
   Future<void> _startGeneration() async {
     try {
-      final html = await _service.generateDiagram(widget.router, widget.request);
+      final html = await _service.generateDiagram(
+        widget.router,
+        widget.request,
+      );
       if (mounted) {
         setState(() {
           _htmlContent = html;
@@ -60,8 +63,15 @@ class _DiagramScreenState extends State<DiagramScreen> {
         backgroundColor: const Color(0xFF0A0A0F),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF00FFB4), size: 18),
-          onPressed: () => Navigator.pop(context, _htmlContent != null), // Return true if successful, tells provider
+          icon: const Icon(
+            Icons.arrow_back_ios,
+            color: Color(0xFF00FFB4),
+            size: 18,
+          ),
+          onPressed: () => Navigator.pop(
+            context,
+            _htmlContent != null,
+          ), // Return true if successful, tells provider
         ),
         title: Text(
           'JARVIS — ${widget.title.toUpperCase()}',
@@ -144,7 +154,9 @@ class _DiagramScreenState extends State<DiagramScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _isGenerating ? 'JARVIS AI Engine is drawing...' : 'Rendering UI Engine...',
+                      _isGenerating
+                          ? 'JARVIS AI Engine is drawing...'
+                          : 'Rendering UI Engine...',
                       style: const TextStyle(
                         color: Color(0xFF445566),
                         fontFamily: 'monospace',
@@ -156,15 +168,19 @@ class _DiagramScreenState extends State<DiagramScreen> {
                 ),
               ),
             ),
-            
+
           if (_errorMsg != null)
-             Container(
+            Container(
               color: const Color(0xFF0A0A0F),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.redAccent,
+                      size: 48,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'FAILED TO GENERATE DIAGRAM',
@@ -209,10 +225,7 @@ class _DiagramScreenState extends State<DiagramScreen> {
             height: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFF00FFB4),
-                width: 2,
-              ),
+              border: Border.all(color: const Color(0xFF00FFB4), width: 2),
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFF00FFB4).withValues(alpha: 0.3),

@@ -24,6 +24,7 @@ import 'package:jarvis_ai/features/codesign/services/codesign_service.dart';
 import 'package:jarvis_ai/features/codesign/models/codesign_models.dart';
 import 'package:jarvis_ai/features/mcp/mcp_client.dart';
 import 'package:jarvis_ai/core/security/secure_storage_service.dart';
+
 class ChatProvider extends ChangeNotifier {
   final AIRouter router;
   final SessionService sessionService;
@@ -67,12 +68,16 @@ class ChatProvider extends ChangeNotifier {
       try {
         final List<dynamic> list = jsonDecode(dataStr);
         final servers = list.map((json) => McpServer.fromJson(json)).toList();
-        
+
         // Re-handshake in the background
         for (final server in servers) {
           try {
             final token = await _secureStorage.getMcpToken(server.id);
-            final connected = await McpServer.connect(server.url, token: token, id: server.id);
+            final connected = await McpServer.connect(
+              server.url,
+              token: token,
+              id: server.id,
+            );
             connectedMcpServers.add(connected);
           } catch (e) {
             debugPrint('Failed to re-connect to MCP: ${server.url} - $e');
@@ -106,12 +111,16 @@ class ChatProvider extends ChangeNotifier {
   List<String> _activeContextualSkills = [];
 
   List<String> get activeDnaModels => List.unmodifiable(_activeDnaModels);
-  List<String> get activeContextualSkills => List.unmodifiable(_activeContextualSkills);
-  int get totalActiveSkillCount => _activeDnaModels.length + _activeContextualSkills.length;
+  List<String> get activeContextualSkills =>
+      List.unmodifiable(_activeContextualSkills);
+  int get totalActiveSkillCount =>
+      _activeDnaModels.length + _activeContextualSkills.length;
 
   /// Compute which skills are active for a given query — mirrors ai_router logic
   void _computeActiveSkills(String query) {
-    final allSkills = router.skillService.skills.where((s) => s.isActive).toList();
+    final allSkills = router.skillService.skills
+        .where((s) => s.isActive)
+        .toList();
     _activeDnaModels = allSkills
         .where((s) => s.id.startsWith('jarvis-dna-'))
         .map((s) => s.description.split('—').first.trim())
@@ -121,7 +130,8 @@ class ChatProvider extends ChangeNotifier {
     final scored = allSkills
         .where((s) => !s.id.startsWith('jarvis-dna-'))
         .map((s) {
-          final queryWords = query.toLowerCase()
+          final queryWords = query
+              .toLowerCase()
               .split(RegExp(r'[^a-zA-Z0-9]'))
               .where((w) => w.length > 2)
               .toSet();
@@ -134,9 +144,7 @@ class ChatProvider extends ChangeNotifier {
         .where((e) => e.value > 0)
         .toList();
     scored.sort((a, b) => b.value.compareTo(a.value));
-    _activeContextualSkills = scored.take(12)
-        .map((e) => e.key.name)
-        .toList();
+    _activeContextualSkills = scored.take(12).map((e) => e.key.name).toList();
     notifyListeners();
   }
 
@@ -297,7 +305,8 @@ class ChatProvider extends ChangeNotifier {
       if (skillDescription.isEmpty) {
         final errorMsg = Message(
           id: _uuid.v4(),
-          content: "❌ **Error: Skill description cannot be empty.**\n\nUsage: `/skill [description of what the skill should do]`\nE.g.: `/skill Translate any programming queries to python scripts`",
+          content:
+              "❌ **Error: Skill description cannot be empty.**\n\nUsage: `/skill [description of what the skill should do]`\nE.g.: `/skill Translate any programming queries to python scripts`",
           isUser: false,
           timestamp: DateTime.now(),
           sessionId: _currentSessionId!,
@@ -311,7 +320,8 @@ class ChatProvider extends ChangeNotifier {
 
       final SkillService service = router.skillService;
       try {
-        final creatorPrompt = "The user wants to build a custom skill for their AI assistant. "
+        final creatorPrompt =
+            "The user wants to build a custom skill for their AI assistant. "
             "Skill description: '$skillDescription'.\n\n"
             "Analyze the description and generate a structured JSON object for this skill. "
             "Ensure the system instructions are highly specific, professional, and explain how to handle the inputs and format responses. "
@@ -326,16 +336,24 @@ class ChatProvider extends ChangeNotifier {
 
         final response = await router.generate(
           creatorPrompt,
-          systemPrompt: "You are the JARVIS Autonomous Skill Builder. Output valid JSON matching the schema only.",
+          systemPrompt:
+              "You are the JARVIS Autonomous Skill Builder. Output valid JSON matching the schema only.",
         );
 
-        final cleanJson = response.replaceFirst('```json', '').replaceFirst('```', '').trim();
+        final cleanJson = response
+            .replaceFirst('```json', '')
+            .replaceFirst('```', '')
+            .trim();
         final Map<String, dynamic> parsed = jsonDecode(cleanJson);
 
         final skillName = parsed['name']?.toString() ?? 'Custom Skill';
         final skillDesc = parsed['description']?.toString() ?? skillDescription;
-        final skillInstruction = parsed['systemInstruction']?.toString() ?? 'Adopt the user\'s requested behavior.';
-        final List<String> keywords = List<String>.from(parsed['triggerKeywords'] ?? []);
+        final skillInstruction =
+            parsed['systemInstruction']?.toString() ??
+            'Adopt the user\'s requested behavior.';
+        final List<String> keywords = List<String>.from(
+          parsed['triggerKeywords'] ?? [],
+        );
 
         final createdSkill = await service.createSkill(
           name: skillName,
@@ -344,7 +362,8 @@ class ChatProvider extends ChangeNotifier {
           triggerKeywords: keywords,
         );
 
-        final successContent = "🎨 **Dynamic Skill Built Successfully!**\n\n"
+        final successContent =
+            "🎨 **Dynamic Skill Built Successfully!**\n\n"
             "JARVIS has autonomously generated and compiled this capability:\n\n"
             "• **Skill Name:** ${createdSkill.name}\n"
             "• **Description:** ${createdSkill.description}\n"
@@ -364,15 +383,23 @@ class ChatProvider extends ChangeNotifier {
         _messages.add(successMsg);
         await sessionService.addMessage(successMsg);
       } catch (e) {
-        final fallbackName = skillDescription.length > 20 ? "${skillDescription.substring(0, 20)}..." : skillDescription;
+        final fallbackName = skillDescription.length > 20
+            ? "${skillDescription.substring(0, 20)}..."
+            : skillDescription;
         final createdSkill = await service.createSkill(
           name: fallbackName,
           description: "User-defined skill: $skillDescription",
-          systemInstruction: "You are playing a custom role. Behavior required: $skillDescription.",
-          triggerKeywords: skillDescription.toLowerCase().split(' ').where((w) => w.length > 4).toList(),
+          systemInstruction:
+              "You are playing a custom role. Behavior required: $skillDescription.",
+          triggerKeywords: skillDescription
+              .toLowerCase()
+              .split(' ')
+              .where((w) => w.length > 4)
+              .toList(),
         );
 
-        final successContent = "🎨 **Dynamic Skill Created (Local Fallback)**\n\n"
+        final successContent =
+            "🎨 **Dynamic Skill Created (Local Fallback)**\n\n"
             "• **Skill Name:** ${createdSkill.name}\n"
             "• **Description:** ${createdSkill.description}\n\n"
             "🔄 *This skill has been added and is active. JARVIS will run it when triggered!*";
@@ -395,7 +422,8 @@ class ChatProvider extends ChangeNotifier {
 
     // ── Intercept Roadmap Commands ──────────────────────────────────────────
     final cleanInput = text.trim().toLowerCase();
-    final isRoadmapRequest = cleanInput == '/roadmap' ||
+    final isRoadmapRequest =
+        cleanInput == '/roadmap' ||
         cleanInput == 'roadmap' ||
         cleanInput.contains('roadmap') ||
         cleanInput.contains('road map') ||
@@ -413,7 +441,8 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
 
       // 1. Add Textual Milestones Message
-      final textContent = '# Strategic Roadmap Toward Robust, Human-Like AI Capabilities\n\n'
+      final textContent =
+          '# Strategic Roadmap Toward Robust, Human-Like AI Capabilities\n\n'
           'Here are the key milestones of the 10-year phased research plan:\n\n'
           '| Milestone | Phase & Focus | Target / Evaluation Metric |\n'
           '|-----------|---------------|----------------------------|\n'
@@ -472,41 +501,59 @@ class ChatProvider extends ChangeNotifier {
         combinedText = combinedText.substring(atMatch.end).trim();
       }
     }
-    
+
     // ── Creative Modes Interception ──────────────────────────────────────────
     bool isImagiya = false;
     bool isCodesign = false;
     String imagiyaPrompt = '';
     String finalImagePrompt = '';
     String codesignAgentType = 'landing';
-    
+
     if (combinedText.startsWith('[IMAGIYA]')) {
       isImagiya = true;
       final parts = combinedText.substring(9).split('|');
       final qualityStyle = parts.isNotEmpty ? parts[0].trim() : 'hd realistic';
       final qualityParts = qualityStyle.split(' ');
-      final style = qualityParts.length > 1 ? qualityParts.skip(1).join(' ') : 'realistic';
+      final style = qualityParts.length > 1
+          ? qualityParts.skip(1).join(' ')
+          : 'realistic';
       imagiyaPrompt = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
-      finalImagePrompt = '$imagiyaPrompt, $style style, highly detailed, sharp text, legible typography';
+      finalImagePrompt =
+          '$imagiyaPrompt, $style style, highly detailed, sharp text, legible typography';
     } else if (combinedText.startsWith('[CODESIGN]')) {
       isCodesign = true;
       final parts = combinedText.substring(10).split('|');
       codesignAgentType = parts.isNotEmpty ? parts[0].trim() : 'landing';
-      final designQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
+      final designQuery = parts.length > 1
+          ? parts.skip(1).join('|').trim()
+          : '';
       imagiyaPrompt = designQuery.isNotEmpty ? designQuery : codesignAgentType;
-      finalImagePrompt = 'Modern $codesignAgentType UI UX design, $imagiyaPrompt, clean minimal interface, sharp readable text labels, dribbble behance quality, high fidelity wireframe, professional web design, no blur';
+      finalImagePrompt =
+          'Modern $codesignAgentType UI UX design, $imagiyaPrompt, clean minimal interface, sharp readable text labels, dribbble behance quality, high fidelity wireframe, professional web design, no blur';
     } else {
       // Auto-detect design queries
       final queryLower = combinedText.toLowerCase();
       final designKeywords = [
-        'design website', 'design a website', 'design website for',
-        'design landing page', 'design landing-page',
-        'design web page', 'design web-page',
-        'design mobile ui', 'design mobile app', 'design mobile layout',
-        'design dashboard', 'design admin dashboard',
-        'design pricing page', 'design pricing-page',
-        'create landing page', 'create dashboard', 'create pricing page',
-        'design a mobile ui', 'design a dashboard', 'design a landing page'
+        'design website',
+        'design a website',
+        'design website for',
+        'design landing page',
+        'design landing-page',
+        'design web page',
+        'design web-page',
+        'design mobile ui',
+        'design mobile app',
+        'design mobile layout',
+        'design dashboard',
+        'design admin dashboard',
+        'design pricing page',
+        'design pricing-page',
+        'create landing page',
+        'create dashboard',
+        'create pricing page',
+        'design a mobile ui',
+        'design a dashboard',
+        'design a landing page',
       ];
       bool matchesKeyword = false;
       for (final kw in designKeywords) {
@@ -515,11 +562,16 @@ class ChatProvider extends ChangeNotifier {
           break;
         }
       }
-      
+
       // Also check for general "design an app" or "create a website" context
       if (!matchesKeyword) {
-        if ((queryLower.contains('design') || queryLower.contains('create')) && 
-            (queryLower.contains('website') || queryLower.contains('landing page') || queryLower.contains('dashboard') || queryLower.contains('mobile ui') || queryLower.contains('pricing page') || queryLower.contains('app ui'))) {
+        if ((queryLower.contains('design') || queryLower.contains('create')) &&
+            (queryLower.contains('website') ||
+                queryLower.contains('landing page') ||
+                queryLower.contains('dashboard') ||
+                queryLower.contains('mobile ui') ||
+                queryLower.contains('pricing page') ||
+                queryLower.contains('app ui'))) {
           matchesKeyword = true;
         }
       }
@@ -528,20 +580,23 @@ class ChatProvider extends ChangeNotifier {
         isCodesign = true;
         if (queryLower.contains('dashboard') || queryLower.contains('admin')) {
           codesignAgentType = 'dashboard';
-        } else if (queryLower.contains('mobile') || queryLower.contains('app ui') || queryLower.contains('phone')) {
+        } else if (queryLower.contains('mobile') ||
+            queryLower.contains('app ui') ||
+            queryLower.contains('phone')) {
           codesignAgentType = 'mobile';
         } else if (queryLower.contains('pricing')) {
           codesignAgentType = 'pricing';
-        } else if (queryLower.contains('slides') || queryLower.contains('presentation')) {
+        } else if (queryLower.contains('slides') ||
+            queryLower.contains('presentation')) {
           codesignAgentType = 'slides';
         } else {
           codesignAgentType = 'landing';
         }
         imagiyaPrompt = text.trim();
-        finalImagePrompt = 'Modern $codesignAgentType UI UX design, $imagiyaPrompt, clean minimal interface, sharp readable text labels, dribbble behance quality, high fidelity wireframe, professional web design, no blur';
+        finalImagePrompt =
+            'Modern $codesignAgentType UI UX design, $imagiyaPrompt, clean minimal interface, sharp readable text labels, dribbble behance quality, high fidelity wireframe, professional web design, no blur';
       }
     }
-
 
     // NOTE: Autonomous keyword-based integration routing is intentionally disabled.
     // Integrations are ONLY triggered when the user explicitly uses @mention.
@@ -557,7 +612,6 @@ class ChatProvider extends ChangeNotifier {
             '[END OVERRIDE]';
       }
     }
-
 
     // Check if the user is replying after opening the app from a notification
     if (_pendingNotificationReply != null) {
@@ -624,14 +678,18 @@ class ChatProvider extends ChangeNotifier {
       final ref = netlessContext.parseReference(combinedText);
       String enrichedPrompt = combinedText;
       if (ref != null) {
-        enrichedPrompt = '${ref.role} said: "${ref.content}"\n\nUser: $combinedText';
+        enrichedPrompt =
+            '${ref.role} said: "${ref.content}"\n\nUser: $combinedText';
       }
-      combinedText = await netlessContext.prepareContext(enrichedPrompt, NetlessService());
+      combinedText = await netlessContext.prepareContext(
+        enrichedPrompt,
+        NetlessService(),
+      );
     } else {
       final bool isInfinity = router.lastSelectedProvider != AIProvider.netless;
       if (isInfinity) {
         final recentHistory = _messages.where((m) => !m.isStreaming).toList();
-        
+
         // If we have history, build a virtual 3M context window!
         if (recentHistory.isNotEmpty) {
           // Keep the last 12 messages fully intact (short-term context)
@@ -648,7 +706,9 @@ class ChatProvider extends ChangeNotifier {
           // chat session without blowing up the actual model's prompt limit.
           final olderSummaryBuf = StringBuffer();
           if (olderHistory.isNotEmpty) {
-            olderSummaryBuf.writeln("[INFINITY VIRTUAL 3M CONTEXT — COMPRESSED SESSION MEMORY]");
+            olderSummaryBuf.writeln(
+              "[INFINITY VIRTUAL 3M CONTEXT — COMPRESSED SESSION MEMORY]",
+            );
             for (final m in olderHistory) {
               final role = m.isUser ? "User" : "Jarvis";
               final clean = m.content.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -660,31 +720,44 @@ class ChatProvider extends ChangeNotifier {
             olderSummaryBuf.writeln("[END COMPRESSED SESSION MEMORY]\n");
           }
 
-          final recentHistoryStr = recentHistoryPart.map((m) {
-            final str = m.content;
-            final displayStr = str.length > 20000 ? '${str.substring(0, 20000)}\n\n...(TRUNCATED)...' : str;
-            return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
-          }).join('\n\n---\n\n');
+          final recentHistoryStr = recentHistoryPart
+              .map((m) {
+                final str = m.content;
+                final displayStr = str.length > 20000
+                    ? '${str.substring(0, 20000)}\n\n...(TRUNCATED)...'
+                    : str;
+                return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
+              })
+              .join('\n\n---\n\n');
 
-          combinedText = "${olderSummaryBuf.toString()}[RECENT CHAT HISTORY]\n$recentHistoryStr\n\n[CURRENT USER QUERY]\n$combinedText";
+          combinedText =
+              "${olderSummaryBuf.toString()}[RECENT CHAT HISTORY]\n$recentHistoryStr\n\n[CURRENT USER QUERY]\n$combinedText";
         }
       } else {
         final recentHistory = _messages.where((m) => !m.isStreaming).toList();
-        final recentMemories = recentHistory.length > 6 ? recentHistory.sublist(recentHistory.length - 6) : recentHistory;
-        
+        final recentMemories = recentHistory.length > 6
+            ? recentHistory.sublist(recentHistory.length - 6)
+            : recentHistory;
+
         if (recentMemories.isNotEmpty) {
-          final historyStr = recentMemories.map((m) {
-            final str = m.content;
-            final displayStr = str.length > 30000 ? '${str.substring(0, 30000)}\n\n...(TRUNCATED FOR MEMORY)...' : str;
-            return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
-          }).join('\n\n---\n\n');
-          
+          final historyStr = recentMemories
+              .map((m) {
+                final str = m.content;
+                final displayStr = str.length > 30000
+                    ? '${str.substring(0, 30000)}\n\n...(TRUNCATED FOR MEMORY)...'
+                    : str;
+                return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
+              })
+              .join('\n\n---\n\n');
+
           String finalHistory = historyStr;
           int maxLength = 60000;
           if (finalHistory.length > maxLength) {
-            finalHistory = "...\n${finalHistory.substring(finalHistory.length - maxLength)}";
+            finalHistory =
+                "...\n${finalHistory.substring(finalHistory.length - maxLength)}";
           }
-          combinedText = "[RECENT CHAT HISTORY]\n$finalHistory\n\n[CURRENT USER QUERY]\n$combinedText";
+          combinedText =
+              "[RECENT CHAT HISTORY]\n$finalHistory\n\n[CURRENT USER QUERY]\n$combinedText";
         }
       }
     }
@@ -747,10 +820,14 @@ class ChatProvider extends ChangeNotifier {
     } else if (text.startsWith('[CODESIGN]')) {
       final parts = text.substring(10).split('|');
       final agentType = parts.isNotEmpty ? parts[0].trim() : 'landing';
-      final designQuery = parts.length > 1 ? parts.skip(1).join('|').trim() : '';
-      displayText = '🎨 CoDesign · ${agentType[0].toUpperCase()}${agentType.substring(1)}: $designQuery';
+      final designQuery = parts.length > 1
+          ? parts.skip(1).join('|').trim()
+          : '';
+      displayText =
+          '🎨 CoDesign · ${agentType[0].toUpperCase()}${agentType.substring(1)}: $designQuery';
     } else if (isCodesign) {
-      displayText = '🎨 CoDesign · ${codesignAgentType[0].toUpperCase()}${codesignAgentType.substring(1)}: ${text.trim()}';
+      displayText =
+          '🎨 CoDesign · ${codesignAgentType[0].toUpperCase()}${codesignAgentType.substring(1)}: ${text.trim()}';
     }
 
     final userMsg = Message(
@@ -764,7 +841,7 @@ class ChatProvider extends ChangeNotifier {
     _messages.add(userMsg);
     await sessionService.addMessage(userMsg);
     notifyListeners();
-    
+
     // Imagiya: generate image using official providers — image only, no LLM follow-up
     if (isImagiya) {
       _setAnalysisStatus("generating image...", active: true);
@@ -772,7 +849,7 @@ class ChatProvider extends ChangeNotifier {
       try {
         final activeProvider = router.lastSelectedProvider ?? AIProvider.gemini;
         final selectedModel = router.getSelectedModel(activeProvider);
-        
+
         final imageUrl = await router.generateImage(
           finalImagePrompt,
           modelOverride: selectedModel,
@@ -812,10 +889,13 @@ class ChatProvider extends ChangeNotifier {
       _setAnalysisStatus("generating interactive design...", active: true);
       notifyListeners();
       try {
-        final CodesignArtifactType targetType = switch (codesignAgentType.toLowerCase()) {
+        final CodesignArtifactType targetType = switch (codesignAgentType
+            .toLowerCase()) {
           'landing' || 'landingpage' => CodesignArtifactType.landingPage,
           'dashboard' => CodesignArtifactType.dashboard,
-          'slides' || 'presentation' || 'slidesdeck' => CodesignArtifactType.slidesDeck,
+          'slides' ||
+          'presentation' ||
+          'slidesdeck' => CodesignArtifactType.slidesDeck,
           'mobile' || 'mobileui' || 'app' => CodesignArtifactType.mobileUI,
           'pricing' || 'pricingpage' => CodesignArtifactType.pricingPage,
           _ => CodesignArtifactType.landingPage,
@@ -830,7 +910,9 @@ class ChatProvider extends ChangeNotifier {
         final artifact = await codesignService.generate(request);
 
         // Save layout as a physical .html file in the workspace designs directory
-        Directory designsDir = Directory('c:/Users/manit/Downloads/wfy/designs');
+        Directory designsDir = Directory(
+          'c:/Users/manit/Downloads/wfy/designs',
+        );
         try {
           if (!await designsDir.exists()) {
             await designsDir.create(recursive: true);
@@ -941,15 +1023,24 @@ class ChatProvider extends ChangeNotifier {
 
     // --- Agentic Tool Injection Setup ---
     final mcpTools = connectedMcpServers.expand((s) => s.tools).toList();
-    bool hasTools = mcpTools.isNotEmpty && !isImagiya && !isCodesign && resolvedProvider == null;
-    
+    bool hasTools =
+        mcpTools.isNotEmpty &&
+        !isImagiya &&
+        !isCodesign &&
+        resolvedProvider == null;
+
     if (hasTools) {
-      final toolsCompressed = mcpTools.map((t) {
-        final schemaStr = jsonEncode(t.toGeminiSchema()['parameters'] ?? {});
-        return '- name: "${t.name}"\n  description: "${t.description}"\n  args: $schemaStr';
-      }).join('\n\n');
-      
-      final toolPrompt = '''
+      final toolsCompressed = mcpTools
+          .map((t) {
+            final schemaStr = jsonEncode(
+              t.toGeminiSchema()['parameters'] ?? {},
+            );
+            return '- name: "${t.name}"\n  description: "${t.description}"\n  args: $schemaStr';
+          })
+          .join('\n\n');
+
+      final toolPrompt =
+          '''
 \n\n[MCP TOOLS AVAILABLE]
 You have access to the following external tools:
 $toolsCompressed
@@ -969,19 +1060,21 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
       bool isToolCalling = true;
       int toolLoopCount = 0;
       String currentPrompt = combinedText;
-      final RegExp toolCallRegex = RegExp(r'<TOOL_CALL\s+name="([^"]+)">([\s\S]*?)</TOOL_CALL>');
+      final RegExp toolCallRegex = RegExp(
+        r'<TOOL_CALL\s+name="([^"]+)">([\s\S]*?)</TOOL_CALL>',
+      );
 
       while (isToolCalling && toolLoopCount < 5) {
         isToolCalling = false; // Assume no tools unless we find a tag
         buffer.clear();
-        
+
         await for (final chunk in router.generateStream(
           currentPrompt,
           integrationCapabilities: atIntegrationCapability ?? '',
         )) {
           buffer.write(chunk);
           final currentText = buffer.toString();
-          
+
           // Check for Tool Call tag (Robust regex match ignoring wrappers)
           if (hasTools && toolCallRegex.hasMatch(currentText)) {
             isToolCalling = true;
@@ -991,8 +1084,14 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
           final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
           if (idx != -1) {
             // Strip tags purely for UI cleanliness while streaming
-            final displayContent = _stripTags(currentText.replaceAll(RegExp(r'<TOOL_CALL[\s\S]*?(?:</TOOL_CALL>|$)'), ''));
-            final bool isInfinity = router.lastSelectedProvider != AIProvider.netless;
+            final displayContent = _stripTags(
+              currentText.replaceAll(
+                RegExp(r'<TOOL_CALL[\s\S]*?(?:</TOOL_CALL>|$)'),
+                '',
+              ),
+            );
+            final bool isInfinity =
+                router.lastSelectedProvider != AIProvider.netless;
             _messages[idx] = currentAiMsg.copyWith(
               content: displayContent,
               provider: isInfinity ? 'INFINITY' : router.activeProvider?.name,
@@ -1008,35 +1107,42 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
         if (isToolCalling) {
           final fullResponse = buffer.toString();
           final match = toolCallRegex.firstMatch(fullResponse);
-          
+
           if (match != null) {
             final toolName = match.group(1) ?? '';
             final argStr = match.group(2) ?? '';
-            
+
             // Retain any prose generated BEFORE the tool call
-            final prose = fullResponse.substring(0, match.start).replaceAll(RegExp(r'```(?:xml)?\s*$'), '').trim();
-            
+            final prose = fullResponse
+                .substring(0, match.start)
+                .replaceAll(RegExp(r'```(?:xml)?\s*$'), '')
+                .trim();
+
             if (prose.isNotEmpty) {
-               final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
-               if (idx != -1) {
-                 _messages[idx] = currentAiMsg.copyWith(content: _stripTags(prose), isStreaming: false);
-               }
+              final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
+              if (idx != -1) {
+                _messages[idx] = currentAiMsg.copyWith(
+                  content: _stripTags(prose),
+                  isStreaming: false,
+                );
+              }
             } else {
-               _messages.removeWhere((m) => m.id == currentAiMsg.id);
+              _messages.removeWhere((m) => m.id == currentAiMsg.id);
             }
-            
+
             _setAnalysisStatus('Running $toolName...');
-            
+
             String toolResultStr;
             try {
               final args = jsonDecode(argStr);
               final server = connectedMcpServers.firstWhere(
-                (s) => s.tools.any((t) => t.name == toolName)
+                (s) => s.tools.any((t) => t.name == toolName),
               );
               final result = await server.callTool(toolName, args);
               toolResultStr = jsonEncode(result);
             } catch (e) {
-              toolResultStr = 'Error: $e. If this was a JSON parse error, please verify your argument formatting and try again.';
+              toolResultStr =
+                  'Error: $e. If this was a JSON parse error, please verify your argument formatting and try again.';
             }
 
             // Append context natively as a Message for history integrity
@@ -1048,13 +1154,16 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
               sessionId: _currentSessionId!,
             );
             _messages.add(toolResultMsg);
-            
+
             // Re-prompt LLM, incrementally growing context
-            String proseContext = prose.isNotEmpty ? "You thought: $prose\n" : "";
-            currentPrompt += "\n\n$proseContext[SYSTEM: Tool $toolName Returned]\n$toolResultStr\n\nPlease continue responding based on this result.";
-            
+            String proseContext = prose.isNotEmpty
+                ? "You thought: $prose\n"
+                : "";
+            currentPrompt +=
+                "\n\n$proseContext[SYSTEM: Tool $toolName Returned]\n$toolResultStr\n\nPlease continue responding based on this result.";
+
             toolLoopCount++;
-            
+
             // Re-create AI message block for the next iteration
             currentAiMsg = Message(
               id: _uuid.v4(),
@@ -1103,12 +1212,16 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
       try {
         final ariaResults = await ariaFuture;
         if (ariaResults.isNotEmpty) {
-          final srcBuf = StringBuffer('\n\n---\n🔍 **Real-Time Sources (DuckDuckGo)**\n');
+          final srcBuf = StringBuffer(
+            '\n\n---\n🔍 **Real-Time Sources (DuckDuckGo)**\n',
+          );
           for (final r in ariaResults.take(5)) {
             final date = r.publishedAt != null
                 ? r.publishedAt!.toLocal().toString().substring(0, 10)
                 : 'Recent';
-            srcBuf.writeln('- **${r.title}** — ${r.provenance.sourceName} · $date');
+            srcBuf.writeln(
+              '- **${r.title}** — ${r.provenance.sourceName} · $date',
+            );
             if (r.url.isNotEmpty) srcBuf.writeln('  🔗 ${r.url}');
           }
           cleanText = '$cleanText${srcBuf.toString()}';
@@ -1150,7 +1263,8 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
             // 2. Re-inject results into AI for a proper synthesized answer
             //    We send ONLY the search context + the original user query.
             //    This ensures the AI uses REAL data, not hallucinations.
-            final synthesisPrompt = 'The user asked: "$query"\n\n'
+            final synthesisPrompt =
+                'The user asked: "$query"\n\n'
                 'Here are the real-time web search results you must use:\n\n'
                 '$searchContext\n\n'
                 'Now give a complete, accurate answer to the user query based strictly on these sources. '
@@ -1159,7 +1273,8 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
             final synthesisBuffer = StringBuffer();
             await for (final chunk in router.generateStream(
               synthesisPrompt,
-              systemPrompt: 'You are JARVIS real-time information synthesizer. '
+              systemPrompt:
+                  'You are JARVIS real-time information synthesizer. '
                   'Summarize the provided web search results into a clear, accurate, '
                   'well-formatted answer. Cite sources. Do NOT invent data.',
               maxTokens: 2048,
@@ -1176,7 +1291,9 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
               final updatedContent = synthesized.isNotEmpty
                   ? '$baseResponse\n\n**Real-Time Search: $query**\n$synthesized'
                   : '$baseResponse\n\n$searchContext';
-              _messages[idxFinish] = _messages[idxFinish].copyWith(content: updatedContent);
+              _messages[idxFinish] = _messages[idxFinish].copyWith(
+                content: updatedContent,
+              );
               notifyListeners();
               await sessionService.addMessage(_messages[idxFinish]);
             }
@@ -1200,7 +1317,8 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
           final idxDocs = _messages.indexWhere((m) => m.id == aiMsg.id);
           if (idxDocs != -1) {
             final baseResponse = _stripTags(fullResponse);
-            final updated = "$baseResponse\n\n📁 **Google Docs Search: $query**\n$result";
+            final updated =
+                "$baseResponse\n\n📁 **Google Docs Search: $query**\n$result";
             _messages[idxDocs] = _messages[idxDocs].copyWith(content: updated);
             notifyListeners();
             await sessionService.addMessage(_messages[idxDocs]);
@@ -1221,7 +1339,8 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
           final idxRead = _messages.indexWhere((m) => m.id == aiMsg.id);
           if (idxRead != -1) {
             final baseResponse = _stripTags(fullResponse);
-            final updated = "$baseResponse\n\n📖 **Doc Content (ID: $id):**\n$content";
+            final updated =
+                "$baseResponse\n\n📖 **Doc Content (ID: $id):**\n$content";
             _messages[idxRead] = _messages[idxRead].copyWith(content: updated);
             notifyListeners();
             await sessionService.addMessage(_messages[idxRead]);
@@ -1230,7 +1349,10 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
       }
 
       // 3. Create Doc (NEW Robust format)
-      final createDocRegex = RegExp(r'<CREATE_DOC\s+title="([^"]+)">([\s\S]+?)</CREATE_DOC>', dotAll: true);
+      final createDocRegex = RegExp(
+        r'<CREATE_DOC\s+title="([^"]+)">([\s\S]+?)</CREATE_DOC>',
+        dotAll: true,
+      );
       final createDocMatch = createDocRegex.firstMatch(fullResponse);
       if (createDocMatch != null) {
         final title = createDocMatch.group(1);
@@ -1244,7 +1366,9 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
           if (idxCreate != -1) {
             final baseResponse = _stripTags(fullResponse);
             final updated = "$baseResponse\n\n$result";
-            _messages[idxCreate] = _messages[idxCreate].copyWith(content: updated);
+            _messages[idxCreate] = _messages[idxCreate].copyWith(
+              content: updated,
+            );
             notifyListeners();
             await sessionService.addMessage(_messages[idxCreate]);
           }
@@ -1252,7 +1376,23 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
       }
 
       // 4. Create Academic Report (Massive 16-22 pages)
-      final academicReportRegex = RegExp(r'<CREATE_ACADEMIC_REPORT\s+topic=["' "'" r']([^"' "'" r']+)' r'["' "'" r']\s+title=["' "'" r']([^"' "'" r']+)' r'["' "'" r']>');
+      final academicReportRegex = RegExp(
+        r'<CREATE_ACADEMIC_REPORT\s+topic=["'
+        "'"
+        r']([^"'
+        "'"
+        r']+)'
+        r'["'
+        "'"
+        r']\s+title=["'
+        "'"
+        r']([^"'
+        "'"
+        r']+)'
+        r'["'
+        "'"
+        r']>',
+      );
       final academicReportMatch = academicReportRegex.firstMatch(fullResponse);
       if (academicReportMatch != null) {
         final topic = academicReportMatch.group(1);
@@ -1266,7 +1406,9 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
           if (idxReport != -1) {
             final baseResponse = _stripTags(fullResponse);
             final updated = "$baseResponse\n\n$result";
-            _messages[idxReport] = _messages[idxReport].copyWith(content: updated);
+            _messages[idxReport] = _messages[idxReport].copyWith(
+              content: updated,
+            );
             notifyListeners();
             await sessionService.addMessage(_messages[idxReport]);
           }
@@ -1286,7 +1428,9 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
             if (idxDiag != -1) {
               final base = _stripTags(fullResponse);
               final updated = "$base\n\n<!--JARVIS_DIAGRAM-->\n$html";
-              _messages[idxDiag] = _messages[idxDiag].copyWith(content: updated);
+              _messages[idxDiag] = _messages[idxDiag].copyWith(
+                content: updated,
+              );
               notifyListeners();
               await sessionService.addMessage(_messages[idxDiag]);
             }
@@ -1300,7 +1444,9 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
       // ── 6. Agentic Integration Suggestion ────────────────────────────────
       // Check both: if the AI explicitly emitted <OPEN_INTEGRATION> tag,
       // OR if user query keywords match an integration
-      final openIntegRegex = RegExp(r'<OPEN_INTEGRATION\s+id="([^"]+)"(?:\s+query="([^"]+)")?>');
+      final openIntegRegex = RegExp(
+        r'<OPEN_INTEGRATION\s+id="([^"]+)"(?:\s+query="([^"]+)")?>',
+      );
       final tagMatch = openIntegRegex.firstMatch(buffer.toString());
 
       IntegrationMatch? agentMatch;
@@ -1348,9 +1494,6 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
     await loadSessions();
   }
 
-
-
-
   Future<void> sendDiagramMessage(String text) async {
     if (_currentSessionId == null || text.trim().isEmpty) return;
     _currentSuggestions = [];
@@ -1394,7 +1537,10 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
     } catch (e) {
       final idx = _messages.indexWhere((m) => m.id == aiMsg.id);
       if (idx != -1) {
-        _messages[idx] = aiMsg.copyWith(content: "⚠️ Failed to generate diagram: $e", isStreaming: false);
+        _messages[idx] = aiMsg.copyWith(
+          content: "⚠️ Failed to generate diagram: $e",
+          isStreaming: false,
+        );
         notifyListeners();
       }
     }
@@ -1425,54 +1571,115 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
 
   int _estimateTokenCount(String text) => (text.length / 4).ceil();
 
-
-
-
-
   void _generateSuggestions(String lastAiResponse) {
     final r = lastAiResponse.toLowerCase();
     final List<String> suggestions = [];
 
     // ── Code/Tech ──────────────────────────────────────────────
-    if (r.contains('code') || r.contains('function') || r.contains('class ') ||
-        r.contains('algorithm') || r.contains('programming') || r.contains('bug')) {
-      suggestions.addAll(['Optimize this code', 'Explain step by step', 'Add error handling', 'Write unit tests', 'Show me an example']);
+    if (r.contains('code') ||
+        r.contains('function') ||
+        r.contains('class ') ||
+        r.contains('algorithm') ||
+        r.contains('programming') ||
+        r.contains('bug')) {
+      suggestions.addAll([
+        'Optimize this code',
+        'Explain step by step',
+        'Add error handling',
+        'Write unit tests',
+        'Show me an example',
+      ]);
     }
     // ── Story / Creative ───────────────────────────────────────
-    else if (r.contains('story') || r.contains('chapter') || r.contains('character') ||
-        r.contains('plot') || r.contains('write') || r.contains('poem')) {
-      suggestions.addAll(['Continue the story', 'Add a plot twist', 'Describe the setting', 'Write dialogue', 'Make it shorter']);
+    else if (r.contains('story') ||
+        r.contains('chapter') ||
+        r.contains('character') ||
+        r.contains('plot') ||
+        r.contains('write') ||
+        r.contains('poem')) {
+      suggestions.addAll([
+        'Continue the story',
+        'Add a plot twist',
+        'Describe the setting',
+        'Write dialogue',
+        'Make it shorter',
+      ]);
     }
     // ── Math / Science ─────────────────────────────────────────
-    else if (r.contains('equation') || r.contains('formula') || r.contains('calculate') ||
-        r.contains('math') || r.contains('physics') || r.contains('chemistry')) {
-      suggestions.addAll(['Show the solution steps', 'Give a real-world example', 'Simplify this', 'Related concepts', 'Practice problems']);
+    else if (r.contains('equation') ||
+        r.contains('formula') ||
+        r.contains('calculate') ||
+        r.contains('math') ||
+        r.contains('physics') ||
+        r.contains('chemistry')) {
+      suggestions.addAll([
+        'Show the solution steps',
+        'Give a real-world example',
+        'Simplify this',
+        'Related concepts',
+        'Practice problems',
+      ]);
     }
     // ── Research / Topic ───────────────────────────────────────
-    else if (r.contains('research') || r.contains('study') || r.contains('according') ||
-        r.contains('history') || r.contains('discovered') || r.contains('theory')) {
-      suggestions.addAll(['Tell me more', 'Key takeaways', 'Compare perspectives', 'Cite sources', 'Summarize this']);
+    else if (r.contains('research') ||
+        r.contains('study') ||
+        r.contains('according') ||
+        r.contains('history') ||
+        r.contains('discovered') ||
+        r.contains('theory')) {
+      suggestions.addAll([
+        'Tell me more',
+        'Key takeaways',
+        'Compare perspectives',
+        'Cite sources',
+        'Summarize this',
+      ]);
     }
     // ── Planning / Task ────────────────────────────────────────
-    else if (r.contains('plan') || r.contains('schedule') || r.contains('task') ||
-        r.contains('step') || r.contains('goal') || r.contains('project')) {
-      suggestions.addAll(['Break it into steps', 'Set reminders', 'Prioritize tasks', 'Add a timeline', 'Start with the first step']);
+    else if (r.contains('plan') ||
+        r.contains('schedule') ||
+        r.contains('task') ||
+        r.contains('step') ||
+        r.contains('goal') ||
+        r.contains('project')) {
+      suggestions.addAll([
+        'Break it into steps',
+        'Set reminders',
+        'Prioritize tasks',
+        'Add a timeline',
+        'Start with the first step',
+      ]);
     }
     // ── Health / Fitness ───────────────────────────────────────
-    else if (r.contains('health') || r.contains('exercise') || r.contains('diet') ||
-        r.contains('calories') || r.contains('workout') || r.contains('nutrition')) {
-      suggestions.addAll(['Weekly plan', 'Beginner tips', 'Track progress', 'Common mistakes', 'Expert advice']);
+    else if (r.contains('health') ||
+        r.contains('exercise') ||
+        r.contains('diet') ||
+        r.contains('calories') ||
+        r.contains('workout') ||
+        r.contains('nutrition')) {
+      suggestions.addAll([
+        'Weekly plan',
+        'Beginner tips',
+        'Track progress',
+        'Common mistakes',
+        'Expert advice',
+      ]);
     }
     // ── Generic fallback – still context-driven ────────────────
     else {
-      suggestions.addAll(['Tell me more', 'Explain in detail', 'Give an example', 'Summarize this', 'Any alternatives?']);
+      suggestions.addAll([
+        'Tell me more',
+        'Explain in detail',
+        'Give an example',
+        'Summarize this',
+        'Any alternatives?',
+      ]);
     }
 
     // Cap at 5
     _currentSuggestions = suggestions.take(5).toList();
     notifyListeners();
   }
-
 
   Future<void> _parseAndScheduleReminders(String text) async {
     try {
@@ -1493,7 +1700,9 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
         }
       }
 
-      final updateRegex = RegExp(r'<UPDATE_ROUTINE\s+type="([^"]+)"\s+(?:weekday="([^"]+)"\s+)?time="([^"]+)">');
+      final updateRegex = RegExp(
+        r'<UPDATE_ROUTINE\s+type="([^"]+)"\s+(?:weekday="([^"]+)"\s+)?time="([^"]+)">',
+      );
       for (final match in updateRegex.allMatches(text)) {
         final type = match.group(1);
         final wd = match.group(2);
@@ -1528,7 +1737,9 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
         if (ty != null) await ns.skipRoutineForToday(ty);
       }
 
-      final regex = RegExp(r'<SCHEDULE_REMINDER\s+time="([^"]+)"\s+message="([^"]+)">');
+      final regex = RegExp(
+        r'<SCHEDULE_REMINDER\s+time="([^"]+)"\s+message="([^"]+)">',
+      );
       for (final match in regex.allMatches(text)) {
         final t = match.group(1);
         final m = match.group(2);
@@ -1537,10 +1748,20 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
           final rt = _getRoutineTypeFromPurpose(m);
           if (rt != null) {
             final rTime = _getRoutineTimeFromType(rt, st);
-            if (st.difference(rTime).inHours.abs() <= 2) await ns.skipRoutineForToday(rt);
+            if (st.difference(rTime).inHours.abs() <= 2)
+              await ns.skipRoutineForToday(rt);
           }
-          ns.scheduleReminder(st.millisecondsSinceEpoch ~/ 1000, "JARVIS Reminder", m, st);
-          router.memory.addMemory(content: "JARVIS SCHEDULED NOTIFICATION: '$m' at $t.", importance: 0.9, category: 'notification');
+          ns.scheduleReminder(
+            st.millisecondsSinceEpoch ~/ 1000,
+            "JARVIS Reminder",
+            m,
+            st,
+          );
+          router.memory.addMemory(
+            content: "JARVIS SCHEDULED NOTIFICATION: '$m' at $t.",
+            importance: 0.9,
+            category: 'notification',
+          );
         }
       }
     } catch (_) {}
@@ -1548,10 +1769,17 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
 
   String? _getRoutineTypeFromPurpose(String purpose) {
     final lower = purpose.toLowerCase();
-    if (lower.contains('morning') || lower.contains('06:00') || lower.contains('wake up')) return 'morning';
-    if (lower.contains('breakfast') || lower.contains('9:30')) return 'breakfast';
+    if (lower.contains('morning') ||
+        lower.contains('06:00') ||
+        lower.contains('wake up'))
+      return 'morning';
+    if (lower.contains('breakfast') || lower.contains('9:30'))
+      return 'breakfast';
     if (lower.contains('lunch') || lower.contains('13:30')) return 'lunch';
-    if (lower.contains('evening') || lower.contains('tea') || lower.contains('18:00')) return 'evening';
+    if (lower.contains('evening') ||
+        lower.contains('tea') ||
+        lower.contains('18:00'))
+      return 'evening';
     if (lower.contains('dinner') || lower.contains('20:00')) return 'dinner';
     if (lower.contains('sleep') || lower.contains('22:00')) return 'sleep';
     return null;
@@ -1560,12 +1788,26 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
   DateTime _getRoutineTimeFromType(String type, DateTime relativeTo) {
     int h = 0, m = 0;
     switch (type) {
-      case 'morning': h = 6; break;
-      case 'breakfast': h = 9; m = 30; break;
-      case 'lunch': h = 13; m = 30; break;
-      case 'evening': h = 18; break;
-      case 'dinner': h = 20; break;
-      case 'sleep': h = 22; break;
+      case 'morning':
+        h = 6;
+        break;
+      case 'breakfast':
+        h = 9;
+        m = 30;
+        break;
+      case 'lunch':
+        h = 13;
+        m = 30;
+        break;
+      case 'evening':
+        h = 18;
+        break;
+      case 'dinner':
+        h = 20;
+        break;
+      case 'sleep':
+        h = 22;
+        break;
     }
     return DateTime(relativeTo.year, relativeTo.month, relativeTo.day, h, m);
   }
@@ -1576,9 +1818,18 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
         .replaceAll(RegExp(r'<tool_code\b[^>]*>', caseSensitive: false), '')
         .replaceAll(RegExp(r'</tool_code>', caseSensitive: false), '')
         // Strip injected REAL-TIME WEB CONTEXT block (should not appear in output)
-        .replaceAll(RegExp(r'\[REAL-TIME WEB CONTEXT[^\]]*\][\s\S]*?\[END REAL-TIME CONTEXT\]', caseSensitive: false), '')
+        .replaceAll(
+          RegExp(
+            r'\[REAL-TIME WEB CONTEXT[^\]]*\][\s\S]*?\[END REAL-TIME CONTEXT\]',
+            caseSensitive: false,
+          ),
+          '',
+        )
         // Existing tag strips
-        .replaceAll(RegExp(r'<think>[\s\S]*?(?:</think>|$)', caseSensitive: false), '')
+        .replaceAll(
+          RegExp(r'<think>[\s\S]*?(?:</think>|$)', caseSensitive: false),
+          '',
+        )
         .replaceAll(RegExp(r'<SCHEDULE_REMINDER[^>]*>'), '')
         .replaceAll(RegExp(r'<CANCEL_REMINDER[^>]*>'), '')
         .replaceAll(RegExp(r'<SKIP_ROUTINE[^>]*>'), '')
@@ -1587,14 +1838,15 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
         .replaceAll(RegExp(r'<GENERATE_IMAGE[^>]*>', dotAll: true), '')
         .replaceAll(RegExp(r'<SEARCH_DOCS[^>]*>'), '')
         .replaceAll(RegExp(r'<READ_DOC[^>]*>'), '')
-        .replaceAll(RegExp(r'<CREATE_DOC[^>]*>([\s\S]*?)</CREATE_DOC>', dotAll: true), '')
+        .replaceAll(
+          RegExp(r'<CREATE_DOC[^>]*>([\s\S]*?)</CREATE_DOC>', dotAll: true),
+          '',
+        )
         .replaceAll(RegExp(r'<CREATE_ACADEMIC_REPORT[^>]*>'), '')
         .replaceAll(RegExp(r'<DRAW_DIAGRAM[^>]*>', dotAll: true), '')
         .replaceAll(RegExp(r'<OPEN_INTEGRATION[^>]*>'), '')
         .trim();
   }
-
-
 
   @override
   void dispose() {
@@ -1602,4 +1854,3 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
     super.dispose();
   }
 }
-

@@ -7,8 +7,7 @@ class CodesignService {
   final AIRouter _router;
   static const _uuid = Uuid();
 
-  CodesignService({required AIRouter router})
-      : _router = router;
+  CodesignService({required AIRouter router}) : _router = router;
 
   static const _systemPrompt = '''
 You are CoDesign, a senior visual product designer and elite front-end engineer.
@@ -79,14 +78,15 @@ Return ONLY the raw HTML code. Do NOT wrap it in explanations or extra chat. Wra
 
   Future<CodesignArtifact> generate(CodesignRequest request) async {
     final typeLabel = switch (request.type) {
-      CodesignArtifactType.landingPage  => 'landing page',
-      CodesignArtifactType.dashboard    => 'admin dashboard',
-      CodesignArtifactType.slidesDeck   => 'presentation slides',
-      CodesignArtifactType.mobileUI     => 'mobile app UI mockup',
-      CodesignArtifactType.pricingPage  => 'pricing page',
+      CodesignArtifactType.landingPage => 'landing page',
+      CodesignArtifactType.dashboard => 'admin dashboard',
+      CodesignArtifactType.slidesDeck => 'presentation slides',
+      CodesignArtifactType.mobileUI => 'mobile app UI mockup',
+      CodesignArtifactType.pricingPage => 'pricing page',
     };
 
-    final fullPrompt = '''
+    final fullPrompt =
+        '''
 Create a $typeLabel for: "${request.prompt}"
 ${request.brandColor != null ? 'Brand color: ${request.brandColor}' : ''}
 ${request.font != null ? 'Font preference: ${request.font}' : ''}
@@ -118,7 +118,8 @@ ${request.darkMode ? 'Use dark theme.' : 'Use light theme.'}
     CodesignArtifact existing,
     String editInstruction,
   ) async {
-    final prompt = '''
+    final prompt =
+        '''
 Here is an existing HTML design:
 <existing>
 ${existing.htmlContent}
@@ -151,10 +152,13 @@ Return the complete updated HTML only.
 
   String _extractHtml(String raw) {
     // Strip markdown code fences if LLM wrapped the HTML
-    final htmlRegex = RegExp(r'```html\n?([\s\S]*?)\n?```', caseSensitive: false);
+    final htmlRegex = RegExp(
+      r'```html\n?([\s\S]*?)\n?```',
+      caseSensitive: false,
+    );
     final match = htmlRegex.firstMatch(raw);
     if (match != null) return match.group(1)!.trim();
-    
+
     // If it starts with <!DOCTYPE or <html, take as-is
     if (raw.trimLeft().startsWith('<!') || raw.trimLeft().startsWith('<html')) {
       return raw.trim();

@@ -10,21 +10,23 @@ class VoiceConversationScreen extends StatefulWidget {
   const VoiceConversationScreen({super.key});
 
   @override
-  State<VoiceConversationScreen> createState() => _VoiceConversationScreenState();
+  State<VoiceConversationScreen> createState() =>
+      _VoiceConversationScreenState();
 }
 
-class _VoiceConversationScreenState extends State<VoiceConversationScreen> with TickerProviderStateMixin {
+class _VoiceConversationScreenState extends State<VoiceConversationScreen>
+    with TickerProviderStateMixin {
   // Speech to Text
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _sttReady = false;
   bool _isListening = false;
 
   // AI State
-  String _liveWords = '';   
-  String _lastWords = '';   
-  String _aiResponse = '';  
-  bool _isThinking = false; 
-  bool _isSpeaking = false; 
+  String _liveWords = '';
+  String _lastWords = '';
+  String _aiResponse = '';
+  bool _isThinking = false;
+  bool _isSpeaking = false;
   bool _processingLock = false;
 
   // Streaming TTS Pipeline
@@ -48,11 +50,15 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
     super.initState();
     _setupAnimations();
     _initStt();
-    
+
     // SURGICAL HEARTBEAT: Checks every 1s and wakes the mic ONLY if we are truly in 'User Turn'.
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!_speech.isListening && !_isSpeaking && !_isThinking && !_processingLock && !_isTtsActive) {
-         _startStt(force: false); 
+      if (!_speech.isListening &&
+          !_isSpeaking &&
+          !_isThinking &&
+          !_processingLock &&
+          !_isTtsActive) {
+        _startStt(force: false);
       }
     });
 
@@ -80,18 +86,27 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
   }
 
   void _setupAnimations() {
-    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
-    _waveCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.85, end: 1.15).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _waveCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(
+      begin: 0.85,
+      end: 1.15,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
   }
 
   Future<void> _initStt() async {
     _sttReady = await _speech.initialize(
       onStatus: (status) {
         if (status == 'notListening' || status == 'done') {
-           _isListening = false;
-           // Auto-restart if in User Turn and died
-           if (!_isSpeaking && !_processingLock && !_isThinking) _startStt();
+          _isListening = false;
+          // Auto-restart if in User Turn and died
+          if (!_isSpeaking && !_processingLock && !_isThinking) _startStt();
         }
       },
       onError: (err) {
@@ -103,11 +118,17 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
   }
 
   Future<void> _startStt({bool force = false}) async {
-    if (!_sttReady || _isSpeaking || _isThinking || _processingLock || _isTtsActive || !mounted) return;
+    if (!_sttReady ||
+        _isSpeaking ||
+        _isThinking ||
+        _processingLock ||
+        _isTtsActive ||
+        !mounted)
+      return;
     if (_speech.isListening && !force) return;
 
     try {
-      if (force) await _speech.cancel(); 
+      if (force) await _speech.cancel();
 
       // THE SILENCE STACK: Configuration optimized for 45s+ continuous listening with minimal boops.
       await _speech.listen(
@@ -122,16 +143,21 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
           if (words != _lastWords) {
             _lastWords = words;
             _silenceTimer?.cancel();
-            _silenceTimer = Timer(const Duration(milliseconds: _silenceMs), () => _onUserFinishedSpeaking(words));
+            _silenceTimer = Timer(
+              const Duration(milliseconds: _silenceMs),
+              () => _onUserFinishedSpeaking(words),
+            );
           }
         },
-        listenFor: const Duration(hours: 1), 
-        pauseFor: const Duration(seconds: 120), // Long window to prevent in-between boops while user speaks
+        listenFor: const Duration(hours: 1),
+        pauseFor: const Duration(
+          seconds: 120,
+        ), // Long window to prevent in-between boops while user speaks
         listenOptions: stt.SpeechListenOptions(
-          cancelOnError: false, 
+          cancelOnError: false,
           partialResults: true,
           onDevice: true, // Quieter and faster reactivation
-          listenMode: stt.ListenMode.dictation, 
+          listenMode: stt.ListenMode.dictation,
         ),
       );
       if (mounted) setState(() => _isListening = true);
@@ -151,7 +177,7 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
 
   Future<void> _onUserFinishedSpeaking(String words) async {
     if (words.isEmpty || _processingLock || !mounted) return;
-    
+
     final chat = context.read<ChatProvider>();
     _processingLock = true;
     _isStreamActive = true;
@@ -172,7 +198,10 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
 
     try {
       final fullBuffer = StringBuffer();
-      await for (final chunk in chat.sendMessageStream(words, isVoiceMode: true)) {
+      await for (final chunk in chat.sendMessageStream(
+        words,
+        isVoiceMode: true,
+      )) {
         if (mounted && _isThinking) setState(() => _isThinking = false);
         fullBuffer.write(chunk);
         _sentenceBuffer.write(chunk);
@@ -181,29 +210,29 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
         String currentText = _sentenceBuffer.toString();
         final wordsInBuf = currentText.trim().split(RegExp(r'\s+'));
         final hasPunctuation = currentText.contains(RegExp(r'[.!?\n]'));
-        
-        if (hasPunctuation || wordsInBuf.length >= 6) {
-           String sentence;
-           if (hasPunctuation) {
-              final match = RegExp(r'^.*?[.!?\n]').stringMatch(currentText);
-              if (match != null) {
-                sentence = match.trim();
-                _sentenceBuffer.clear();
-                _sentenceBuffer.write(currentText.substring(match.length));
-              } else {
-                sentence = currentText.trim();
-                _sentenceBuffer.clear();
-              }
-           } else {
-              sentence = wordsInBuf.take(5).join(' ');
-              _sentenceBuffer.clear();
-              _sentenceBuffer.write(wordsInBuf.skip(5).join(' '));
-           }
 
-           if (sentence.isNotEmpty) {
-             _ttsQueue.add(sentence);
-             _processTtsQueue();
-           }
+        if (hasPunctuation || wordsInBuf.length >= 6) {
+          String sentence;
+          if (hasPunctuation) {
+            final match = RegExp(r'^.*?[.!?\n]').stringMatch(currentText);
+            if (match != null) {
+              sentence = match.trim();
+              _sentenceBuffer.clear();
+              _sentenceBuffer.write(currentText.substring(match.length));
+            } else {
+              sentence = currentText.trim();
+              _sentenceBuffer.clear();
+            }
+          } else {
+            sentence = wordsInBuf.take(5).join(' ');
+            _sentenceBuffer.clear();
+            _sentenceBuffer.write(wordsInBuf.skip(5).join(' '));
+          }
+
+          if (sentence.isNotEmpty) {
+            _ttsQueue.add(sentence);
+            _processTtsQueue();
+          }
         }
       }
 
@@ -221,7 +250,6 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
       } else {
         _parseAndScheduleReminders(fullBuffer.toString());
       }
-      
     } catch (e) {
       if (mounted) setState(() => _isThinking = false);
       _finishInteraction();
@@ -247,7 +275,9 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
 
   void _parseAndScheduleReminders(String text) {
     try {
-      final regex = RegExp(r'<SCHEDULE_REMINDER\s+time="([^"]+)"\s+message="([^"]+)">');
+      final regex = RegExp(
+        r'<SCHEDULE_REMINDER\s+time="([^"]+)"\s+message="([^"]+)">',
+      );
       final matches = regex.allMatches(text);
       for (final match in matches) {
         if (match.groupCount >= 2) {
@@ -265,7 +295,8 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
               // Store memory of this voice event!
               final chat = context.read<ChatProvider>();
               chat.router.memory.addMemory(
-                content: "JARVIS SCHEDULED NOTIFICATION: '\$msg' at \$timeStr. NOTE: Act like a caring human. Check in on them regarding this event, ask how it went, or convey wishes if it's a special occasion like a birthday.",
+                content:
+                    "JARVIS SCHEDULED NOTIFICATION: '\$msg' at \$timeStr. NOTE: Act like a caring human. Check in on them regarding this event, ask how it went, or convey wishes if it's a special occasion like a birthday.",
                 importance: 0.9,
                 category: 'notification',
               );
@@ -285,7 +316,7 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
     _isTtsActive = false;
     _isStreamActive = false;
     _isSpeaking = false;
-    _lastWords = ''; 
+    _lastWords = '';
     if (mounted) {
       setState(() => _liveWords = '');
       _startStt(force: false);
@@ -295,13 +326,13 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF010206), 
+      backgroundColor: const Color(0xFF010206),
       body: SafeArea(
         child: Column(
           children: [
             _buildTopBar(),
             Expanded(child: _buildCenter()),
-             _buildBottom(),
+            _buildBottom(),
           ],
         ),
       ),
@@ -315,10 +346,22 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
         children: [
           IconButton(
             onPressed: () => _endCall(),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white54, size: 28),
+            icon: const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white54,
+              size: 28,
+            ),
           ),
           const Spacer(),
-          Text('JARVIS LIVE', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 8, color: Colors.cyanAccent.withValues(alpha: 0.8))),
+          Text(
+            'JARVIS LIVE',
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 8,
+              color: Colors.cyanAccent.withValues(alpha: 0.8),
+            ),
+          ),
           const Spacer(),
           const Icon(Icons.waves_rounded, color: Colors.cyanAccent, size: 22),
         ],
@@ -345,12 +388,42 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
     return AnimatedBuilder(
       animation: _pulseAnim,
       builder: (context, child) {
-        final Color orbColor = _isSpeaking ? const Color(0xFF00D4FF) : (_isThinking ? const Color(0xFFFFAA00) : (_isListening ? const Color(0xFF00FF88) : Colors.white24));
+        final Color orbColor = _isSpeaking
+            ? const Color(0xFF00D4FF)
+            : (_isThinking
+                  ? const Color(0xFFFFAA00)
+                  : (_isListening ? const Color(0xFF00FF88) : Colors.white24));
         return Stack(
           alignment: Alignment.center,
           children: [
-            Transform.scale(scale: _pulseAnim.value * 1.3, child: Container(width: 170, height: 170, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: orbColor.withValues(alpha: 0.1), width: 1)))),
-            Transform.scale(scale: _pulseAnim.value * 1.1, child: Container(width: 150, height: 150, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: orbColor.withValues(alpha: 0.2), width: 1.5)))),
+            Transform.scale(
+              scale: _pulseAnim.value * 1.3,
+              child: Container(
+                width: 170,
+                height: 170,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: orbColor.withValues(alpha: 0.1),
+                    width: 1,
+                  ),
+                ),
+              ),
+            ),
+            Transform.scale(
+              scale: _pulseAnim.value * 1.1,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: orbColor.withValues(alpha: 0.2),
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
             Transform.scale(
               scale: (_isListening || _isSpeaking) ? _pulseAnim.value : 1.0,
               child: Container(
@@ -358,8 +431,21 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
                 height: 110,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [orbColor.withValues(alpha: 1.0), orbColor.withValues(alpha: 0.4), Colors.transparent], stops: const [0.0, 0.7, 1.0]),
-                  boxShadow: [BoxShadow(color: orbColor.withValues(alpha: 0.4), blurRadius: 40, spreadRadius: 10)],
+                  gradient: RadialGradient(
+                    colors: [
+                      orbColor.withValues(alpha: 1.0),
+                      orbColor.withValues(alpha: 0.4),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.7, 1.0],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: orbColor.withValues(alpha: 0.4),
+                      blurRadius: 40,
+                      spreadRadius: 10,
+                    ),
+                  ],
                 ),
                 child: Center(child: _buildOrbIcon(orbColor)),
               ),
@@ -371,9 +457,18 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
   }
 
   Widget _buildOrbIcon(Color color) {
-    if (_isThinking) return SizedBox(width: 32, height: 32, child: CircularProgressIndicator(color: color, strokeWidth: 2.5));
+    if (_isThinking)
+      return SizedBox(
+        width: 32,
+        height: 32,
+        child: CircularProgressIndicator(color: color, strokeWidth: 2.5),
+      );
     if (_isSpeaking) return _buildWaveBars(color);
-    return Icon(_isListening ? Icons.graphic_eq_rounded : Icons.mic_none_rounded, color: Colors.white, size: 40);
+    return Icon(
+      _isListening ? Icons.graphic_eq_rounded : Icons.mic_none_rounded,
+      color: Colors.white,
+      size: 40,
+    );
   }
 
   Widget _buildWaveBars(Color color) {
@@ -385,8 +480,17 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
           children: List.generate(5, (i) {
             final heights = [18.0, 32.0, 24.0, 36.0, 20.0];
             final t = (_waveCtrl.value + (i * 0.15)) % 1.0;
-            final h = heights[i] * (0.6 + 0.4 * (t < 0.5 ? t * 2 : (1 - t) * 2));
-            return Container(margin: const EdgeInsets.symmetric(horizontal: 2.5), width: 5, height: h, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)));
+            final h =
+                heights[i] * (0.6 + 0.4 * (t < 0.5 ? t * 2 : (1 - t) * 2));
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2.5),
+              width: 5,
+              height: h,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            );
           }),
         );
       },
@@ -394,9 +498,25 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
   }
 
   Widget _buildStatusLabel() {
-    String label = _isThinking ? 'AGENT THINKING' : (_isSpeaking ? 'JARVIS SPEAKING' : (_isListening ? 'LISTENING LIVE' : 'CONNECTING...'));
-    Color color = _isThinking ? Colors.orange : (_isSpeaking ? Colors.cyanAccent : (_isListening ? Colors.greenAccent : Colors.grey));
-    return Text(label, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 4, color: color));
+    String label = _isThinking
+        ? 'AGENT THINKING'
+        : (_isSpeaking
+              ? 'JARVIS SPEAKING'
+              : (_isListening ? 'LISTENING LIVE' : 'CONNECTING...'));
+    Color color = _isThinking
+        ? Colors.orange
+        : (_isSpeaking
+              ? Colors.cyanAccent
+              : (_isListening ? Colors.greenAccent : Colors.grey));
+    return Text(
+      label,
+      style: GoogleFonts.outfit(
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 4,
+        color: color,
+      ),
+    );
   }
 
   Widget _buildTranscript() {
@@ -404,25 +524,39 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         children: [
-          if (_liveWords.isNotEmpty) Text('"$_liveWords"', textAlign: TextAlign.center, style: GoogleFonts.notoSans(fontSize: 17, fontStyle: FontStyle.italic, color: Colors.greenAccent, fontWeight: FontWeight.w500)),
+          if (_liveWords.isNotEmpty)
+            Text(
+              '"$_liveWords"',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.notoSans(
+                fontSize: 17,
+                fontStyle: FontStyle.italic,
+                color: Colors.greenAccent,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           if (_aiResponse.isNotEmpty) ...[
             const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.02), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.02),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              ),
               child: Text(
-                _aiResponse, 
-                textAlign: TextAlign.center, 
-                maxLines: 4, 
+                _aiResponse,
+                textAlign: TextAlign.center,
+                maxLines: 4,
                 style: GoogleFonts.notoSans(
-                  fontSize: 15, 
-                  color: Colors.white.withValues(alpha: 0.9), 
+                  fontSize: 15,
+                  color: Colors.white.withValues(alpha: 0.9),
                   height: 1.6,
                   fontWeight: FontWeight.w500,
-                )
+                ),
               ),
             ),
-          ]
+          ],
         ],
       ),
     );
@@ -435,9 +569,36 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> with 
         onTap: _endCall,
         child: Column(
           children: [
-            Container(width: 72, height: 72, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.redAccent, boxShadow: [BoxShadow(color: Colors.redAccent.withValues(alpha: 0.3), blurRadius: 20, spreadRadius: 5)]), child: const Icon(Icons.call_end_rounded, color: Colors.white, size: 34)),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.redAccent,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.redAccent.withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.call_end_rounded,
+                color: Colors.white,
+                size: 34,
+              ),
+            ),
             const SizedBox(height: 12),
-            Text('END CALL', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 3)),
+            Text(
+              'END CALL',
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.white54,
+                letterSpacing: 3,
+              ),
+            ),
           ],
         ),
       ),

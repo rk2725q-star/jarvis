@@ -6,10 +6,7 @@ class LocalModelClient {
   final String baseUrl;
   final String? apiKey;
 
-  LocalModelClient({
-    this.baseUrl = 'http://127.0.0.1:8080',
-    this.apiKey,
-  });
+  LocalModelClient({this.baseUrl = 'http://127.0.0.1:8080', this.apiKey});
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
@@ -17,16 +14,18 @@ class LocalModelClient {
   };
 
   Future<String> generate(String prompt) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/completion'),
-      headers: _headers,
-      body: jsonEncode({
-        'prompt': prompt,
-        'n_predict': 1024,
-        'temperature': 0.7,
-        'stop': ['\n\n\n'],
-      }),
-    ).timeout(const Duration(seconds: 120));
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/completion'),
+          headers: _headers,
+          body: jsonEncode({
+            'prompt': prompt,
+            'n_predict': 1024,
+            'temperature': 0.7,
+            'stop': ['\n\n\n'],
+          }),
+        )
+        .timeout(const Duration(seconds: 120));
 
     if (res.statusCode != 200) {
       throw Exception('Local model error ${res.statusCode}');
@@ -48,9 +47,10 @@ class LocalModelClient {
       });
 
       final resp = await client.send(req);
-      await for (final line in resp.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())) {
+      await for (final line
+          in resp.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())) {
         if (line.startsWith('data: ')) {
           final jsonStr = line.substring(6).trim();
           try {
@@ -68,7 +68,8 @@ class LocalModelClient {
 
   Future<bool> isAvailable() async {
     try {
-      final res = await http.get(Uri.parse('$baseUrl/health'))
+      final res = await http
+          .get(Uri.parse('$baseUrl/health'))
           .timeout(const Duration(seconds: 3));
       return res.statusCode == 200;
     } catch (_) {

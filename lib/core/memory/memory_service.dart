@@ -63,29 +63,37 @@ class MemoryService {
     // Prioritize language preferences and notification status
     final langMems = all.where((m) => m.category == 'language').toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    
+
     final notifMems = all.where((m) => m.category == 'notification').toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    
+
     // Get other important memories
-    final otherMems = all.where((m) => m.category != 'language' && m.category != 'notification').toList()
-      ..sort((a, b) => b.importance.compareTo(a.importance));
+    final otherMems =
+        all
+            .where(
+              (m) => m.category != 'language' && m.category != 'notification',
+            )
+            .toList()
+          ..sort((a, b) => b.importance.compareTo(a.importance));
 
     final Set<MemoryItem> contextItems = {};
-    if (langMems.isNotEmpty) contextItems.add(langMems.first); // Take the latest language choice
-    
+    if (langMems.isNotEmpty)
+      contextItems.add(langMems.first); // Take the latest language choice
+
     // Always include the last 3 notification memories to prevent repetitive asking
     for (var m in notifMems.take(3)) {
       contextItems.add(m);
     }
-    
+
     for (var m in otherMems) {
       if (contextItems.length >= limit) break;
       contextItems.add(m);
     }
 
     final finalItems = contextItems.toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt)); // Chronological order for logic
+      ..sort(
+        (a, b) => a.createdAt.compareTo(b.createdAt),
+      ); // Chronological order for logic
 
     return '=== Relevant Memory Context ===\n${finalItems.map((m) => '• ${m.content}').join('\n')}\n\n';
   }

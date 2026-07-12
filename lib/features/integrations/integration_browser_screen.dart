@@ -136,23 +136,61 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
 
   /// Sites that work better in desktop mode (complex web apps, productivity tools)
   static const _desktopSites = [
-    'docs.google.com', 'sheets.google.com', 'slides.google.com',
-    'mail.google.com', 'drive.google.com', 'notion.so', 'figma.com',
-    'github.com', 'gitlab.com', 'codesandbox.io', 'codepen.io',
-    'stackoverflow.com', 'trello.com', 'airtable.com', 'canva.com',
-    'whatsapp.web.whatsapp.com', 'web.whatsapp.com', 'outlook.com',
-    'office.com', 'microsoft.com/en-us/microsoft-365', 'word.cloud.microsoft', 'office.live.com',
-    'jira.atlassian.com', 'slack.com', 'discord.com', 'linear.app',
-    'vercel.com', 'netlify.com', 'heroku.com', 'railway.app',
+    'docs.google.com',
+    'sheets.google.com',
+    'slides.google.com',
+    'mail.google.com',
+    'drive.google.com',
+    'notion.so',
+    'figma.com',
+    'github.com',
+    'gitlab.com',
+    'codesandbox.io',
+    'codepen.io',
+    'stackoverflow.com',
+    'trello.com',
+    'airtable.com',
+    'canva.com',
+    'whatsapp.web.whatsapp.com',
+    'web.whatsapp.com',
+    'outlook.com',
+    'office.com',
+    'microsoft.com/en-us/microsoft-365',
+    'word.cloud.microsoft',
+    'office.live.com',
+    'jira.atlassian.com',
+    'slack.com',
+    'discord.com',
+    'linear.app',
+    'vercel.com',
+    'netlify.com',
+    'heroku.com',
+    'railway.app',
   ];
 
   /// Sites that work better in mobile mode
   static const _mobileSites = [
-    'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
-    'facebook.com', 'm.facebook.com', 'reddit.com', 'pinterest.com',
-    'amazon.in', 'flipkart.com', 'myntra.com', 'meesho.com',
-    'youtube.com', 'youtu.be', 'spotify.com', 'swiggy.com', 'zomato.com',
-    'phonepe.com', 'paytm.com', 'gpay.app', 'udemy.com',
+    'instagram.com',
+    'twitter.com',
+    'x.com',
+    'tiktok.com',
+    'facebook.com',
+    'm.facebook.com',
+    'reddit.com',
+    'pinterest.com',
+    'amazon.in',
+    'flipkart.com',
+    'myntra.com',
+    'meesho.com',
+    'youtube.com',
+    'youtu.be',
+    'spotify.com',
+    'swiggy.com',
+    'zomato.com',
+    'phonepe.com',
+    'paytm.com',
+    'gpay.app',
+    'udemy.com',
   ];
 
   bool _autoDetectDesktopMode(String url) {
@@ -265,11 +303,11 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
         // ── UA: dynamically adapts to site type ──────────────────────────────
         userAgent: _isDesktopMode
             ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-              'AppleWebKit/537.36 (KHTML, like Gecko) '
-              'Chrome/124.0.0.0 Safari/537.36'
+                  'AppleWebKit/537.36 (KHTML, like Gecko) '
+                  'Chrome/124.0.0.0 Safari/537.36'
             : 'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
-              'AppleWebKit/537.36 (KHTML, like Gecko) '
-              'Chrome/124.0.6367.82 Mobile Safari/537.36',
+                  'AppleWebKit/537.36 (KHTML, like Gecko) '
+                  'Chrome/124.0.6367.82 Mobile Safari/537.36',
 
         // ── Long-press context menu for image save ────────────────────────
         disableContextMenu: false,
@@ -322,11 +360,18 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
             final newUA = shouldBeDesktop
                 ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
                 : 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36';
-            await c.setSettings(settings: InAppWebViewSettings(
-              userAgent: newUA,
-              preferredContentMode: shouldBeDesktop ? UserPreferredContentMode.DESKTOP : UserPreferredContentMode.MOBILE,
-            ));
-            await c.evaluateJavascript(source: "Object.defineProperty(navigator, 'userAgent', {get: function(){ return '$newUA'; }});");
+            await c.setSettings(
+              settings: InAppWebViewSettings(
+                userAgent: newUA,
+                preferredContentMode: shouldBeDesktop
+                    ? UserPreferredContentMode.DESKTOP
+                    : UserPreferredContentMode.MOBILE,
+              ),
+            );
+            await c.evaluateJavascript(
+              source:
+                  "Object.defineProperty(navigator, 'userAgent', {get: function(){ return '$newUA'; }});",
+            );
           }
           setState(() {});
         }
@@ -852,12 +897,17 @@ class _IntegrationBrowserScreenState extends State<IntegrationBrowserScreen>
               final newUA = _isDesktopMode
                   ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
                   : 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36';
-              await _currentTab.controller?.setSettings(settings: InAppWebViewSettings(
-                userAgent: newUA,
-                preferredContentMode: _isDesktopMode ? UserPreferredContentMode.DESKTOP : UserPreferredContentMode.MOBILE,
-              ));
+              await _currentTab.controller?.setSettings(
+                settings: InAppWebViewSettings(
+                  userAgent: newUA,
+                  preferredContentMode: _isDesktopMode
+                      ? UserPreferredContentMode.DESKTOP
+                      : UserPreferredContentMode.MOBILE,
+                ),
+              );
               await _currentTab.controller?.evaluateJavascript(
-                source: "Object.defineProperty(navigator, 'userAgent', {get: function(){ return '$newUA'; }});",
+                source:
+                    "Object.defineProperty(navigator, 'userAgent', {get: function(){ return '$newUA'; }});",
               );
               _currentTab.controller?.reload();
             },

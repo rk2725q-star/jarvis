@@ -25,8 +25,8 @@ class TextRun {
   final bool isUnderline;
   final bool isStrike;
   final double? fontSize;
-  final String? color;       // hex like '#FF0000'
-  final String? highlight;   // hex background
+  final String? color; // hex like '#FF0000'
+  final String? highlight; // hex background
   final bool isSuperscript;
   final bool isSubscript;
   final String? hyperlink;

@@ -51,13 +51,19 @@ class McpTool {
   static Map<String, dynamic> _sanitizeSchema(Map<String, dynamic> schema) {
     final sanitized = <String, dynamic>{};
     schema.forEach((key, value) {
-      if (key == '\$schema' || key == 'additionalProperties' || key == 'default' || key == 'title' || key == 'format') {
+      if (key == '\$schema' ||
+          key == 'additionalProperties' ||
+          key == 'default' ||
+          key == 'title' ||
+          key == 'format') {
         return;
       }
       if (value is Map<String, dynamic>) {
         sanitized[key] = _sanitizeSchema(value);
       } else if (value is List) {
-        sanitized[key] = value.map((e) => e is Map<String, dynamic> ? _sanitizeSchema(e) : e).toList();
+        sanitized[key] = value
+            .map((e) => e is Map<String, dynamic> ? _sanitizeSchema(e) : e)
+            .toList();
       } else {
         sanitized[key] = value;
       }
@@ -97,7 +103,9 @@ class McpServer {
       sessionId: json['sessionId'],
     );
     if (json['tools'] != null) {
-      server.tools = (json['tools'] as List).map((t) => McpTool.fromJson(t)).toList();
+      server.tools = (json['tools'] as List)
+          .map((t) => McpTool.fromJson(t))
+          .toList();
     }
     return server;
   }
@@ -137,7 +145,7 @@ class McpServer {
     if (resp.body.isEmpty) return {};
 
     final bodyText = resp.body.trim();
-    
+
     // Parse SSE format if present
     if (bodyText.startsWith('data:')) {
       for (final line in bodyText.split('\n')) {
@@ -151,7 +159,7 @@ class McpServer {
         }
       }
     }
-    
+
     // Fallback to raw JSON
     final parsed = jsonDecode(bodyText);
     if (parsed['error'] != null) throw Exception(parsed['error']);
@@ -171,9 +179,17 @@ class McpServer {
   }
 
   /// Auto-connect: Tries plain connection, falls back to OAuth if 401
-  static Future<McpServer> connect(String url, {String? token, String? id}) async {
-    final server = McpServer(id: id ?? const Uuid().v4(), url: url, authToken: token);
-    
+  static Future<McpServer> connect(
+    String url, {
+    String? token,
+    String? id,
+  }) async {
+    final server = McpServer(
+      id: id ?? const Uuid().v4(),
+      url: url,
+      authToken: token,
+    );
+
     try {
       await server._handshake();
       return server;
@@ -192,18 +208,12 @@ class McpServer {
       "params": {
         "protocolVersion": "2024-11-05",
         "capabilities": {},
-        "clientInfo": {
-          "name": "jarvis-client",
-          "version": "1.0.0"
-        }
-      }
+        "clientInfo": {"name": "jarvis-client", "version": "1.0.0"},
+      },
     });
 
     // 2. Notifications/initialized (Required by MCP spec)
-    await _post({
-      "jsonrpc": "2.0",
-      "method": "notifications/initialized"
-    });
+    await _post({"jsonrpc": "2.0", "method": "notifications/initialized"});
 
     // 3. Fetch Tools
     final toolsData = await _post({
@@ -218,21 +228,25 @@ class McpServer {
 
   static Future<McpServer> connectWithOAuth(McpServer server) async {
     final mcpUrl = server.url;
-    
+
     // Step 1: probe server, read metadata hint
-    final metaUrl = mcpUrl.endsWith('/') ? "${mcpUrl}.well-known/oauth-authorization-server" : "$mcpUrl/.well-known/oauth-authorization-server";
+    final metaUrl = mcpUrl.endsWith('/')
+        ? "${mcpUrl}.well-known/oauth-authorization-server"
+        : "$mcpUrl/.well-known/oauth-authorization-server";
     final metaResp = await http.get(Uri.parse(metaUrl));
     if (metaResp.statusCode >= 400) {
-      throw Exception('Server requires authentication but lacks OAuth endpoints.');
+      throw Exception(
+        'Server requires authentication but lacks OAuth endpoints.',
+      );
     }
     final meta = jsonDecode(metaResp.body);
-    
+
     String? clientId = meta['client_id'];
-    
+
     if (clientId == null) {
       if (meta['registration_endpoint'] != null) {
         final regResp = await http.post(
-          Uri.parse(meta['registration_endpoint']), 
+          Uri.parse(meta['registration_endpoint']),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'client_name': 'JARVIS',
@@ -240,27 +254,33 @@ class McpServer {
             'grant_types': ['authorization_code'],
             'response_types': ['code'],
             'token_endpoint_auth_method': 'none',
-          })
+          }),
         );
         if (regResp.statusCode >= 400) {
-          throw Exception('Dynamic client registration failed: ${regResp.body}');
+          throw Exception(
+            'Dynamic client registration failed: ${regResp.body}',
+          );
         }
         clientId = jsonDecode(regResp.body)['client_id'];
       } else {
-        throw Exception('This server needs manual app registration — no dynamic registration support.');
+        throw Exception(
+          'This server needs manual app registration — no dynamic registration support.',
+        );
       }
     }
-    
+
     final verifier = _generateCodeVerifier();
     final challenge = _codeChallengeS256(verifier);
-    
-    final authUrl = Uri.parse(meta['authorization_endpoint']).replace(queryParameters: {
-      'response_type': 'code',
-      'client_id': clientId,
-      'redirect_uri': 'jarvis://mcp-callback',
-      'code_challenge': challenge,
-      'code_challenge_method': 'S256',
-    });
+
+    final authUrl = Uri.parse(meta['authorization_endpoint']).replace(
+      queryParameters: {
+        'response_type': 'code',
+        'client_id': clientId,
+        'redirect_uri': 'jarvis://mcp-callback',
+        'code_challenge': challenge,
+        'code_challenge_method': 'S256',
+      },
+    );
 
     // Trigger system browser for OAuth login
     final result = await FlutterWebAuth2.authenticate(
@@ -274,13 +294,16 @@ class McpServer {
     }
 
     // Exchange code for token
-    final tokenResp = await http.post(Uri.parse(meta['token_endpoint']), body: {
-      'grant_type': 'authorization_code',
-      'code': code,
-      'redirect_uri': 'jarvis://mcp-callback',
-      'code_verifier': verifier,
-      'client_id': clientId,
-    });
+    final tokenResp = await http.post(
+      Uri.parse(meta['token_endpoint']),
+      body: {
+        'grant_type': 'authorization_code',
+        'code': code,
+        'redirect_uri': 'jarvis://mcp-callback',
+        'code_verifier': verifier,
+        'client_id': clientId,
+      },
+    );
 
     if (tokenResp.statusCode >= 400) {
       throw Exception('OAuth token exchange failed');
@@ -288,25 +311,25 @@ class McpServer {
 
     final accessToken = jsonDecode(tokenResp.body)['access_token'];
     server.authToken = accessToken;
-    
+
     final secureStorage = SecureStorageService();
     await secureStorage.saveMcpToken(server.id, accessToken);
-    
+
     // Resume handshake with valid token
     await server._handshake();
-    
+
     return server;
   }
 
   /// Calls a tool on the remote MCP server
-  Future<Map<String, dynamic>> callTool(String toolName, Map<String, dynamic> arguments) async {
+  Future<Map<String, dynamic>> callTool(
+    String toolName,
+    Map<String, dynamic> arguments,
+  ) async {
     final result = await _post({
       "jsonrpc": "2.0",
       "method": "tools/call",
-      "params": {
-        "name": toolName,
-        "arguments": arguments,
-      },
+      "params": {"name": toolName, "arguments": arguments},
       "id": const Uuid().v4(),
     });
     return result as Map<String, dynamic>? ?? {};

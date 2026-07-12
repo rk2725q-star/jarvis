@@ -27,15 +27,11 @@ class DioClient {
 
     _dio = Dio(
       BaseOptions(
-        connectTimeout: Duration(
-          milliseconds: ApiConstants.connectTimeoutMs,
-        ),
-        receiveTimeout: Duration(
-          milliseconds: ApiConstants.receiveTimeoutMs,
-        ),
+        connectTimeout: Duration(milliseconds: ApiConstants.connectTimeoutMs),
+        receiveTimeout: Duration(milliseconds: ApiConstants.receiveTimeoutMs),
         headers: {
-          'User-Agent':      ApiConstants.userAgent,
-          'Accept':          'application/json',
+          'User-Agent': ApiConstants.userAgent,
+          'Accept': 'application/json',
           'Accept-Language': 'en-US,en;q=0.9',
         },
       ),
@@ -70,8 +66,10 @@ class _RetryInterceptor extends Interceptor {
     if (_shouldRetry(err) && _attempt < ApiConstants.maxRetries) {
       _attempt++;
       // Exponential backoff: 1s, 2s, 4s... capped at 30s for this mobile context
-      final waitMs = (ApiConstants.baseBackoffMs * 
-                      (1 << (_attempt - 1))).clamp(0, 30000);
+      final waitMs = (ApiConstants.baseBackoffMs * (1 << (_attempt - 1))).clamp(
+        0,
+        30000,
+      );
       logger.w('Retry attempt $_attempt after ${waitMs}ms');
       await Future.delayed(Duration(milliseconds: waitMs));
       try {
@@ -91,8 +89,8 @@ class _RetryInterceptor extends Interceptor {
     return err.type == DioExceptionType.connectionTimeout ||
         err.type == DioExceptionType.receiveTimeout ||
         err.type == DioExceptionType.connectionError ||
-        (err.response?.statusCode == 429) ||  // Rate limited
-        (err.response?.statusCode == 503);    // Service unavailable
+        (err.response?.statusCode == 429) || // Rate limited
+        (err.response?.statusCode == 503); // Service unavailable
   }
 }
 

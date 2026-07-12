@@ -1,4 +1,5 @@
 enum ImageResolution { standard, hd, fullhd }
+
 enum ImageStatus { idle, generating, success, error }
 
 class ImagiyaPrompt {
@@ -21,8 +22,8 @@ class ImagiyaPrompt {
     final encoded = Uri.encodeComponent(text);
     final (w, h) = switch (resolution) {
       ImageResolution.standard => (512, 512),
-      ImageResolution.hd      => (1024, 1024),
-      ImageResolution.fullhd  => (1920, 1080),
+      ImageResolution.hd => (1024, 1024),
+      ImageResolution.fullhd => (1920, 1080),
     };
     final params = {
       'width': w.toString(),
@@ -31,7 +32,8 @@ class ImagiyaPrompt {
       'nologo': 'true',
       'enhance': 'true',
       // ignore: use_null_aware_elements
-      if (negativePrompt != null) 'negative': Uri.encodeComponent(negativePrompt!),
+      if (negativePrompt != null)
+        'negative': Uri.encodeComponent(negativePrompt!),
       // ignore: use_null_aware_elements
       if (seed != null) 'seed': seed!,
     };

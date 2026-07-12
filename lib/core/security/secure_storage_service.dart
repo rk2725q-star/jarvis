@@ -2,7 +2,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Handles encrypted storage of API keys using Android Keystore / iOS Keychain
 class SecureStorageService {
-  static final SecureStorageService _instance = SecureStorageService._internal();
+  static final SecureStorageService _instance =
+      SecureStorageService._internal();
   factory SecureStorageService() => _instance;
   SecureStorageService._internal();
 
@@ -39,12 +40,20 @@ class SecureStorageService {
   }
 
   Future<String> getLocalUrl() async {
-    return (await _storage.read(key: _baseUrlKey('local_model'))) ?? 'http://127.0.0.1:8080';
+    return (await _storage.read(key: _baseUrlKey('local_model'))) ??
+        'http://127.0.0.1:8080';
   }
 
   Future<Map<String, String?>> getAllKeys() async {
     final Map<String, String?> keys = {};
-    for (final p in ['gemini', 'ollama', 'nvidia', 'deepseek', 'ollamaCloud', 'llamaCpp']) {
+    for (final p in [
+      'gemini',
+      'ollama',
+      'nvidia',
+      'deepseek',
+      'ollamaCloud',
+      'llamaCpp',
+    ]) {
       keys[p] = await getApiKey(p);
     }
     return keys;

@@ -32,17 +32,48 @@ import 'package:file_picker/file_picker.dart';
 // ─── File type helpers ────────────────────────────────────────────────────────
 String _ext(String path) => path.split('.').last.toLowerCase();
 
-bool _isImage(String path) => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(_ext(path));
-bool _isText(String path) => ['txt', 'md', 'dart', 'py', 'js', 'ts', 'kt', 'java', 'swift',
-    'go', 'rs', 'cpp', 'c', 'h', 'html', 'css', 'scss', 'json', 'xml', 'yaml', 'yml',
-    'sh', 'bat', 'sql', 'csv'].contains(_ext(path));
+bool _isImage(String path) =>
+    ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(_ext(path));
+bool _isText(String path) => [
+  'txt',
+  'md',
+  'dart',
+  'py',
+  'js',
+  'ts',
+  'kt',
+  'java',
+  'swift',
+  'go',
+  'rs',
+  'cpp',
+  'c',
+  'h',
+  'html',
+  'css',
+  'scss',
+  'json',
+  'xml',
+  'yaml',
+  'yml',
+  'sh',
+  'bat',
+  'sql',
+  'csv',
+].contains(_ext(path));
 bool _isPdf(String path) => _ext(path) == 'pdf';
 bool _isDoc(String path) => ['doc', 'docx'].contains(_ext(path));
-bool _isSheet(String path) => ['xls', 'xlsx'].contains(_ext(path)); // removed csv from sheet logic for WPS render
+bool _isSheet(String path) => [
+  'xls',
+  'xlsx',
+].contains(_ext(path)); // removed csv from sheet logic for WPS render
 bool _isSlides(String path) => ['ppt', 'pptx'].contains(_ext(path));
-bool _isAudio(String path) => ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus'].contains(_ext(path));
-bool _isVideo(String path) => ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp', 'flv'].contains(_ext(path));
-bool _isOffice(String path) => _isDoc(path) || _isSheet(path) || _isSlides(path);
+bool _isAudio(String path) =>
+    ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus'].contains(_ext(path));
+bool _isVideo(String path) =>
+    ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp', 'flv'].contains(_ext(path));
+bool _isOffice(String path) =>
+    _isDoc(path) || _isSheet(path) || _isSlides(path);
 bool _isCsv(String path) => _ext(path) == 'csv';
 
 String _basename(String path) => path.split(Platform.pathSeparator).last;
@@ -83,7 +114,11 @@ class JarvisFileViewer extends StatefulWidget {
   final String filePath;
   final String? initialQuestion;
 
-  const JarvisFileViewer({super.key, required this.filePath, this.initialQuestion});
+  const JarvisFileViewer({
+    super.key,
+    required this.filePath,
+    this.initialQuestion,
+  });
 
   @override
   State<JarvisFileViewer> createState() => _JarvisFileViewerState();
@@ -128,7 +163,7 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         try {
           final fileBytes = await File(widget.filePath).readAsBytes();
           final archive = ZipDecoder().decodeBytes(fileBytes);
-          
+
           if (_isDoc(widget.filePath)) {
             pDoc = DocxParser(archive).parse(_basename(widget.filePath));
           } else if (_isSlides(widget.filePath)) {
@@ -143,29 +178,29 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
 
       String extracted = text;
       if (pDoc != null) {
-         if (_isSheet(widget.filePath)) {
-            final sb = StringBuffer();
-            for (final sheet in pDoc.sheets ?? <SheetData>[]) {
-               sb.writeln('=== Sheet: ${sheet.name} ===');
-               for (final row in sheet.rows) {
-                  sb.writeln(row.join(' | '));
-               }
+        if (_isSheet(widget.filePath)) {
+          final sb = StringBuffer();
+          for (final sheet in pDoc.sheets ?? <SheetData>[]) {
+            sb.writeln('=== Sheet: ${sheet.name} ===');
+            for (final row in sheet.rows) {
+              sb.writeln(row.join(' | '));
             }
-            if (sb.isNotEmpty) extracted = sb.toString();
-         } else if (_isDoc(widget.filePath) || _isSlides(widget.filePath)) {
-            final sb = StringBuffer();
-            for (final block in pDoc.blocks) {
-              sb.writeln(block.plainText);
+          }
+          if (sb.isNotEmpty) extracted = sb.toString();
+        } else if (_isDoc(widget.filePath) || _isSlides(widget.filePath)) {
+          final sb = StringBuffer();
+          for (final block in pDoc.blocks) {
+            sb.writeln(block.plainText);
+          }
+          for (final slide in pDoc.slides ?? <ParsedSlide>[]) {
+            sb.writeln('Slide ${slide.index}:');
+            if (slide.title != null) sb.writeln(slide.title);
+            for (final block in slide.blocks) {
+              if (block.plainText != null) sb.writeln(block.plainText);
             }
-            for (final slide in pDoc.slides ?? <ParsedSlide>[]) {
-               sb.writeln('Slide ${slide.index}:');
-               if (slide.title != null) sb.writeln(slide.title);
-               for (final block in slide.blocks) {
-                 if (block.plainText != null) sb.writeln(block.plainText);
-               }
-            }
-            if (sb.isNotEmpty) extracted = sb.toString();
-         }
+          }
+          if (sb.isNotEmpty) extracted = sb.toString();
+        }
       }
 
       setState(() {
@@ -180,7 +215,10 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         WidgetsBinding.instance.addPostFrameCallback((_) => _openChat());
       }
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -209,7 +247,10 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
       appBar: AppBar(
         backgroundColor: JarvisColors.surface,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: JarvisColors.textPrimary),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: JarvisColors.textPrimary,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
@@ -217,22 +258,37 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
             Icon(_typeIcon(widget.filePath), color: color, size: 18),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(name,
-                style: const TextStyle(color: JarvisColors.textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
-                maxLines: 1, overflow: TextOverflow.ellipsis,
+              child: Text(
+                name,
+                style: const TextStyle(
+                  color: JarvisColors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.share_rounded, color: JarvisColors.textSecondary, size: 22),
+            icon: const Icon(
+              Icons.share_rounded,
+              color: JarvisColors.textSecondary,
+              size: 22,
+            ),
             tooltip: 'Share original',
             onPressed: () => Share.shareXFiles([XFile(widget.filePath)]),
           ),
           IconButton(
-            icon: Icon(_isEditMode ? Icons.save_rounded : Icons.open_in_new_rounded, 
-                 color: _isEditMode ? JarvisColors.accentPrimary : JarvisColors.textSecondary, size: 22),
+            icon: Icon(
+              _isEditMode ? Icons.save_rounded : Icons.open_in_new_rounded,
+              color: _isEditMode
+                  ? JarvisColors.accentPrimary
+                  : JarvisColors.textSecondary,
+              size: 22,
+            ),
             tooltip: _isEditMode ? 'Save changes' : 'Open in native app',
             onPressed: () {
               if (_isEditMode) {
@@ -245,44 +301,66 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(36),
-          child: _FileMeta(name: name, size: size, color: color, path: widget.filePath),
+          child: _FileMeta(
+            name: name,
+            size: size,
+            color: color,
+            path: widget.filePath,
+          ),
         ),
       ),
       body: _loading
           ? _buildLoader()
           : _error != null
-              ? _buildError()
-              : _buildContent(),
-      floatingActionButton: _loading ? null : FloatingActionButton(
-        onPressed: _openActionMenu,
-        backgroundColor: JarvisColors.bg,
-        elevation: 12,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(50),
-          side: const BorderSide(color: JarvisColors.accentPrimary, width: 2),
-        ),
-        child: Container(
-          width: 56, height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [JarvisColors.accentPrimary, JarvisColors.accentSecondary.withValues(alpha: 0.8)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: JarvisColors.accentPrimary.withValues(alpha: 0.4),
-                blurRadius: 15,
-                spreadRadius: 2,
+          ? _buildError()
+          : _buildContent(),
+      floatingActionButton: _loading
+          ? null
+          : FloatingActionButton(
+              onPressed: _openActionMenu,
+              backgroundColor: JarvisColors.bg,
+              elevation: 12,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(50),
+                side: const BorderSide(
+                  color: JarvisColors.accentPrimary,
+                  width: 2,
+                ),
               ),
-            ],
-          ),
-          child: const Center(
-            child: Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 30),
-          ),
-        ),
-      ).animate().scale(delay: 500.ms, duration: 400.ms, curve: Curves.easeOutBack),
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      JarvisColors.accentPrimary,
+                      JarvisColors.accentSecondary.withValues(alpha: 0.8),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: JarvisColors.accentPrimary.withValues(alpha: 0.4),
+                      blurRadius: 15,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                ),
+              ),
+            ).animate().scale(
+              delay: 500.ms,
+              duration: 400.ms,
+              curve: Curves.easeOutBack,
+            ),
     );
   }
 
@@ -301,31 +379,50 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: JarvisColors.border, borderRadius: BorderRadius.circular(2))),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: JarvisColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const SizedBox(height: 24),
             _buildActionItem(
-              Icons.auto_awesome_rounded, 'Ask JARVIS', 'Analyze and chat with this file',
-              () { Navigator.pop(context); _openChat(); },
+              Icons.auto_awesome_rounded,
+              'Ask JARVIS',
+              'Analyze and chat with this file',
+              () {
+                Navigator.pop(context);
+                _openChat();
+              },
               isPrimary: true,
             ),
             const SizedBox(height: 12),
             _buildActionItem(
-              _isEditMode ? Icons.view_quilt_rounded : Icons.edit_document, 
-              _isEditMode ? 'Exit Edit Mode' : 'Edit File', 
-              _isEditMode ? 'Return to viewing mode' : 'Highly customizable dynamic editor',
-              () { 
-                Navigator.pop(context); 
+              _isEditMode ? Icons.view_quilt_rounded : Icons.edit_document,
+              _isEditMode ? 'Exit Edit Mode' : 'Edit File',
+              _isEditMode
+                  ? 'Return to viewing mode'
+                  : 'Highly customizable dynamic editor',
+              () {
+                Navigator.pop(context);
                 if (_isSheet(widget.filePath)) {
-                  setState(() => _isEditMode = !_isEditMode); 
+                  setState(() => _isEditMode = !_isEditMode);
                 } else {
-                  _openEditor(); 
+                  _openEditor();
                 }
               },
             ),
             const SizedBox(height: 12),
             _buildActionItem(
-              Icons.share_rounded, 'Share / Convert', 'Convert formats or share original',
-              () { Navigator.pop(context); _openShareSheet(); },
+              Icons.share_rounded,
+              'Share / Convert',
+              'Convert formats or share original',
+              () {
+                Navigator.pop(context);
+                _openShareSheet();
+              },
             ),
             const SizedBox(height: 24),
           ],
@@ -334,38 +431,76 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
     );
   }
 
-  Widget _buildActionItem(IconData icon, String title, String subtitle, VoidCallback onTap, {bool isPrimary = false}) {
+  Widget _buildActionItem(
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap, {
+    bool isPrimary = false,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isPrimary ? JarvisColors.accentPrimary.withValues(alpha: 0.1) : JarvisColors.bg,
+          color: isPrimary
+              ? JarvisColors.accentPrimary.withValues(alpha: 0.1)
+              : JarvisColors.bg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isPrimary ? JarvisColors.accentPrimary.withValues(alpha: 0.3) : JarvisColors.border),
+          border: Border.all(
+            color: isPrimary
+                ? JarvisColors.accentPrimary.withValues(alpha: 0.3)
+                : JarvisColors.border,
+          ),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isPrimary ? JarvisColors.accentPrimary : JarvisColors.surface,
+                color: isPrimary
+                    ? JarvisColors.accentPrimary
+                    : JarvisColors.surface,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: isPrimary ? Colors.white : JarvisColors.textPrimary, size: 20),
+              child: Icon(
+                icon,
+                color: isPrimary ? Colors.white : JarvisColors.textPrimary,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(color: isPrimary ? JarvisColors.accentPrimary : JarvisColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
-                  Text(subtitle, style: const TextStyle(color: JarvisColors.textMuted, fontSize: 12)),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: isPrimary
+                          ? JarvisColors.accentPrimary
+                          : JarvisColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: JarvisColors.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: isPrimary ? JarvisColors.accentPrimary : JarvisColors.textSecondary),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isPrimary
+                  ? JarvisColors.accentPrimary
+                  : JarvisColors.textSecondary,
+            ),
           ],
         ),
       ),
@@ -409,11 +544,21 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Share Options', style: TextStyle(color: JarvisColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Share Options',
+              style: TextStyle(
+                color: JarvisColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.share, color: JarvisColors.textPrimary),
-              title: const Text('Share Original File', style: TextStyle(color: JarvisColors.textPrimary)),
+              title: const Text(
+                'Share Original File',
+                style: TextStyle(color: JarvisColors.textPrimary),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 Share.shareXFiles([XFile(widget.filePath)]);
@@ -421,8 +566,15 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
             ),
             const Divider(color: JarvisColors.border),
             const Padding(
-               padding: EdgeInsets.symmetric(vertical: 8),
-               child: Text('Convert & Share', style: TextStyle(color: JarvisColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Convert & Share',
+                style: TextStyle(
+                  color: JarvisColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
             _buildConvertOption('PDF Document', '.pdf'),
             _buildConvertOption('Word Document', '.docx'),
@@ -435,12 +587,28 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
 
   Widget _buildConvertOption(String title, String ext) {
     return ListTile(
-      leading: const Icon(Icons.transform_rounded, color: JarvisColors.accentPrimary),
-      title: Text('Convert to $title', style: const TextStyle(color: JarvisColors.textPrimary)),
+      leading: const Icon(
+        Icons.transform_rounded,
+        color: JarvisColors.accentPrimary,
+      ),
+      title: Text(
+        'Convert to $title',
+        style: const TextStyle(color: JarvisColors.textPrimary),
+      ),
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: JarvisColors.bg, borderRadius: BorderRadius.circular(4)),
-        child: Text(ext, style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
+        decoration: BoxDecoration(
+          color: JarvisColors.bg,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          ext,
+          style: const TextStyle(
+            color: JarvisColors.textSecondary,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
       onTap: () {
         Navigator.pop(context);
@@ -456,13 +624,21 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
       builder: (context) => Center(
         child: Container(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: JarvisColors.surface, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(
+            color: JarvisColors.surface,
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(color: JarvisColors.accentPrimary),
+              const CircularProgressIndicator(
+                color: JarvisColors.accentPrimary,
+              ),
               const SizedBox(height: 16),
-              Text("Converting to $targetType...", style: const TextStyle(color: JarvisColors.textPrimary)),
+              Text(
+                "Converting to $targetType...",
+                style: const TextStyle(color: JarvisColors.textPrimary),
+              ),
             ],
           ),
         ),
@@ -476,22 +652,25 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
 
       if (targetExt == '.pdf') {
         final pdfDoc = PdfDocument();
-        pdfDoc.pageSettings.margins.all = 0; 
-        
+        pdfDoc.pageSettings.margins.all = 0;
+
         // 1.5 cm border (approx 42.5 points)
         const double margin = 42.5;
-        final contentSize = Size(pdfDoc.pageSettings.size.width - (margin * 2), pdfDoc.pageSettings.size.height - (margin * 2));
-        
+        final contentSize = Size(
+          pdfDoc.pageSettings.size.width - (margin * 2),
+          pdfDoc.pageSettings.size.height - (margin * 2),
+        );
+
         // Use a better font if available, or stay with Helvetica for basic ASCII
         // If a Tamil font is provided in assets later, use: PdfTrueTypeFont(File('path').readAsBytesSync(), 12)
         final font = PdfStandardFont(PdfFontFamily.helvetica, 12);
-        
+
         final textElement = PdfTextElement(
           text: _extractedText.isEmpty ? "Empty Document" : _extractedText,
           font: font,
           brush: PdfBrushes.black,
         );
-        
+
         final layoutFormat = PdfLayoutFormat(
           layoutType: PdfLayoutType.paginate,
           breakType: PdfLayoutBreakType.fitPage,
@@ -500,7 +679,12 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         // Draw on first page
         textElement.draw(
           page: pdfDoc.pages.add(),
-          bounds: Rect.fromLTWH(margin + 20, margin + 20, contentSize.width - 40, contentSize.height - 40),
+          bounds: Rect.fromLTWH(
+            margin + 20,
+            margin + 20,
+            contentSize.width - 40,
+            contentSize.height - 40,
+          ),
           format: layoutFormat,
         );
 
@@ -509,11 +693,16 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
           final p = pdfDoc.pages[i];
           // Drawing simple medium-thick border around the content area
           p.graphics.drawRectangle(
-            pen: PdfPen(PdfColor(0, 0, 0), width: 1.5), 
-            bounds: Rect.fromLTWH(margin, margin, contentSize.width, contentSize.height),
+            pen: PdfPen(PdfColor(0, 0, 0), width: 1.5),
+            bounds: Rect.fromLTWH(
+              margin,
+              margin,
+              contentSize.width,
+              contentSize.height,
+            ),
           );
         }
-        
+
         final bytes = await pdfDoc.save();
         pdfDoc.dispose();
         await File(outputPath).writeAsBytes(bytes);
@@ -527,7 +716,7 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
 
       if (!mounted) return;
       Navigator.pop(context); // close loader
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Successfully converted to $targetExt"),
@@ -539,13 +728,16 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
           ),
         ),
       );
-      
+
       Share.shareXFiles([XFile(outputPath)]);
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Conversion failed: $e"), backgroundColor: JarvisColors.error),
+        SnackBar(
+          content: Text("Conversion failed: $e"),
+          backgroundColor: JarvisColors.error,
+        ),
       );
     }
   }
@@ -557,10 +749,17 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         children: [
           ShaderMask(
             shaderCallback: (b) => JarvisColors.primaryGradient.createShader(b),
-            child: const Icon(Icons.document_scanner_rounded, size: 48, color: Colors.white),
+            child: const Icon(
+              Icons.document_scanner_rounded,
+              size: 48,
+              color: Colors.white,
+            ),
           ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms),
           const SizedBox(height: 16),
-          const Text('Reading file...', style: TextStyle(color: JarvisColors.textSecondary, fontSize: 14)),
+          const Text(
+            'Reading file...',
+            style: TextStyle(color: JarvisColors.textSecondary, fontSize: 14),
+          ),
         ],
       ),
     );
@@ -573,11 +772,29 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, color: JarvisColors.error, size: 48),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: JarvisColors.error,
+              size: 48,
+            ),
             const SizedBox(height: 12),
-            const Text('Could not read this file', style: TextStyle(color: JarvisColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text(
+              'Could not read this file',
+              style: TextStyle(
+                color: JarvisColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(_error ?? 'Unknown error', style: const TextStyle(color: JarvisColors.textMuted, fontSize: 12), textAlign: TextAlign.center),
+            Text(
+              _error ?? 'Unknown error',
+              style: const TextStyle(
+                color: JarvisColors.textMuted,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -603,17 +820,19 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
       );
     }
     if (_isImage(widget.filePath)) return _buildImageView();
-    if (_isAudio(widget.filePath)) return _AudioViewerWidget(filePath: widget.filePath, fileName: _basename(widget.filePath));
-    if (_isVideo(widget.filePath)) return _VideoViewerWidget(filePath: widget.filePath);
+    if (_isAudio(widget.filePath))
+      return _AudioViewerWidget(
+        filePath: widget.filePath,
+        fileName: _basename(widget.filePath),
+      );
+    if (_isVideo(widget.filePath))
+      return _VideoViewerWidget(filePath: widget.filePath);
     if (_isCsv(widget.filePath) && _csvRows.isNotEmpty) return _buildCsvView();
     return _buildTextView();
   }
 
   Widget _buildPdfView() {
-    return SfPdfViewer.file(
-      File(widget.filePath),
-      canShowScrollHead: false,
-    );
+    return SfPdfViewer.file(File(widget.filePath), canShowScrollHead: false);
   }
 
   Widget _buildImageView() {
@@ -634,20 +853,44 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.all(16),
         child: DataTable(
-          headingRowColor: WidgetStateProperty.all(JarvisColors.surfaceElevated),
-          dataRowColor: WidgetStateProperty.resolveWith((s) =>
-              s.contains(WidgetState.selected) ? JarvisColors.accentPrimary.withValues(alpha: 0.1) : JarvisColors.surface),
+          headingRowColor: WidgetStateProperty.all(
+            JarvisColors.surfaceElevated,
+          ),
+          dataRowColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.selected)
+                ? JarvisColors.accentPrimary.withValues(alpha: 0.1)
+                : JarvisColors.surface,
+          ),
           border: TableBorder.all(color: JarvisColors.border, width: 0.5),
-          columns: headers.map((h) => DataColumn(
-            label: Text(h.trim(), style: const TextStyle(color: JarvisColors.accentSecondary, fontWeight: FontWeight.w600, fontSize: 12)),
-          )).toList(),
+          columns: headers
+              .map(
+                (h) => DataColumn(
+                  label: Text(
+                    h.trim(),
+                    style: const TextStyle(
+                      color: JarvisColors.accentSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
           rows: rows.take(200).map((row) {
             final cells = row.split(',');
             return DataRow(
-              cells: List.generate(headers.length, (i) => DataCell(
-                Text(i < cells.length ? cells[i].trim() : '',
-                    style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 12)),
-              )),
+              cells: List.generate(
+                headers.length,
+                (i) => DataCell(
+                  Text(
+                    i < cells.length ? cells[i].trim() : '',
+                    style: const TextStyle(
+                      color: JarvisColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
             );
           }).toList(),
         ),
@@ -656,12 +899,17 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
   }
 
   Widget _buildTextView() {
-    final isCode = _ext(widget.filePath) != 'txt' && _ext(widget.filePath) != 'md';
+    final isCode =
+        _ext(widget.filePath) != 'txt' && _ext(widget.filePath) != 'md';
     return Container(
       color: isCode ? const Color(0xFF0D1017) : JarvisColors.bg,
       child: _extractedText.isEmpty
-          ? const Center(child: Text('File is empty or cannot be read as text.',
-              style: TextStyle(color: JarvisColors.textMuted)))
+          ? const Center(
+              child: Text(
+                'File is empty or cannot be read as text.',
+                style: TextStyle(color: JarvisColors.textMuted),
+              ),
+            )
           : Scrollbar(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -670,17 +918,23 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
                         controller: _editCtrl,
                         maxLines: null,
                         style: TextStyle(
-                          color: isCode ? const Color(0xFFABB2BF) : JarvisColors.textPrimary,
+                          color: isCode
+                              ? const Color(0xFFABB2BF)
+                              : JarvisColors.textPrimary,
                           fontSize: isCode ? 12.5 : 14,
                           fontFamily: isCode ? 'monospace' : null,
                         ),
-                        decoration: const InputDecoration(border: InputBorder.none),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                        ),
                         onChanged: (v) => _extractedText = v,
                       )
                     : SelectableText(
                         _extractedText,
                         style: TextStyle(
-                          color: isCode ? const Color(0xFFABB2BF) : JarvisColors.textPrimary,
+                          color: isCode
+                              ? const Color(0xFFABB2BF)
+                              : JarvisColors.textPrimary,
                           fontSize: isCode ? 12.5 : 14,
                           fontFamily: isCode ? 'monospace' : null,
                           height: 1.6,
@@ -702,13 +956,13 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
         if (_parsedDoc != null) {
           final sb = StringBuffer();
           for (final block in _parsedDoc!.blocks) {
-             sb.writeln(block.plainText);
+            sb.writeln(block.plainText);
           }
           if (_parsedDoc!.slides != null) {
             for (final slide in _parsedDoc!.slides!) {
-               for (final block in slide.blocks) {
-                  if (block.plainText != null) sb.writeln(block.plainText);
-               }
+              for (final block in slide.blocks) {
+                if (block.plainText != null) sb.writeln(block.plainText);
+              }
             }
           }
           finalContent = sb.toString();
@@ -718,21 +972,27 @@ class _JarvisFileViewerState extends State<JarvisFileViewer> {
       } else {
         await File(widget.filePath).writeAsString(_extractedText);
       }
-      
+
       setState(() {
         _isEditMode = false;
         _loading = false;
       });
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Changes saved successfully"), backgroundColor: JarvisColors.success),
+        const SnackBar(
+          content: Text("Changes saved successfully"),
+          backgroundColor: JarvisColors.success,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Save failed: $e"), backgroundColor: JarvisColors.error),
+        SnackBar(
+          content: Text("Save failed: $e"),
+          backgroundColor: JarvisColors.error,
+        ),
       );
     }
   }
@@ -745,7 +1005,12 @@ class _FileMeta extends StatelessWidget {
   final Color color;
   final String path;
 
-  const _FileMeta({required this.name, required this.size, required this.color, required this.path});
+  const _FileMeta({
+    required this.name,
+    required this.size,
+    required this.color,
+    required this.path,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -762,14 +1027,31 @@ class _FileMeta extends StatelessWidget {
               color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(ext, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w700)),
+            child: Text(
+              ext,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
           const SizedBox(width: 10),
-          Text(_formatSize(size), style: const TextStyle(color: JarvisColors.textMuted, fontSize: 11)),
+          Text(
+            _formatSize(size),
+            style: const TextStyle(color: JarvisColors.textMuted, fontSize: 11),
+          ),
           const SizedBox(width: 10),
-          const Icon(Icons.auto_awesome_rounded, color: JarvisColors.accentPrimary, size: 11),
+          const Icon(
+            Icons.auto_awesome_rounded,
+            color: JarvisColors.accentPrimary,
+            size: 11,
+          ),
           const SizedBox(width: 4),
-          const Text('Ask JARVIS about this file', style: TextStyle(color: JarvisColors.accentPrimary, fontSize: 11)),
+          const Text(
+            'Ask JARVIS about this file',
+            style: TextStyle(color: JarvisColors.accentPrimary, fontSize: 11),
+          ),
         ],
       ),
     );
@@ -782,7 +1064,11 @@ class _FileChat extends StatefulWidget {
   final String extractedText;
   final String? initialQuestion;
 
-  const _FileChat({required this.filePath, required this.extractedText, this.initialQuestion});
+  const _FileChat({
+    required this.filePath,
+    required this.extractedText,
+    this.initialQuestion,
+  });
 
   @override
   State<_FileChat> createState() => _FileChatState();
@@ -794,12 +1080,13 @@ class _FileChatState extends State<_FileChat> {
   final List<({String text, bool isUser})> _messages = [];
   bool _thinking = false;
 
-
   @override
   void initState() {
     super.initState();
     if (widget.initialQuestion != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _send(widget.initialQuestion!));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _send(widget.initialQuestion!),
+      );
     }
   }
 
@@ -842,7 +1129,8 @@ class _FileChatState extends State<_FileChat> {
           ? '${widget.extractedText.substring(0, 40000)}\n\n...[TRUNCATED — file is very large]'
           : widget.extractedText;
 
-      final systemPrompt = '''You are JARVIS File Intelligence. The user has opened a file and is asking questions about it.
+      final systemPrompt =
+          '''You are JARVIS File Intelligence. The user has opened a file and is asking questions about it.
 
 FILE NAME: $name
 FILE TYPE: $ext
@@ -860,7 +1148,10 @@ INSTRUCTIONS:
 - If file is a spreadsheet/CSV: analyze the data patterns.''';
 
       final buffer = StringBuffer();
-      await for (final chunk in router.generateStream(text, systemPrompt: systemPrompt)) {
+      await for (final chunk in router.generateStream(
+        text,
+        systemPrompt: systemPrompt,
+      )) {
         buffer.write(chunk);
       }
 
@@ -892,9 +1183,13 @@ INSTRUCTIONS:
           children: [
             // Handle
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               margin: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(color: JarvisColors.border, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                color: JarvisColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
 
             // Header
@@ -903,23 +1198,47 @@ INSTRUCTIONS:
               child: Row(
                 children: [
                   ShaderMask(
-                    shaderCallback: (b) => JarvisColors.primaryGradient.createShader(b),
-                    child: const Icon(Icons.bolt_rounded, size: 20, color: Colors.white),
+                    shaderCallback: (b) =>
+                        JarvisColors.primaryGradient.createShader(b),
+                    child: const Icon(
+                      Icons.bolt_rounded,
+                      size: 20,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Ask JARVIS', style: TextStyle(color: JarvisColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 16)),
-                        Text('Chatting about your file', style: TextStyle(color: JarvisColors.textMuted, fontSize: 11)),
+                        Text(
+                          'Ask JARVIS',
+                          style: TextStyle(
+                            color: JarvisColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          'Chatting about your file',
+                          style: TextStyle(
+                            color: JarvisColors.textMuted,
+                            fontSize: 11,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   // Quick prompts
-                  _QuickChip(label: 'Summarize', onTap: () => _send('Please summarize this file for me.')),
+                  _QuickChip(
+                    label: 'Summarize',
+                    onTap: () => _send('Please summarize this file for me.'),
+                  ),
                   const SizedBox(width: 6),
-                  _QuickChip(label: 'Key Points', onTap: () => _send('What are the key points in this file?')),
+                  _QuickChip(
+                    label: 'Key Points',
+                    onTap: () => _send('What are the key points in this file?'),
+                  ),
                 ],
               ),
             ),
@@ -935,7 +1254,8 @@ INSTRUCTIONS:
                       padding: const EdgeInsets.all(16),
                       itemCount: _messages.length + (_thinking ? 1 : 0),
                       itemBuilder: (_, i) {
-                        if (i == _messages.length && _thinking) return _buildThinkingBubble();
+                        if (i == _messages.length && _thinking)
+                          return _buildThinkingBubble();
                         final msg = _messages[i];
                         return _ChatBubble(text: msg.text, isUser: msg.isUser);
                       },
@@ -944,17 +1264,27 @@ INSTRUCTIONS:
 
             // Input bar
             Container(
-              padding: EdgeInsets.only(left: 16, right: 8, top: 8, bottom: MediaQuery.of(context).viewInsets.bottom + 12),
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 8,
+                top: 8,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+              ),
               decoration: const BoxDecoration(
                 color: JarvisColors.surfaceElevated,
-                border: Border(top: BorderSide(color: JarvisColors.border, width: 0.5)),
+                border: Border(
+                  top: BorderSide(color: JarvisColors.border, width: 0.5),
+                ),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _controller,
-                      style: const TextStyle(color: JarvisColors.textPrimary, fontSize: 14),
+                      style: const TextStyle(
+                        color: JarvisColors.textPrimary,
+                        fontSize: 14,
+                      ),
                       decoration: const InputDecoration(
                         hintText: 'Ask anything about this file...',
                         hintStyle: TextStyle(color: JarvisColors.textMuted),
@@ -968,9 +1298,19 @@ INSTRUCTIONS:
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
                     child: _thinking
-                        ? const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(strokeWidth: 2, color: JarvisColors.accentPrimary))
+                        ? const SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: JarvisColors.accentPrimary,
+                            ),
+                          )
                         : IconButton(
-                            icon: const Icon(Icons.send_rounded, color: JarvisColors.accentPrimary),
+                            icon: const Icon(
+                              Icons.send_rounded,
+                              color: JarvisColors.accentPrimary,
+                            ),
                             onPressed: () => _send(_controller.text),
                           ),
                   ),
@@ -991,28 +1331,60 @@ INSTRUCTIONS:
           mainAxisSize: MainAxisSize.min,
           children: [
             ShaderMask(
-              shaderCallback: (b) => JarvisColors.primaryGradient.createShader(b),
-              child: const Icon(Icons.chat_bubble_outline_rounded, size: 40, color: Colors.white),
-            ).animate().scale(begin: const Offset(0.6, 0.6), duration: 400.ms, curve: Curves.elasticOut),
+              shaderCallback: (b) =>
+                  JarvisColors.primaryGradient.createShader(b),
+              child: const Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 40,
+                color: Colors.white,
+              ),
+            ).animate().scale(
+              begin: const Offset(0.6, 0.6),
+              duration: 400.ms,
+              curve: Curves.elasticOut,
+            ),
             const SizedBox(height: 12),
-            const Text("Ask me anything about this file", style: TextStyle(color: JarvisColors.textSecondary, fontSize: 14), textAlign: TextAlign.center),
+            const Text(
+              "Ask me anything about this file",
+              style: TextStyle(color: JarvisColors.textSecondary, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 16),
             Wrap(
-              spacing: 8, runSpacing: 8, alignment: WrapAlignment.center,
-              children: [
-                '📋 Summarize it', '🐛 Find bugs', '📊 Analyze data', '🔍 Explain this',
-              ].map((s) => GestureDetector(
-                onTap: () => _send(s.substring(3)),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: JarvisColors.surfaceElevated,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: JarvisColors.border),
-                  ),
-                  child: Text(s, style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 12)),
-                ),
-              )).toList(),
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children:
+                  [
+                        '📋 Summarize it',
+                        '🐛 Find bugs',
+                        '📊 Analyze data',
+                        '🔍 Explain this',
+                      ]
+                      .map(
+                        (s) => GestureDetector(
+                          onTap: () => _send(s.substring(3)),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: JarvisColors.surfaceElevated,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: JarvisColors.border),
+                            ),
+                            child: Text(
+                              s,
+                              style: const TextStyle(
+                                color: JarvisColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
             ),
           ],
         ),
@@ -1026,27 +1398,52 @@ INSTRUCTIONS:
       child: Row(
         children: [
           Container(
-            width: 28, height: 28,
-            decoration: BoxDecoration(shape: BoxShape.circle, gradient: JarvisColors.primaryGradient),
-            child: const Icon(Icons.auto_awesome_rounded, size: 14, color: Colors.white),
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: JarvisColors.primaryGradient,
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              size: 14,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: JarvisColors.surfaceElevated,
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(16), bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(4),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (i) => Container(
-                width: 6, height: 6,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: JarvisColors.accentPrimary),
-              ).animate(delay: Duration(milliseconds: i * 180), onPlay: (c) => c.repeat())
-                .fadeIn(duration: 400.ms)
-                .then()
-                .fadeOut(duration: 400.ms)),
+              children: List.generate(
+                3,
+                (i) =>
+                    Container(
+                          width: 6,
+                          height: 6,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: JarvisColors.accentPrimary,
+                          ),
+                        )
+                        .animate(
+                          delay: Duration(milliseconds: i * 180),
+                          onPlay: (c) => c.repeat(),
+                        )
+                        .fadeIn(duration: 400.ms)
+                        .then()
+                        .fadeOut(duration: 400.ms),
+              ),
             ),
           ),
         ],
@@ -1066,14 +1463,24 @@ class _ChatBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser) ...[
             Container(
-              width: 28, height: 28,
-              decoration: BoxDecoration(shape: BoxShape.circle, gradient: JarvisColors.primaryGradient),
-              child: const Icon(Icons.auto_awesome_rounded, size: 14, color: Colors.white),
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: JarvisColors.primaryGradient,
+              ),
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                size: 14,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -1081,7 +1488,9 @@ class _ChatBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: isUser ? JarvisColors.accentPrimary : JarvisColors.surfaceElevated,
+                color: isUser
+                    ? JarvisColors.accentPrimary
+                    : JarvisColors.surfaceElevated,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -1089,51 +1498,87 @@ class _ChatBubble extends StatelessWidget {
                   bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
               ),
-              child: isUser 
-                ? SelectableText(
-                    text,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13.5, height: 1.5,
-                    ),
-                  )
-                : MarkdownBody(
-                    data: replaceMermaidDiagrams(replaceMarkdownTables(text)),
-                    builders: {
-                      'latex': LatexElementBuilder(
-                        textStyle: TextStyle(color: JarvisColors.textPrimary, fontSize: 13.5),
-                        textScaleFactor: 1.1,
+              child: isUser
+                  ? SelectableText(
+                      text,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        height: 1.5,
                       ),
-                      'customtable': CustomTableBuilder(),
-                      'custommermaid': CustomMermaidBuilder(),
-                    },
-                    styleSheetTheme: MarkdownStyleSheetBaseTheme.cupertino,
-                    extensionSet: md.ExtensionSet(
-                      [
-                        LatexBlockSyntax(),
-                        const CustomTableSyntax(),
-                        const CustomMermaidSyntax(),
-                        ...md.ExtensionSet.gitHubFlavored.blockSyntaxes
-                      ],
-                      [LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
-                    ),
-                    styleSheet: MarkdownStyleSheet(
-                      p: GoogleFonts.outfit(color: JarvisColors.textPrimary, fontSize: 13.5, height: 1.5),
-                      h2: GoogleFonts.outfit(color: JarvisColors.accentSecondary, fontSize: 16, fontWeight: FontWeight.bold),
-                      h3: GoogleFonts.outfit(color: JarvisColors.accentPrimary, fontSize: 15, fontWeight: FontWeight.bold),
-                      strong: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
-                      listBullet: const TextStyle(color: JarvisColors.accentPrimary),
-                      tableHead: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
-                      tableBody: GoogleFonts.outfit(color: JarvisColors.textPrimary),
-                      tableBorder: TableBorder.all(color: JarvisColors.border, width: 1),
-                      code: GoogleFonts.firaCode(backgroundColor: Colors.black26, fontSize: 12, color: JarvisColors.accentPrimary),
-                      codeblockDecoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: JarvisColors.border),
+                    )
+                  : MarkdownBody(
+                      data: replaceMermaidDiagrams(replaceMarkdownTables(text)),
+                      builders: {
+                        'latex': LatexElementBuilder(
+                          textStyle: TextStyle(
+                            color: JarvisColors.textPrimary,
+                            fontSize: 13.5,
+                          ),
+                          textScaleFactor: 1.1,
+                        ),
+                        'customtable': CustomTableBuilder(),
+                        'custommermaid': CustomMermaidBuilder(),
+                      },
+                      styleSheetTheme: MarkdownStyleSheetBaseTheme.cupertino,
+                      extensionSet: md.ExtensionSet(
+                        [
+                          LatexBlockSyntax(),
+                          const CustomTableSyntax(),
+                          const CustomMermaidSyntax(),
+                          ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                        ],
+                        [
+                          LatexInlineSyntax(),
+                          ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+                        ],
+                      ),
+                      styleSheet: MarkdownStyleSheet(
+                        p: GoogleFonts.outfit(
+                          color: JarvisColors.textPrimary,
+                          fontSize: 13.5,
+                          height: 1.5,
+                        ),
+                        h2: GoogleFonts.outfit(
+                          color: JarvisColors.accentSecondary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        h3: GoogleFonts.outfit(
+                          color: JarvisColors.accentPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        strong: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        listBullet: const TextStyle(
+                          color: JarvisColors.accentPrimary,
+                        ),
+                        tableHead: GoogleFonts.outfit(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        tableBody: GoogleFonts.outfit(
+                          color: JarvisColors.textPrimary,
+                        ),
+                        tableBorder: TableBorder.all(
+                          color: JarvisColors.border,
+                          width: 1,
+                        ),
+                        code: GoogleFonts.firaCode(
+                          backgroundColor: Colors.black26,
+                          fontSize: 12,
+                          color: JarvisColors.accentPrimary,
+                        ),
+                        codeblockDecoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: JarvisColors.border),
+                        ),
                       ),
                     ),
-                  ),
             ),
           ),
         ],
@@ -1156,9 +1601,18 @@ class _QuickChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: JarvisColors.accentPrimary.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: JarvisColors.accentPrimary.withValues(alpha: 0.3)),
+          border: Border.all(
+            color: JarvisColors.accentPrimary.withValues(alpha: 0.3),
+          ),
         ),
-        child: Text(label, style: const TextStyle(color: JarvisColors.accentPrimary, fontSize: 11, fontWeight: FontWeight.w500)),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: JarvisColors.accentPrimary,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
@@ -1189,7 +1643,10 @@ class _OfficeViewerWidget extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [color.withValues(alpha: 0.15), color.withValues(alpha: 0.05)],
+              colors: [
+                color.withValues(alpha: 0.15),
+                color.withValues(alpha: 0.05),
+              ],
             ),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: color.withValues(alpha: 0.3)),
@@ -1209,10 +1666,22 @@ class _OfficeViewerWidget extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(ext, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+                    Text(
+                      ext,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    const Text('Open with your device\'s native app for full formatting',
-                        style: TextStyle(color: JarvisColors.textMuted, fontSize: 11)),
+                    const Text(
+                      'Open with your device\'s native app for full formatting',
+                      style: TextStyle(
+                        color: JarvisColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1222,12 +1691,20 @@ class _OfficeViewerWidget extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: color,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   elevation: 0,
                 ),
                 icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                label: const Text('Open', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                label: const Text(
+                  'Open',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
@@ -1242,13 +1719,23 @@ class _OfficeViewerWidget extends StatelessWidget {
                     children: [
                       Icon(icon, size: 56, color: color.withValues(alpha: 0.4)),
                       const SizedBox(height: 16),
-                      Text('No text could be extracted from this $ext file.',
-                          style: const TextStyle(color: JarvisColors.textMuted, fontSize: 14),
-                          textAlign: TextAlign.center),
+                      Text(
+                        'No text could be extracted from this $ext file.',
+                        style: const TextStyle(
+                          color: JarvisColors.textMuted,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                       const SizedBox(height: 8),
-                      const Text('Use "Open" above to view it with a compatible app.',
-                          style: TextStyle(color: JarvisColors.textMuted, fontSize: 12),
-                          textAlign: TextAlign.center),
+                      const Text(
+                        'Use "Open" above to view it with a compatible app.',
+                        style: TextStyle(
+                          color: JarvisColors.textMuted,
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                   ),
                 )
@@ -1297,7 +1784,9 @@ class _AudioViewerWidgetState extends State<_AudioViewerWidget> {
   Future<void> _initAudio() async {
     try {
       await _audioPlayer.setFilePath(widget.filePath);
-      _audioPlayer.durationStream.listen((d) => setState(() => _duration = d ?? Duration.zero));
+      _audioPlayer.durationStream.listen(
+        (d) => setState(() => _duration = d ?? Duration.zero),
+      );
       _audioPlayer.positionStream.listen((p) => setState(() => _position = p));
       _audioPlayer.playerStateStream.listen((state) {
         if (mounted) setState(() => _isPlaying = state.playing);
@@ -1317,7 +1806,8 @@ class _AudioViewerWidgetState extends State<_AudioViewerWidget> {
     String twoDigits(int n) => n.toString().padLeft(2, "0");
     String twoDigitMinutes = twoDigits(d.inMinutes.remainder(60));
     String twoDigitSeconds = twoDigits(d.inSeconds.remainder(60));
-    return "${twoDigits(d.inHours)}:$twoDigitMinutes:$twoDigitSeconds".replaceFirst(RegExp(r'^00:'), "");
+    return "${twoDigits(d.inHours)}:$twoDigitMinutes:$twoDigitSeconds"
+        .replaceFirst(RegExp(r'^00:'), "");
   }
 
   @override
@@ -1333,13 +1823,28 @@ class _AudioViewerWidgetState extends State<_AudioViewerWidget> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: [JarvisColors.accentPrimary.withValues(alpha: 0.2), JarvisColors.accentSecondary.withValues(alpha: 0.2)],
+                  colors: [
+                    JarvisColors.accentPrimary.withValues(alpha: 0.2),
+                    JarvisColors.accentSecondary.withValues(alpha: 0.2),
+                  ],
                 ),
               ),
-              child: const Icon(Icons.music_note_rounded, size: 64, color: JarvisColors.accentPrimary),
+              child: const Icon(
+                Icons.music_note_rounded,
+                size: 64,
+                color: JarvisColors.accentPrimary,
+              ),
             ),
             const SizedBox(height: 24),
-            Text(widget.fileName, style: const TextStyle(color: JarvisColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            Text(
+              widget.fileName,
+              style: const TextStyle(
+                color: JarvisColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 32),
             SliderTheme(
               data: SliderThemeData(
@@ -1350,8 +1855,11 @@ class _AudioViewerWidgetState extends State<_AudioViewerWidget> {
               ),
               child: Slider(
                 value: _position.inMilliseconds.toDouble(),
-                max: _duration.inMilliseconds.toDouble() > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
-                onChanged: (v) => _audioPlayer.seek(Duration(milliseconds: v.toInt())),
+                max: _duration.inMilliseconds.toDouble() > 0
+                    ? _duration.inMilliseconds.toDouble()
+                    : 1.0,
+                onChanged: (v) =>
+                    _audioPlayer.seek(Duration(milliseconds: v.toInt())),
               ),
             ),
             Padding(
@@ -1359,8 +1867,20 @@ class _AudioViewerWidgetState extends State<_AudioViewerWidget> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(_formatDuration(_position), style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 12)),
-                  Text(_formatDuration(_duration), style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 12)),
+                  Text(
+                    _formatDuration(_position),
+                    style: const TextStyle(
+                      color: JarvisColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  Text(
+                    _formatDuration(_duration),
+                    style: const TextStyle(
+                      color: JarvisColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1369,21 +1889,43 @@ class _AudioViewerWidgetState extends State<_AudioViewerWidget> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.replay_10_rounded, size: 32, color: JarvisColors.textPrimary),
-                  onPressed: () => _audioPlayer.seek(_position - const Duration(seconds: 10)),
+                  icon: const Icon(
+                    Icons.replay_10_rounded,
+                    size: 32,
+                    color: JarvisColors.textPrimary,
+                  ),
+                  onPressed: () => _audioPlayer.seek(
+                    _position - const Duration(seconds: 10),
+                  ),
                 ),
                 const SizedBox(width: 24),
                 Container(
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: JarvisColors.accentPrimary),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: JarvisColors.accentPrimary,
+                  ),
                   child: IconButton(
-                    icon: Icon(_isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 40, color: Colors.white),
-                    onPressed: () => _isPlaying ? _audioPlayer.pause() : _audioPlayer.play(),
+                    icon: Icon(
+                      _isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                    onPressed: () =>
+                        _isPlaying ? _audioPlayer.pause() : _audioPlayer.play(),
                   ),
                 ),
                 const SizedBox(width: 24),
                 IconButton(
-                  icon: const Icon(Icons.forward_10_rounded, size: 32, color: JarvisColors.textPrimary),
-                  onPressed: () => _audioPlayer.seek(_position + const Duration(seconds: 10)),
+                  icon: const Icon(
+                    Icons.forward_10_rounded,
+                    size: 32,
+                    color: JarvisColors.textPrimary,
+                  ),
+                  onPressed: () => _audioPlayer.seek(
+                    _position + const Duration(seconds: 10),
+                  ),
                 ),
               ],
             ),
@@ -1443,26 +1985,46 @@ class _VideoViewerWidgetState extends State<_VideoViewerWidget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.video_library_rounded, size: 56, color: Color(0xFF009688)),
+              const Icon(
+                Icons.video_library_rounded,
+                size: 56,
+                color: Color(0xFF009688),
+              ),
               const SizedBox(height: 16),
-              const Text('Cannot play this video format in-app.',
-                  style: TextStyle(color: JarvisColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.center),
+              const Text(
+                'Cannot play this video format in-app.',
+                style: TextStyle(
+                  color: JarvisColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 8),
-              const Text('Use "Open externally" to play with your video player.',
-                  style: TextStyle(color: JarvisColors.textMuted, fontSize: 13),
-                  textAlign: TextAlign.center),
+              const Text(
+                'Use "Open externally" to play with your video player.',
+                style: TextStyle(color: JarvisColors.textMuted, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: () => OpenFilex.open(widget.filePath),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF009688),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Open in Video Player', style: TextStyle(fontWeight: FontWeight.w600)),
+                label: const Text(
+                  'Open in Video Player',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
@@ -1477,7 +2039,10 @@ class _VideoViewerWidgetState extends State<_VideoViewerWidget> {
           children: [
             CircularProgressIndicator(color: JarvisColors.accentPrimary),
             SizedBox(height: 12),
-            Text('Loading video...', style: TextStyle(color: JarvisColors.textMuted, fontSize: 13)),
+            Text(
+              'Loading video...',
+              style: TextStyle(color: JarvisColors.textMuted, fontSize: 13),
+            ),
           ],
         ),
       );
@@ -1515,34 +2080,55 @@ class _VideoViewerWidgetState extends State<_VideoViewerWidget> {
                             playedColor: JarvisColors.accentPrimary,
                             backgroundColor: JarvisColors.border,
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 28),
+                              icon: const Icon(
+                                Icons.replay_10_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                               onPressed: () {
-                                final pos = _controller.value.position - const Duration(seconds: 10);
-                                _controller.seekTo(pos < Duration.zero ? Duration.zero : pos);
+                                final pos =
+                                    _controller.value.position -
+                                    const Duration(seconds: 10);
+                                _controller.seekTo(
+                                  pos < Duration.zero ? Duration.zero : pos,
+                                );
                               },
                             ),
                             IconButton(
                               icon: Icon(
-                                _controller.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                _controller.value.isPlaying
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
                                 color: Colors.white,
                                 size: 38,
                               ),
                               onPressed: () {
                                 setState(() {
-                                  _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                                  _controller.value.isPlaying
+                                      ? _controller.pause()
+                                      : _controller.play();
                                 });
                               },
                             ),
                             IconButton(
-                              icon: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 28),
+                              icon: const Icon(
+                                Icons.forward_10_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                               onPressed: () {
-                                final pos = _controller.value.position + const Duration(seconds: 10);
+                                final pos =
+                                    _controller.value.position +
+                                    const Duration(seconds: 10);
                                 _controller.seekTo(pos);
                               },
                             ),
@@ -1678,8 +2264,10 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
     _ctrl.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(
-        offset: (sel.isValid ? sel.start : text.length) +
-            prefix.length + selected.length,
+        offset:
+            (sel.isValid ? sel.start : text.length) +
+            prefix.length +
+            selected.length,
       ),
     );
     _focusNode.requestFocus();
@@ -1759,7 +2347,10 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
       appBar: AppBar(
         backgroundColor: JarvisColors.surface,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: JarvisColors.textPrimary),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: JarvisColors.textPrimary,
+          ),
           onPressed: () {
             if (_hasUnsaved) {
               _showUnsavedDialog();
@@ -1770,20 +2361,29 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.edit_document, color: JarvisColors.accentPrimary, size: 18),
+            const Icon(
+              Icons.edit_document,
+              color: JarvisColors.accentPrimary,
+              size: 18,
+            ),
             const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('JARVIS Editor',
-                    style: TextStyle(
-                      color: JarvisColors.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    )),
+                const Text(
+                  'JARVIS Editor',
+                  style: TextStyle(
+                    color: JarvisColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 Text(
                   'Page ${_currentPage + 1} of ${_pages.length}',
-                  style: const TextStyle(color: JarvisColors.textMuted, fontSize: 10),
+                  style: const TextStyle(
+                    color: JarvisColors.textMuted,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),
@@ -1792,13 +2392,21 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
         actions: [
           // Import file
           IconButton(
-            icon: const Icon(Icons.upload_file_rounded, color: JarvisColors.textSecondary, size: 22),
+            icon: const Icon(
+              Icons.upload_file_rounded,
+              color: JarvisColors.textSecondary,
+              size: 22,
+            ),
             tooltip: 'Import file / image',
             onPressed: _importFile,
           ),
           // Share
           IconButton(
-            icon: const Icon(Icons.share_rounded, color: JarvisColors.textSecondary, size: 22),
+            icon: const Icon(
+              Icons.share_rounded,
+              color: JarvisColors.textSecondary,
+              size: 22,
+            ),
             tooltip: 'Share edited file',
             onPressed: _share,
           ),
@@ -1809,9 +2417,14 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
               backgroundColor: JarvisColors.accentPrimary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            child: const Text(
+              'Save',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
           ),
           const SizedBox(width: 8),
         ],
@@ -1843,8 +2456,12 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 80),
                 border: InputBorder.none,
-                hintText: 'Start typing here... Use the toolbar above to format.',
-                hintStyle: const TextStyle(color: JarvisColors.textMuted, fontSize: 14),
+                hintText:
+                    'Start typing here... Use the toolbar above to format.',
+                hintStyle: const TextStyle(
+                  color: JarvisColors.textMuted,
+                  fontSize: 14,
+                ),
                 fillColor: JarvisColors.bg,
                 filled: true,
               ),
@@ -1867,21 +2484,60 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
         child: Row(
           children: [
             _ToolBtn('H1', () => _insertLinePrefix('# '), tooltip: 'Heading 1'),
-            _ToolBtn('H2', () => _insertLinePrefix('## '), tooltip: 'Heading 2'),
-            _ToolBtn('H3', () => _insertLinePrefix('### '), tooltip: 'Heading 3'),
+            _ToolBtn(
+              'H2',
+              () => _insertLinePrefix('## '),
+              tooltip: 'Heading 2',
+            ),
+            _ToolBtn(
+              'H3',
+              () => _insertLinePrefix('### '),
+              tooltip: 'Heading 3',
+            ),
             _ToolDivider(),
-            _ToolIconBtn(Icons.format_bold_rounded, () => _insertFormat('**', '**'), tooltip: 'Bold'),
-            _ToolIconBtn(Icons.format_italic_rounded, () => _insertFormat('*', '*'), tooltip: 'Italic'),
-            _ToolIconBtn(Icons.format_strikethrough_rounded, () => _insertFormat('~~', '~~'), tooltip: 'Strikethrough'),
+            _ToolIconBtn(
+              Icons.format_bold_rounded,
+              () => _insertFormat('**', '**'),
+              tooltip: 'Bold',
+            ),
+            _ToolIconBtn(
+              Icons.format_italic_rounded,
+              () => _insertFormat('*', '*'),
+              tooltip: 'Italic',
+            ),
+            _ToolIconBtn(
+              Icons.format_strikethrough_rounded,
+              () => _insertFormat('~~', '~~'),
+              tooltip: 'Strikethrough',
+            ),
             _ToolDivider(),
-            _ToolIconBtn(Icons.format_list_bulleted_rounded, () => _insertLinePrefix('- '), tooltip: 'Bullet List'),
-            _ToolIconBtn(Icons.format_list_numbered_rounded, () => _insertLinePrefix('1. '), tooltip: 'Numbered List'),
-            _ToolIconBtn(Icons.code_rounded, () => _insertFormat('`', '`'), tooltip: 'Inline Code'),
-            _ToolIconBtn(Icons.segment_rounded, () => _insertLinePrefix('> '), tooltip: 'Blockquote'),
+            _ToolIconBtn(
+              Icons.format_list_bulleted_rounded,
+              () => _insertLinePrefix('- '),
+              tooltip: 'Bullet List',
+            ),
+            _ToolIconBtn(
+              Icons.format_list_numbered_rounded,
+              () => _insertLinePrefix('1. '),
+              tooltip: 'Numbered List',
+            ),
+            _ToolIconBtn(
+              Icons.code_rounded,
+              () => _insertFormat('`', '`'),
+              tooltip: 'Inline Code',
+            ),
+            _ToolIconBtn(
+              Icons.segment_rounded,
+              () => _insertLinePrefix('> '),
+              tooltip: 'Blockquote',
+            ),
             _ToolDivider(),
             _ToolIconBtn(Icons.horizontal_rule_rounded, () {
-              final pos = _ctrl.selection.isValid ? _ctrl.selection.end : _ctrl.text.length;
-              final newText = '${_ctrl.text.substring(0, pos)}\n\n---\n\n${_ctrl.text.substring(pos)}';
+              final pos = _ctrl.selection.isValid
+                  ? _ctrl.selection.end
+                  : _ctrl.text.length;
+              final newText =
+                  '${_ctrl.text.substring(0, pos)}\n\n---\n\n${_ctrl.text.substring(pos)}';
               _ctrl.text = newText;
               _ctrl.selection = TextSelection.collapsed(offset: pos + 7);
             }, tooltip: 'Horizontal Rule'),
@@ -1910,9 +2566,15 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
                 decoration: BoxDecoration(
                   color: JarvisColors.accentPrimary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: JarvisColors.accentPrimary.withValues(alpha: 0.4)),
+                  border: Border.all(
+                    color: JarvisColors.accentPrimary.withValues(alpha: 0.4),
+                  ),
                 ),
-                child: const Icon(Icons.add_rounded, color: JarvisColors.accentPrimary, size: 18),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: JarvisColors.accentPrimary,
+                  size: 18,
+                ),
               ),
             );
           }
@@ -1924,10 +2586,14 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
               margin: const EdgeInsets.only(right: 6),
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: isSelected ? JarvisColors.accentPrimary : JarvisColors.surface,
+                color: isSelected
+                    ? JarvisColors.accentPrimary
+                    : JarvisColors.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isSelected ? JarvisColors.accentPrimary : JarvisColors.border,
+                  color: isSelected
+                      ? JarvisColors.accentPrimary
+                      : JarvisColors.border,
                 ),
               ),
               child: Center(
@@ -1999,23 +2665,46 @@ class _JarvisRichEditorState extends State<_JarvisRichEditor> {
       builder: (_) => AlertDialog(
         backgroundColor: JarvisColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Unsaved Changes',
-            style: TextStyle(color: JarvisColors.textPrimary, fontWeight: FontWeight.w700)),
-        content: const Text('Do you want to save your changes before leaving?',
-            style: TextStyle(color: JarvisColors.textSecondary)),
+        title: const Text(
+          'Unsaved Changes',
+          style: TextStyle(
+            color: JarvisColors.textPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: const Text(
+          'Do you want to save your changes before leaving?',
+          style: TextStyle(color: JarvisColors.textSecondary),
+        ),
         actions: [
           TextButton(
-            onPressed: () { Navigator.pop(context); Navigator.pop(context); },
-            child: const Text('Discard', style: TextStyle(color: JarvisColors.error)),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'Discard',
+              style: TextStyle(color: JarvisColors.error),
+            ),
           ),
           TextButton(
-            onPressed: () { Navigator.pop(context); },
-            child: const Text('Continue Editing', style: TextStyle(color: JarvisColors.textSecondary)),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'Continue Editing',
+              style: TextStyle(color: JarvisColors.textSecondary),
+            ),
           ),
           ElevatedButton(
-            onPressed: () { Navigator.pop(context); _saveAndPop(); },
+            onPressed: () {
+              Navigator.pop(context);
+              _saveAndPop();
+            },
             style: ElevatedButton.styleFrom(
-                backgroundColor: JarvisColors.accentPrimary, foregroundColor: Colors.white),
+              backgroundColor: JarvisColors.accentPrimary,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Save & Exit'),
           ),
         ],
@@ -2046,9 +2735,14 @@ class _ToolBtn extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: JarvisColors.border),
         ),
-        child: Text(label,
-            style: const TextStyle(
-              color: JarvisColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w700)),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: JarvisColors.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     ),
   );
@@ -2083,7 +2777,8 @@ class _ToolIconBtn extends StatelessWidget {
 class _ToolDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-    width: 1, height: 24,
+    width: 1,
+    height: 24,
     margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
     color: JarvisColors.border,
   );
@@ -2095,7 +2790,12 @@ class _ActionChip extends StatelessWidget {
   final Color? color;
   final VoidCallback? onTap;
 
-  const _ActionChip({required this.icon, required this.label, this.color, this.onTap});
+  const _ActionChip({
+    required this.icon,
+    required this.label,
+    this.color,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2118,7 +2818,14 @@ class _ActionChip extends StatelessWidget {
             children: [
               Icon(icon, color: c, size: 14),
               const SizedBox(width: 4),
-              Text(label, style: TextStyle(color: c, fontSize: 11, fontWeight: FontWeight.w600)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: c,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),

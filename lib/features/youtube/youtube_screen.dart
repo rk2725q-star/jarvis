@@ -10,7 +10,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audio_service/audio_service.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart' hide VideoQuality;
+import 'package:youtube_explode_dart/youtube_explode_dart.dart'
+    hide VideoQuality;
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../main.dart' show ytAudioHandler;
 import 'package:provider/provider.dart';
@@ -28,9 +29,17 @@ const _kAccountKey = 'yt_account_info';
 // ─────────────────────────────────────────────────────────────────────────────
 class YtAccount {
   final String name, email, photoUrl;
-  const YtAccount({required this.name, required this.email, required this.photoUrl});
+  const YtAccount({
+    required this.name,
+    required this.email,
+    required this.photoUrl,
+  });
 
-  Map<String, String> toJson() => {'name': name, 'email': email, 'photo': photoUrl};
+  Map<String, String> toJson() => {
+    'name': name,
+    'email': email,
+    'photo': photoUrl,
+  };
   factory YtAccount.fromJson(Map<String, dynamic> j) => YtAccount(
     name: j['name'] ?? '',
     email: j['email'] ?? '',
@@ -45,9 +54,14 @@ class YtAccount {
 class YtVid {
   final String id, title, channel, channelId, thumb, duration, viewCount, age;
   const YtVid({
-    required this.id, required this.title, required this.channel,
-    required this.channelId, required this.thumb, required this.duration,
-    this.viewCount = '', this.age = '',
+    required this.id,
+    required this.title,
+    required this.channel,
+    required this.channelId,
+    required this.thumb,
+    required this.duration,
+    this.viewCount = '',
+    this.age = '',
   });
 
   factory YtVid.fromVideo(Video v) => YtVid(
@@ -97,47 +111,74 @@ class YtVid {
 
 class YtChannel {
   final String id, name, thumb, subs;
-  const YtChannel({required this.id, required this.name, required this.thumb, this.subs = ''});
+  const YtChannel({
+    required this.id,
+    required this.name,
+    required this.thumb,
+    this.subs = '',
+  });
 
-  Map<String, String> toJson() => {'id': id, 'name': name, 'thumb': thumb, 'subs': subs};
+  Map<String, String> toJson() => {
+    'id': id,
+    'name': name,
+    'thumb': thumb,
+    'subs': subs,
+  };
   factory YtChannel.fromJson(Map<String, dynamic> j) => YtChannel(
-    id: j['id'] as String, name: j['name'] as String,
-    thumb: j['thumb'] as String, subs: j['subs'] as String? ?? '',
+    id: j['id'] as String,
+    name: j['name'] as String,
+    thumb: j['thumb'] as String,
+    subs: j['subs'] as String? ?? '',
   );
 }
 
 /// Holds raw adaptive + muxed format maps from InnerTube ANDROID player response.
 class _StreamBundle {
   final List<Map<String, dynamic>> adaptive; // videoOnly + audioOnly
-  final List<Map<String, dynamic>> muxed;    // combined video+audio (360p/720p)
+  final List<Map<String, dynamic>> muxed; // combined video+audio (360p/720p)
   const _StreamBundle({required this.adaptive, required this.muxed});
 
   // All video-only adaptive entries (mime starts with "video/")
-  List<Map<String, dynamic>> get videoFormats =>
-      adaptive.where((f) => (f['mimeType'] as String? ?? '').startsWith('video/')).toList();
+  List<Map<String, dynamic>> get videoFormats => adaptive
+      .where((f) => (f['mimeType'] as String? ?? '').startsWith('video/'))
+      .toList();
 
   // All audio-only adaptive entries
-  List<Map<String, dynamic>> get audioFormats =>
-      adaptive.where((f) => (f['mimeType'] as String? ?? '').startsWith('audio/')).toList();
+  List<Map<String, dynamic>> get audioFormats => adaptive
+      .where((f) => (f['mimeType'] as String? ?? '').startsWith('audio/'))
+      .toList();
 
   // Pick best audio (highest bitrate, prefer mp4a/AAC)
   Map<String, dynamic>? get bestAudio {
-    final all = audioFormats..sort((a, b) =>
-        ((b['bitrate'] as num?) ?? 0).compareTo((a['bitrate'] as num?) ?? 0));
-    return all.firstWhere(
-      (f) => (f['mimeType'] as String? ?? '').contains('mp4a'),
-      orElse: () => all.isNotEmpty ? all.first : {},
-    ).nullIfEmpty;
+    final all = audioFormats
+      ..sort(
+        (a, b) => ((b['bitrate'] as num?) ?? 0).compareTo(
+          (a['bitrate'] as num?) ?? 0,
+        ),
+      );
+    return all
+        .firstWhere(
+          (f) => (f['mimeType'] as String? ?? '').contains('mp4a'),
+          orElse: () => all.isNotEmpty ? all.first : {},
+        )
+        .nullIfEmpty;
   }
 
   // Pick video closest to targetHeight (H.264/avc1 preferred only as tiebreaker)
   Map<String, dynamic>? videoForQuality(int targetHeight) {
-    final vids = videoFormats.where((f) => ((f['height'] as num?) ?? 0) <= targetHeight).toList();
+    final vids = videoFormats
+        .where((f) => ((f['height'] as num?) ?? 0) <= targetHeight)
+        .toList();
     if (vids.isEmpty) {
-      final all = List.of(videoFormats)..sort((a, b) => ((a['height'] as num?) ?? 0).compareTo((b['height'] as num?) ?? 0));
+      final all = List.of(videoFormats)
+        ..sort(
+          (a, b) => ((a['height'] as num?) ?? 0).compareTo(
+            (b['height'] as num?) ?? 0,
+          ),
+        );
       return all.isNotEmpty ? all.first : null;
     }
-    
+
     vids.sort((a, b) {
       final hA = (a['height'] as num?) ?? 0;
       final hB = (b['height'] as num?) ?? 0;
@@ -151,8 +192,11 @@ class _StreamBundle {
 
   // Best muxed stream closest to target
   Map<String, dynamic>? muxedForQuality(int targetHeight) {
-    final sorted = [...muxed]..sort((a, b) =>
-        ((b['height'] as num?) ?? 0).compareTo((a['height'] as num?) ?? 0));
+    final sorted = [...muxed]
+      ..sort(
+        (a, b) =>
+            ((b['height'] as num?) ?? 0).compareTo((a['height'] as num?) ?? 0),
+      );
     for (final f in sorted) {
       if (((f['height'] as num?) ?? 0) <= targetHeight) return f;
     }
@@ -164,32 +208,33 @@ extension _MapNullIfEmpty on Map<String, dynamic> {
   Map<String, dynamic>? get nullIfEmpty => isEmpty ? null : this;
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 String _fmtDur(Duration? d) {
   if (d == null) return '';
-  final h = d.inHours; final m = d.inMinutes % 60; final s = d.inSeconds % 60;
+  final h = d.inHours;
+  final m = d.inMinutes % 60;
+  final s = d.inSeconds % 60;
   return h > 0
-      ? '$h:${m.toString().padLeft(2,'0')}:${s.toString().padLeft(2,'0')}'
-      : '$m:${s.toString().padLeft(2,'0')}';
+      ? '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}'
+      : '$m:${s.toString().padLeft(2, '0')}';
 }
 
 String _fmtViews(int n) {
-  if (n >= 1000000000) return '${(n/1000000000).toStringAsFixed(1)}B views';
-  if (n >= 1000000)    return '${(n/1000000).toStringAsFixed(1)}M views';
-  if (n >= 1000)       return '${(n/1000).toStringAsFixed(0)}K views';
+  if (n >= 1000000000) return '${(n / 1000000000).toStringAsFixed(1)}B views';
+  if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M views';
+  if (n >= 1000) return '${(n / 1000).toStringAsFixed(0)}K views';
   return '$n views';
 }
 
 String _fmtAge(DateTime? dt) {
   if (dt == null) return '';
   final d = DateTime.now().difference(dt);
-  if (d.inDays > 365) return '${(d.inDays/365).toInt()} years ago';
-  if (d.inDays > 30)  return '${(d.inDays/30).toInt()} months ago';
-  if (d.inDays > 0)   return '${d.inDays} days ago';
-  if (d.inHours > 0)  return '${d.inHours}h ago';
+  if (d.inDays > 365) return '${(d.inDays / 365).toInt()} years ago';
+  if (d.inDays > 30) return '${(d.inDays / 30).toInt()} months ago';
+  if (d.inDays > 0) return '${d.inDays} days ago';
+  if (d.inHours > 0) return '${d.inHours}h ago';
   return '${d.inMinutes}m ago';
 }
 
@@ -197,12 +242,20 @@ String _fmtAge(DateTime? dt) {
 // Account Store
 // ─────────────────────────────────────────────────────────────────────────────
 class _AccountStore {
-  static YtAccount _current = const YtAccount(name: '', email: '', photoUrl: '');
+  static YtAccount _current = const YtAccount(
+    name: '',
+    email: '',
+    photoUrl: '',
+  );
   static final _listeners = <VoidCallback>[];
 
   static void addListener(VoidCallback cb) => _listeners.add(cb);
   static void removeListener(VoidCallback cb) => _listeners.remove(cb);
-  static void _notify() { for (final cb in _listeners) { cb(); } }
+  static void _notify() {
+    for (final cb in _listeners) {
+      cb();
+    }
+  }
 
   static YtAccount get current => _current;
 
@@ -210,7 +263,9 @@ class _AccountStore {
     final p = await SharedPreferences.getInstance();
     final raw = p.getString(_kAccountKey);
     if (raw != null) {
-      try { _current = YtAccount.fromJson(json.decode(raw)); } catch (_) {}
+      try {
+        _current = YtAccount.fromJson(json.decode(raw));
+      } catch (_) {}
     }
   }
 
@@ -220,23 +275,26 @@ class _AccountStore {
     await p.setString(_kAccountKey, json.encode(a.toJson()));
     _notify();
   }
-
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Innertube API helper — uses browser cookies for personalized content
 // ─────────────────────────────────────────────────────────────────────────────
 class _InnertubeApi {
-  static const _apiKey = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'; // Public WEB client key
+  static const _apiKey =
+      'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'; // Public WEB client key
   static const _clientName = 'WEB';
   static const _clientVer = '2.20240101';
 
   static Future<Map<String, String>> _buildHeaders() async {
-    final cookies = await CookieManager.instance().getCookies(url: WebUri('https://www.youtube.com'));
+    final cookies = await CookieManager.instance().getCookies(
+      url: WebUri('https://www.youtube.com'),
+    );
     final cookieStr = cookies.map((c) => '${c.name}=${c.value}').join('; ');
     return {
       'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/100.0.4896.79 Mobile Safari/537.36',
+      'User-Agent':
+          'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/100.0.4896.79 Mobile Safari/537.36',
       'Cookie': cookieStr,
       'X-YouTube-Client-Name': '1',
       'X-YouTube-Client-Version': _clientVer,
@@ -252,45 +310,53 @@ class _InnertubeApi {
         'clientVersion': _clientVer,
         'hl': 'en',
         'gl': 'IN',
-      }
-    }
+      },
+    },
   };
 
   // ── ANDROID client — gives pre-signed URLs, no cipher/signature needed ──────
   // This is the same approach used by NewPipe & LibreTube for reliable streaming.
   static Future<_StreamBundle?> getAdaptiveStreams(String videoId) async {
     try {
-      final resp = await http.post(
-        Uri.parse('https://www.youtube.com/youtubei/v1/player?key=$_apiKey'),
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
-        },
-        body: json.encode({
-          'videoId': videoId,
-          'context': {
-            'client': {
-              'clientName': 'ANDROID',
-              'clientVersion': '19.09.37',
-              'androidSdkVersion': 30,
-              'hl': 'en', 'gl': 'IN',
-            }
-          },
-          'playbackContext': {
-            'contentPlaybackContext': {'html5Preference': 'HTML5_PREF_WANTS'},
-          },
-        }),
-      ).timeout(const Duration(seconds: 15));
+      final resp = await http
+          .post(
+            Uri.parse(
+              'https://www.youtube.com/youtubei/v1/player?key=$_apiKey',
+            ),
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent':
+                  'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
+            },
+            body: json.encode({
+              'videoId': videoId,
+              'context': {
+                'client': {
+                  'clientName': 'ANDROID',
+                  'clientVersion': '19.09.37',
+                  'androidSdkVersion': 30,
+                  'hl': 'en',
+                  'gl': 'IN',
+                },
+              },
+              'playbackContext': {
+                'contentPlaybackContext': {
+                  'html5Preference': 'HTML5_PREF_WANTS',
+                },
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (resp.statusCode != 200) return null;
       final data = json.decode(resp.body) as Map<String, dynamic>;
       final sd = data['streamingData'] as Map<String, dynamic>?;
       if (sd == null) return null;
 
-      final adaptive = (sd['adaptiveFormats'] as List?)
-              ?.cast<Map<String, dynamic>>() ?? [];
-      final formats  = (sd['formats'] as List?)
-              ?.cast<Map<String, dynamic>>() ?? [];
+      final adaptive =
+          (sd['adaptiveFormats'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final formats =
+          (sd['formats'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
       return _StreamBundle(adaptive: adaptive, muxed: formats);
     } catch (e) {
@@ -304,11 +370,15 @@ class _InnertubeApi {
     try {
       final headers = await _buildHeaders();
       final body = _baseBody();
-      final resp = await http.post(
-        Uri.parse('https://www.youtube.com/youtubei/v1/browse?key=$_apiKey'),
-        headers: headers,
-        body: json.encode({...body, 'browseId': 'FEwhat_to_watch'}),
-      ).timeout(const Duration(seconds: 12));
+      final resp = await http
+          .post(
+            Uri.parse(
+              'https://www.youtube.com/youtubei/v1/browse?key=$_apiKey',
+            ),
+            headers: headers,
+            body: json.encode({...body, 'browseId': 'FEwhat_to_watch'}),
+          )
+          .timeout(const Duration(seconds: 12));
       if (resp.statusCode == 200) {
         return _parseVideoList(json.decode(resp.body));
       }
@@ -323,11 +393,15 @@ class _InnertubeApi {
     try {
       final headers = await _buildHeaders();
       final body = _baseBody();
-      final resp = await http.post(
-        Uri.parse('https://www.youtube.com/youtubei/v1/browse?key=$_apiKey'),
-        headers: headers,
-        body: json.encode({...body, 'browseId': 'FEsubscriptions'}),
-      ).timeout(const Duration(seconds: 12));
+      final resp = await http
+          .post(
+            Uri.parse(
+              'https://www.youtube.com/youtubei/v1/browse?key=$_apiKey',
+            ),
+            headers: headers,
+            body: json.encode({...body, 'browseId': 'FEsubscriptions'}),
+          )
+          .timeout(const Duration(seconds: 12));
       if (resp.statusCode == 200) {
         return _parseVideoList(json.decode(resp.body));
       }
@@ -342,11 +416,13 @@ class _InnertubeApi {
     try {
       final headers = await _buildHeaders();
       final body = _baseBody();
-      final resp = await http.post(
-        Uri.parse('https://www.youtube.com/youtubei/v1/guide?key=$_apiKey'),
-        headers: headers,
-        body: json.encode(body),
-      ).timeout(const Duration(seconds: 12));
+      final resp = await http
+          .post(
+            Uri.parse('https://www.youtube.com/youtubei/v1/guide?key=$_apiKey'),
+            headers: headers,
+            body: json.encode(body),
+          )
+          .timeout(const Duration(seconds: 12));
       if (resp.statusCode == 200) {
         return _parseChannelList(json.decode(resp.body));
       }
@@ -359,11 +435,19 @@ class _InnertubeApi {
   /// Check if user is logged in via cookies
   static Future<bool> isLoggedIn() async {
     try {
-      final cookies = await CookieManager.instance().getCookies(url: WebUri('https://www.youtube.com'));
+      final cookies = await CookieManager.instance().getCookies(
+        url: WebUri('https://www.youtube.com'),
+      );
       // Check for SID, SSID, or APISID — Google auth cookies
-      return cookies.any((c) =>
-        c.name == 'SID' || c.name == '__Secure-1PSID' || c.name == 'SAPISID');
-    } catch (_) { return false; }
+      return cookies.any(
+        (c) =>
+            c.name == 'SID' ||
+            c.name == '__Secure-1PSID' ||
+            c.name == 'SAPISID',
+      );
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Extract account info from YouTube page
@@ -371,24 +455,31 @@ class _InnertubeApi {
     try {
       final headers = await _buildHeaders();
       final body = _baseBody();
-      final resp = await http.post(
-        Uri.parse('https://www.youtube.com/youtubei/v1/account/account_menu?key=$_apiKey'),
-        headers: headers,
-        body: json.encode(body),
-      ).timeout(const Duration(seconds: 10));
+      final resp = await http
+          .post(
+            Uri.parse(
+              'https://www.youtube.com/youtubei/v1/account/account_menu?key=$_apiKey',
+            ),
+            headers: headers,
+            body: json.encode(body),
+          )
+          .timeout(const Duration(seconds: 10));
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
         // Navigate the JSON structure to find account details
         try {
-          final items = data['actions']?[0]?['openPopupAction']?['popup']
-              ?['multiPageMenuRenderer']?['sections']?[0]?['multiPageMenuSectionRenderer']
-              ?['items']?[0]?['compactLinkRenderer']?['title']?['simpleText'] as String? ?? '';
-          final photo = data['actions']?[0]?['openPopupAction']?['popup']
-              ?['multiPageMenuRenderer']?['header']?['activeAccountHeaderRenderer']
-              ?['accountPhoto']?['thumbnails']?[0]?['url'] as String? ?? '';
-          final email = data['actions']?[0]?['openPopupAction']?['popup']
-              ?['multiPageMenuRenderer']?['header']?['activeAccountHeaderRenderer']
-              ?['email']?['simpleText'] as String? ?? '';
+          final items =
+              data['actions']?[0]?['openPopupAction']?['popup']?['multiPageMenuRenderer']?['sections']?[0]?['multiPageMenuSectionRenderer']?['items']?[0]?['compactLinkRenderer']?['title']?['simpleText']
+                  as String? ??
+              '';
+          final photo =
+              data['actions']?[0]?['openPopupAction']?['popup']?['multiPageMenuRenderer']?['header']?['activeAccountHeaderRenderer']?['accountPhoto']?['thumbnails']?[0]?['url']
+                  as String? ??
+              '';
+          final email =
+              data['actions']?[0]?['openPopupAction']?['popup']?['multiPageMenuRenderer']?['header']?['activeAccountHeaderRenderer']?['email']?['simpleText']
+                  as String? ??
+              '';
           if (items.isNotEmpty || email.isNotEmpty) {
             return YtAccount(name: items, email: email, photoUrl: photo);
           }
@@ -404,7 +495,8 @@ class _InnertubeApi {
     final results = <YtVid>[];
     try {
       // Navigate the complex Innertube response structure
-      final contents = _deepFind(data, 'richGridRenderer')?['contents'] as List? ??
+      final contents =
+          _deepFind(data, 'richGridRenderer')?['contents'] as List? ??
           (_deepFind(data, 'sectionListRenderer')?['contents'] as List? ?? []);
 
       _extractVideos(contents, results);
@@ -417,7 +509,9 @@ class _InnertubeApi {
   static void _extractVideos(dynamic node, List<YtVid> out) {
     if (out.length >= 25) return;
     if (node is List) {
-      for (final item in node) { _extractVideos(item, out); }
+      for (final item in node) {
+        _extractVideos(item, out);
+      }
     } else if (node is Map) {
       // richItemRenderer
       if (node.containsKey('richItemRenderer')) {
@@ -444,25 +538,42 @@ class _InnertubeApi {
         try {
           final id = vr['videoId'] as String? ?? '';
           final title = _getText(vr['title']) ?? '';
-          final channel = _getText(vr['ownerText'] ?? vr['longBylineText'] ?? vr['shortBylineText']) ?? '';
-          final channelId = vr['ownerText']?['runs']?[0]
-              ?['navigationEndpoint']?['browseEndpoint']?['browseId'] as String? ?? '';
+          final channel =
+              _getText(
+                vr['ownerText'] ??
+                    vr['longBylineText'] ??
+                    vr['shortBylineText'],
+              ) ??
+              '';
+          final channelId =
+              vr['ownerText']?['runs']?[0]?['navigationEndpoint']?['browseEndpoint']?['browseId']
+                  as String? ??
+              '';
           final dur = _getText(vr['lengthText']) ?? '';
-          final views = _getText(vr['shortViewCountText'] ?? vr['viewCountText']) ?? '';
+          final views =
+              _getText(vr['shortViewCountText'] ?? vr['viewCountText']) ?? '';
           final age = _getText(vr['publishedTimeText']) ?? '';
           if (id.isNotEmpty && title.isNotEmpty) {
-            out.add(YtVid(
-              id: id, title: title, channel: channel,
-              channelId: channelId,
-              thumb: 'https://i.ytimg.com/vi/$id/mqdefault.jpg',
-              duration: dur, viewCount: views, age: age,
-            ));
+            out.add(
+              YtVid(
+                id: id,
+                title: title,
+                channel: channel,
+                channelId: channelId,
+                thumb: 'https://i.ytimg.com/vi/$id/mqdefault.jpg',
+                duration: dur,
+                viewCount: views,
+                age: age,
+              ),
+            );
           }
         } catch (_) {}
         return;
       }
       // Recurse into all values
-      for (final v in node.values) { _extractVideos(v, out); }
+      for (final v in node.values) {
+        _extractVideos(v, out);
+      }
     }
   }
 
@@ -503,26 +614,39 @@ class _InnertubeApi {
   static void _extractChannels(dynamic node, List<YtChannel> out) {
     if (out.length >= 50) return;
     if (node is List) {
-      for (final item in node) { _extractChannels(item, out); }
+      for (final item in node) {
+        _extractChannels(item, out);
+      }
     } else if (node is Map) {
       if (node.containsKey('guideSubscriptionsSectionRenderer')) {
-        _extractChannels(node['guideSubscriptionsSectionRenderer']?['items'], out);
+        _extractChannels(
+          node['guideSubscriptionsSectionRenderer']?['items'],
+          out,
+        );
         return;
       }
       if (node.containsKey('guideEntryRenderer')) {
         try {
-          final title = _getText(node['guideEntryRenderer']?['formattedTitle']) ?? '';
-          final browseId = node['guideEntryRenderer']?['navigationEndpoint']
-              ?['browseEndpoint']?['browseId'] as String? ?? '';
-          final photo = node['guideEntryRenderer']?['thumbnail']?['thumbnails']
-              ?.last?['url'] as String? ?? '';
+          final title =
+              _getText(node['guideEntryRenderer']?['formattedTitle']) ?? '';
+          final browseId =
+              node['guideEntryRenderer']?['navigationEndpoint']?['browseEndpoint']?['browseId']
+                  as String? ??
+              '';
+          final photo =
+              node['guideEntryRenderer']?['thumbnail']?['thumbnails']
+                      ?.last?['url']
+                  as String? ??
+              '';
           if (title.isNotEmpty && browseId.startsWith('UC')) {
             out.add(YtChannel(id: browseId, name: title, thumb: photo));
           }
         } catch (_) {}
         return;
       }
-      for (final v in node.values) { _extractChannels(v, out); }
+      for (final v in node.values) {
+        _extractChannels(v, out);
+      }
     }
   }
 }
@@ -539,13 +663,18 @@ class _YtSvc {
     // age strings like "2 days ago", "1 week ago", "3 months ago", "1 year ago"
     final age = v.age.toLowerCase();
     if (age.isEmpty) return true; // no data, keep it
-    if (age.contains('hour') || age.contains('minute') || age.contains('second')) return true;
+    if (age.contains('hour') ||
+        age.contains('minute') ||
+        age.contains('second'))
+      return true;
     if (age.contains('day')) {
-      final n = int.tryParse(RegExp(r'(\d+)').firstMatch(age)?.group(1) ?? '0') ?? 0;
+      final n =
+          int.tryParse(RegExp(r'(\d+)').firstMatch(age)?.group(1) ?? '0') ?? 0;
       return n <= maxDays;
     }
     if (age.contains('week')) {
-      final n = int.tryParse(RegExp(r'(\d+)').firstMatch(age)?.group(1) ?? '0') ?? 0;
+      final n =
+          int.tryParse(RegExp(r'(\d+)').firstMatch(age)?.group(1) ?? '0') ?? 0;
       return n * 7 <= maxDays;
     }
     if (age.contains('month')) {
@@ -558,8 +687,21 @@ class _YtSvc {
   // Current month/year for search query injection
   static String get _nowMonthYear {
     final now = DateTime.now();
-    const months = ['', 'January','February','March','April','May','June',
-      'July','August','September','October','November','December'];
+    const months = [
+      '',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
     return '${months[now.month]} ${now.year}';
   }
 
@@ -581,11 +723,18 @@ class _YtSvc {
       final channelFutures = subs.take(6).map((ch) async {
         try {
           final uploads = await _yt.channels.getUploads(ch.id).take(5).toList();
-          return uploads.map((v) => YtVid.fromVideo(v)).where((v) => _isRecent(v)).toList();
-        } catch (_) { return <YtVid>[]; }
+          return uploads
+              .map((v) => YtVid.fromVideo(v))
+              .where((v) => _isRecent(v))
+              .toList();
+        } catch (_) {
+          return <YtVid>[];
+        }
       });
       final all = await Future.wait(channelFutures);
-      for (final list in all) { results.addAll(list); }
+      for (final list in all) {
+        results.addAll(list);
+      }
     }
 
     // 3. Trending — date-scoped queries for truly fresh content
@@ -599,19 +748,28 @@ class _YtSvc {
     final trendingFutures = trendingQueries.map((q) async {
       try {
         final list = await _yt.search.search(q);
-        return list.take(6).map((v) => YtVid.fromVideo(v))
-            .where((v) => _isRecent(v)).toList();
-      } catch (_) { return <YtVid>[]; }
+        return list
+            .take(6)
+            .map((v) => YtVid.fromVideo(v))
+            .where((v) => _isRecent(v))
+            .toList();
+      } catch (_) {
+        return <YtVid>[];
+      }
     });
     final trending = await Future.wait(trendingFutures);
-    for (final list in trending) { results.addAll(list); }
+    for (final list in trending) {
+      results.addAll(list);
+    }
 
     // 4. Fallback: trending playlist (pick only recent)
     if (results.isEmpty) {
       try {
         const plId = 'PLrEnWoR732-BHrPp_Pm8_VleD68f9s14-';
         final plVideos = await _yt.playlists.getVideos(plId).take(25).toList();
-        results.addAll(plVideos.map((v) => YtVid.fromPlaylist(v)).where((v) => _isRecent(v)));
+        results.addAll(
+          plVideos.map((v) => YtVid.fromPlaylist(v)).where((v) => _isRecent(v)),
+        );
       } catch (_) {}
     }
 
@@ -651,7 +809,9 @@ class _YtSvc {
           return vids;
         }).toList();
         final results = await Future.wait(futures);
-        for (final list in results) { out.addAll(list); }
+        for (final list in results) {
+          out.addAll(list);
+        }
       }
       // 2. Fill up to 20 from trending shorts search
       if (out.length < 20) {
@@ -697,9 +857,13 @@ class _YtSvc {
         id: ch.id.value,
         name: ch.title,
         thumb: ch.logoUrl,
-        subs: ch.subscribersCount != null ? _fmtViews(ch.subscribersCount!) : '',
+        subs: ch.subscribersCount != null
+            ? _fmtViews(ch.subscribersCount!)
+            : '',
       );
-    } catch (_) { return null; }
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Related videos — recent only, based on video title keywords
@@ -750,7 +914,9 @@ class _BgAudio {
 
     _nowPlayingId = null;
     try {
-      final url = streamUrl?.isNotEmpty == true ? streamUrl! : await _fetchBestAudioUrl(vid.id);
+      final url = streamUrl?.isNotEmpty == true
+          ? streamUrl!
+          : await _fetchBestAudioUrl(vid.id);
       _nowPlayingId = vid.id;
       await _startPlayback(vid, url);
     } catch (e) {
@@ -762,13 +928,17 @@ class _BgAudio {
   static Future<String> _fetchBestAudioUrl(String videoId) async {
     final ytLocal = YoutubeExplode();
     try {
-      final m = await ytLocal.videos.streamsClient.getManifest(videoId)
+      final m = await ytLocal.videos.streamsClient
+          .getManifest(videoId)
           .timeout(const Duration(seconds: 20));
       final audioStreams = m.audioOnly.sortByBitrate();
       // Prefer AAC (mp4a) codec
       StreamInfo? chosen;
       for (final s in audioStreams.reversed) {
-        if (s.audioCodec.toLowerCase().contains('mp4a')) { chosen = s; break; }
+        if (s.audioCodec.toLowerCase().contains('mp4a')) {
+          chosen = s;
+          break;
+        }
       }
       chosen ??= audioStreams.last;
       return chosen.url.toString();
@@ -781,11 +951,11 @@ class _BgAudio {
     await ytAudioHandler.playUrl(
       url,
       MediaItem(
-        id:              vid.id,
-        album:           vid.channel,
-        title:           vid.title,
-        artUri:          Uri.parse(vid.thumb),
-        displayTitle:    vid.title,
+        id: vid.id,
+        album: vid.channel,
+        title: vid.title,
+        artUri: Uri.parse(vid.thumb),
+        displayTitle: vid.title,
         displaySubtitle: vid.channel,
       ),
     );
@@ -804,7 +974,8 @@ class _BgAudio {
 // ─────────────────────────────────────────────────────────────────────────────
 class _SubStore {
   static List<YtChannel> _cache = [];
-  static const _kBlockedKey = 'yt_blocked_channels'; // permanently removed channel IDs
+  static const _kBlockedKey =
+      'yt_blocked_channels'; // permanently removed channel IDs
 
   static Future<Set<String>> _loadBlocked() async {
     final p = await SharedPreferences.getInstance();
@@ -821,11 +992,19 @@ class _SubStore {
     final p = await SharedPreferences.getInstance();
     final blocked = await _loadBlocked();
     final raw = p.getStringList(_kSprefsKey) ?? [];
-    final all = raw.map((e) => YtChannel.fromJson(json.decode(e) as Map<String, dynamic>)).toList();
+    final all = raw
+        .map((e) => YtChannel.fromJson(json.decode(e) as Map<String, dynamic>))
+        .toList();
     // Keep only real UC channels that user hasn't permanently removed
-    final valid = all.where((c) => c.id.startsWith('UC') && !blocked.contains(c.id)).toList();
-    if (valid.length != all.length) { _cache = valid; await _save(); }
-    else { _cache = valid; }
+    final valid = all
+        .where((c) => c.id.startsWith('UC') && !blocked.contains(c.id))
+        .toList();
+    if (valid.length != all.length) {
+      _cache = valid;
+      await _save();
+    } else {
+      _cache = valid;
+    }
     return _cache;
   }
 
@@ -844,13 +1023,18 @@ class _SubStore {
   static Future<void> setAll(List<YtChannel> channels) async {
     final blocked = await _loadBlocked();
     // Filter: real UC channels that user hasn't blocked
-    _cache = channels.where((c) => c.id.startsWith('UC') && !blocked.contains(c.id)).toList();
+    _cache = channels
+        .where((c) => c.id.startsWith('UC') && !blocked.contains(c.id))
+        .toList();
     await _save();
   }
 
   static Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
-    await p.setStringList(_kSprefsKey, _cache.map((c) => json.encode(c.toJson())).toList());
+    await p.setStringList(
+      _kSprefsKey,
+      _cache.map((c) => json.encode(c.toJson())).toList(),
+    );
   }
 }
 
@@ -860,7 +1044,8 @@ class _SubStore {
 class YouTubeScreen extends StatefulWidget {
   final String? initialVideoId;
   const YouTubeScreen({super.key, this.initialVideoId});
-  @override State<YouTubeScreen> createState() => _YouTubeScreenState();
+  @override
+  State<YouTubeScreen> createState() => _YouTubeScreenState();
 }
 
 class _YouTubeScreenState extends State<YouTubeScreen> {
@@ -911,17 +1096,24 @@ class _YouTubeScreenState extends State<YouTubeScreen> {
   }
 
   void _openVideo(YtVid v) {
-    Navigator.of(context).push(PageRouteBuilder(
-      pageBuilder: (_, a1, a2) => _VideoPage(video: v, onMinimize: (vid) {
-        setState(() => _miniVideo = vid);
-      }),
-      transitionsBuilder: (_, anim, a2, child) => SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-            .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
-        child: child,
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, a1, a2) => _VideoPage(
+          video: v,
+          onMinimize: (vid) {
+            setState(() => _miniVideo = vid);
+          },
+        ),
+        transitionsBuilder: (_, anim, a2, child) => SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          child: child,
+        ),
+        transitionDuration: const Duration(milliseconds: 280),
       ),
-      transitionDuration: const Duration(milliseconds: 280),
-    ));
+    );
   }
 
   @override
@@ -931,10 +1123,13 @@ class _YouTubeScreenState extends State<YouTubeScreen> {
       _ShortsTab(onTap: _openVideo),
       const _CreateTab(),
       _SubsTab(onTap: _openVideo, account: _account),
-      _YouTab(onTap: _openVideo, onAccountChange: () {
-        _syncAccountFromCookies();
-        setState(() {});
-      }),
+      _YouTab(
+        onTap: _openVideo,
+        onAccountChange: () {
+          _syncAccountFromCookies();
+          setState(() {});
+        },
+      ),
     ];
 
     return PopScope(
@@ -945,15 +1140,24 @@ class _YouTubeScreenState extends State<YouTubeScreen> {
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
-        body: Stack(children: [
-          IndexedStack(index: _tab, children: tabs),
-          if (_miniVideo != null)
-            _MiniPlayer(
-              video: _miniVideo!,
-              onExpand: () { final v = _miniVideo!; setState(() => _miniVideo = null); _openVideo(v); },
-              onClose: () { setState(() => _miniVideo = null); _BgAudio.stop(); },
-            ),
-        ]),
+        body: Stack(
+          children: [
+            IndexedStack(index: _tab, children: tabs),
+            if (_miniVideo != null)
+              _MiniPlayer(
+                video: _miniVideo!,
+                onExpand: () {
+                  final v = _miniVideo!;
+                  setState(() => _miniVideo = null);
+                  _openVideo(v);
+                },
+                onClose: () {
+                  setState(() => _miniVideo = null);
+                  _BgAudio.stop();
+                },
+              ),
+          ],
+        ),
         bottomNavigationBar: _buildBottomNav(),
       ),
     );
@@ -977,20 +1181,31 @@ class _YouTubeScreenState extends State<YouTubeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: List.generate(items.length, (i) {
               final selected = _tab == i;
-              return Expanded(child: GestureDetector(
-                onTap: () => setState(() => _tab = i),
-                behavior: HitTestBehavior.opaque,
-                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(selected ? items[i].$2 : items[i].$1,
-                      color: selected ? Colors.white : Colors.white38, size: 22),
-                  const SizedBox(height: 2),
-                  Text(items[i].$3,
-                      style: TextStyle(
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _tab = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        selected ? items[i].$2 : items[i].$1,
                         color: selected ? Colors.white : Colors.white38,
-                        fontSize: 10, fontWeight: FontWeight.w500,
-                      )),
-                ]),
-              ));
+                        size: 22,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        items[i].$3,
+                        style: TextStyle(
+                          color: selected ? Colors.white : Colors.white38,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             }),
           ),
         ),
@@ -1016,46 +1231,73 @@ class _YtAppBar extends StatelessWidget implements PreferredSizeWidget {
     return SafeArea(
       bottom: false,
       child: Container(
-        height: 64, color: const Color(0xFF0F0F0F),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0), // extra top for breathing room
-        child: Row(children: [
-          // YouTube logo
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              width: 28, height: 20,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF0000),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: const Center(child: Icon(Icons.play_arrow, color: Colors.white, size: 16)),
+        height: 64,
+        color: const Color(0xFF0F0F0F),
+        padding: const EdgeInsets.fromLTRB(
+          12,
+          10,
+          12,
+          0,
+        ), // extra top for breathing room
+        child: Row(
+          children: [
+            // YouTube logo
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 28,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF0000),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.play_arrow,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                const Text(
+                  'YouTube',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 5),
-            const Text('YouTube', style: TextStyle(
-              color: Colors.white, fontSize: 17,
-              fontWeight: FontWeight.w700, letterSpacing: -0.5,
-            )),
-          ]),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.cast, color: Colors.white, size: 22),
-            onPressed: () {},
-            padding: const EdgeInsets.all(8),
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.white, size: 22),
-            onPressed: () {},
-            padding: const EdgeInsets.all(8),
-          ),
-          if (onSearch != null)
+            const Spacer(),
             IconButton(
-              icon: const Icon(Icons.search, color: Colors.white, size: 22),
-              onPressed: onSearch,
+              icon: const Icon(Icons.cast, color: Colors.white, size: 22),
+              onPressed: () {},
               padding: const EdgeInsets.all(8),
             ),
-          // Real account avatar
-          _AccountAvatar(account: acct, size: 14),
-          const SizedBox(width: 4),
-        ]),
+            IconButton(
+              icon: const Icon(
+                Icons.notifications_none,
+                color: Colors.white,
+                size: 22,
+              ),
+              onPressed: () {},
+              padding: const EdgeInsets.all(8),
+            ),
+            if (onSearch != null)
+              IconButton(
+                icon: const Icon(Icons.search, color: Colors.white, size: 22),
+                onPressed: onSearch,
+                padding: const EdgeInsets.all(8),
+              ),
+            // Real account avatar
+            _AccountAvatar(account: acct, size: 14),
+            const SizedBox(width: 4),
+          ],
+        ),
       ),
     );
   }
@@ -1072,7 +1314,9 @@ class _AccountAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = size;
-    if (account != null && account!.isSignedIn && account!.photoUrl.isNotEmpty) {
+    if (account != null &&
+        account!.isSignedIn &&
+        account!.photoUrl.isNotEmpty) {
       return CircleAvatar(
         radius: radius,
         backgroundImage: NetworkImage(account!.photoUrl),
@@ -1084,8 +1328,14 @@ class _AccountAvatar extends StatelessWidget {
       return CircleAvatar(
         radius: radius,
         backgroundColor: const Color(0xFF6C63FF),
-        child: Text(account!.name[0].toUpperCase(),
-            style: TextStyle(color: Colors.white, fontSize: radius * 0.9, fontWeight: FontWeight.bold)),
+        child: Text(
+          account!.name[0].toUpperCase(),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: radius * 0.9,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       );
     }
     return CircleAvatar(
@@ -1103,19 +1353,35 @@ class _HomeTab extends StatefulWidget {
   final void Function(YtVid) onTap;
   final YtAccount account;
   const _HomeTab({required this.onTap, required this.account});
-  @override State<_HomeTab> createState() => _HomeTabState();
+  @override
+  State<_HomeTab> createState() => _HomeTabState();
 }
 
 class _HomeTabState extends State<_HomeTab> with AutomaticKeepAliveClientMixin {
   List<YtVid> _videos = [];
   bool _loading = true;
-  final _cats = ['All', 'Music', 'Gaming', 'News', 'Sports', 'Tech', 'Movies', 'Live', 'Tamil', 'Finance'];
+  final _cats = [
+    'All',
+    'Music',
+    'Gaming',
+    'News',
+    'Sports',
+    'Tech',
+    'Movies',
+    'Live',
+    'Tamil',
+    'Finance',
+  ];
   String _selCat = 'All';
 
-  @override bool get wantKeepAlive => true;
+  @override
+  bool get wantKeepAlive => true;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void didUpdateWidget(_HomeTab old) {
@@ -1132,13 +1398,24 @@ class _HomeTabState extends State<_HomeTab> with AutomaticKeepAliveClientMixin {
     if (_selCat != 'All') {
       vids = await _YtSvc.search(_selCat);
     }
-    if (mounted) setState(() { _videos = vids; _loading = false; });
+    if (mounted)
+      setState(() {
+        _videos = vids;
+        _loading = false;
+      });
   }
 
   Future<void> _selectCat(String cat) async {
-    setState(() { _selCat = cat; _loading = true; });
+    setState(() {
+      _selCat = cat;
+      _loading = true;
+    });
     final vids = cat == 'All' ? await _YtSvc.home() : await _YtSvc.search(cat);
-    if (mounted) setState(() { _videos = vids; _loading = false; });
+    if (mounted)
+      setState(() {
+        _videos = vids;
+        _loading = false;
+      });
   }
 
   @override
@@ -1146,81 +1423,126 @@ class _HomeTabState extends State<_HomeTab> with AutomaticKeepAliveClientMixin {
     super.build(context);
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
-      appBar: _YtAppBar(onSearch: () => _pushSearch(context), account: widget.account),
+      appBar: _YtAppBar(
+        onSearch: () => _pushSearch(context),
+        account: widget.account,
+      ),
       body: RefreshIndicator(
         color: const Color(0xFFFF0000),
         backgroundColor: const Color(0xFF1A1A1A),
         onRefresh: _load,
-        child: CustomScrollView(slivers: [
-          // Category chips
-          SliverToBoxAdapter(child: SizedBox(
-            height: 46,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              itemCount: _cats.length,
-              itemBuilder: (_, i) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => _selectCat(_cats[i]),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: _selCat == _cats[i] ? Colors.white : const Color(0xFF272727),
-                      borderRadius: BorderRadius.circular(20),
+        child: CustomScrollView(
+          slivers: [
+            // Category chips
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 46,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  itemCount: _cats.length,
+                  itemBuilder: (_, i) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => _selectCat(_cats[i]),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _selCat == _cats[i]
+                              ? Colors.white
+                              : const Color(0xFF272727),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _cats[i],
+                          style: TextStyle(
+                            color: _selCat == _cats[i]
+                                ? Colors.black
+                                : Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     ),
-                    child: Text(_cats[i], style: TextStyle(
-                      color: _selCat == _cats[i] ? Colors.black : Colors.white,
-                      fontSize: 13, fontWeight: FontWeight.w500,
-                    )),
                   ),
                 ),
               ),
             ),
-          )),
-          // Personalized banner
-          if (widget.account.isSignedIn)
-            SliverToBoxAdapter(child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A2A1A),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.withOpacity(0.3)),
+            // Personalized banner
+            if (widget.account.isSignedIn)
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A2A1A),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      _AccountAvatar(account: widget.account, size: 12),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Personalized for ${widget.account.name}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              child: Row(children: [
-                _AccountAvatar(account: widget.account, size: 12),
-                const SizedBox(width: 8),
-                Expanded(child: Text(
-                  'Personalized for ${widget.account.name}',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                )),
-              ]),
-            )),
-          if (_loading)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator(color: Color(0xFFFF0000))),
-            )
-          else if (_videos.isEmpty)
-            const SliverFillRemaining(
-              child: Center(child: Text('Could not load feed.\nPull down to retry.',
-                  textAlign: TextAlign.center, style: TextStyle(color: Colors.white38))),
-            )
-          else
-            SliverList(delegate: SliverChildBuilderDelegate(
-              (_, i) => _VCard(video: _videos[i], onTap: () => widget.onTap(_videos[i])),
-              childCount: _videos.length,
-            )),
-        ]),
+            if (_loading)
+              const SliverFillRemaining(
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFFFF0000)),
+                ),
+              )
+            else if (_videos.isEmpty)
+              const SliverFillRemaining(
+                child: Center(
+                  child: Text(
+                    'Could not load feed.\nPull down to retry.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white38),
+                  ),
+                ),
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) => _VCard(
+                    video: _videos[i],
+                    onTap: () => widget.onTap(_videos[i]),
+                  ),
+                  childCount: _videos.length,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   void _pushSearch(BuildContext ctx) {
-    Navigator.of(ctx).push(MaterialPageRoute(
-      builder: (_) => _SearchPage(onTap: widget.onTap),
-    ));
+    Navigator.of(
+      ctx,
+    ).push(MaterialPageRoute(builder: (_) => _SearchPage(onTap: widget.onTap)));
   }
 }
 
@@ -1230,7 +1552,8 @@ class _HomeTabState extends State<_HomeTab> with AutomaticKeepAliveClientMixin {
 class _SearchPage extends StatefulWidget {
   final void Function(YtVid) onTap;
   const _SearchPage({required this.onTap});
-  @override State<_SearchPage> createState() => _SearchPageState();
+  @override
+  State<_SearchPage> createState() => _SearchPageState();
 }
 
 class _SearchPageState extends State<_SearchPage> {
@@ -1239,7 +1562,8 @@ class _SearchPageState extends State<_SearchPage> {
   List<String> _suggestions = [];
   bool _loading = false;
   bool _showSuggestions = false;
-  bool _suppressSuggestions = false; // prevents re-trigger when setting ctrl.text
+  bool _suppressSuggestions =
+      false; // prevents re-trigger when setting ctrl.text
   Timer? _debounce;
 
   @override
@@ -1260,17 +1584,27 @@ class _SearchPageState extends State<_SearchPage> {
     if (_suppressSuggestions) return;
     final q = _ctrl.text.trim();
     if (q.isEmpty) {
-      setState(() { _suggestions = []; _showSuggestions = false; });
+      setState(() {
+        _suggestions = [];
+        _showSuggestions = false;
+      });
       return;
     }
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () => _fetchSuggestions(q));
+    _debounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _fetchSuggestions(q),
+    );
   }
 
   Future<void> _fetchSuggestions(String q) async {
     try {
       final s = await _yt.search.getQuerySuggestions(q);
-      if (mounted) setState(() { _suggestions = s.take(7).toList(); _showSuggestions = _suggestions.isNotEmpty; });
+      if (mounted)
+        setState(() {
+          _suggestions = s.take(7).toList();
+          _showSuggestions = _suggestions.isNotEmpty;
+        });
     } catch (_) {}
   }
 
@@ -1279,10 +1613,19 @@ class _SearchPageState extends State<_SearchPage> {
     _debounce?.cancel();
     _suppressSuggestions = true;
     FocusScope.of(context).unfocus();
-    setState(() { _loading = true; _results = []; _showSuggestions = false; _suggestions = []; });
+    setState(() {
+      _loading = true;
+      _results = [];
+      _showSuggestions = false;
+      _suggestions = [];
+    });
     _ctrl.text = q;
     final r = await _YtSvc.search(q);
-    if (mounted) setState(() { _results = r; _loading = false; });
+    if (mounted)
+      setState(() {
+        _results = r;
+        _loading = false;
+      });
     // Small delay so setText event doesn't re-trigger suggestions
     await Future.delayed(const Duration(milliseconds: 200));
     _suppressSuggestions = false;
@@ -1312,7 +1655,14 @@ class _SearchPageState extends State<_SearchPage> {
           if (_ctrl.text.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.close, color: Colors.white),
-              onPressed: () { _ctrl.clear(); setState(() { _results = []; _suggestions = []; _showSuggestions = false; }); },
+              onPressed: () {
+                _ctrl.clear();
+                setState(() {
+                  _results = [];
+                  _suggestions = [];
+                  _showSuggestions = false;
+                });
+              },
             ),
           IconButton(
             icon: const Icon(Icons.search, color: Colors.white),
@@ -1320,55 +1670,88 @@ class _SearchPageState extends State<_SearchPage> {
           ),
         ],
       ),
-      body: Column(children: [
-        // Suggestions dropdown
-        if (_showSuggestions)
-          Container(
-            color: const Color(0xFF1A1A1A),
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _suggestions.length,
-              itemBuilder: (_, i) {
-                final s = _suggestions[i];
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.search, color: Colors.white38, size: 18),
-                  title: Text(s, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.north_west, color: Colors.white38, size: 16),
-                    onPressed: () { _ctrl.text = s; _ctrl.selection = TextSelection.collapsed(offset: s.length); setState(() => _showSuggestions = false); },
-                  ),
-                  onTap: () => _search(s),
-                );
-              },
-            ),
-          ),
-        // Results
-        Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF0000)))
-              : _results.isEmpty
-                  ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.search, size: 72, color: Colors.white12),
-                      const SizedBox(height: 12),
-                      const Text('Search for videos, channels\nor playlists',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white38, fontSize: 14)),
-                    ]))
-                  : ListView.builder(
-                      itemCount: _results.length,
-                      itemBuilder: (_, i) => _VCard(
-                        video: _results[i],
-                        onTap: () { widget.onTap(_results[i]); },
-                        compact: true,
-                      ),
+      body: Column(
+        children: [
+          // Suggestions dropdown
+          if (_showSuggestions)
+            Container(
+              color: const Color(0xFF1A1A1A),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _suggestions.length,
+                itemBuilder: (_, i) {
+                  final s = _suggestions[i];
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.search,
+                      color: Colors.white38,
+                      size: 18,
                     ),
-        ),
-      ]),
+                    title: Text(
+                      s,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(
+                        Icons.north_west,
+                        color: Colors.white38,
+                        size: 16,
+                      ),
+                      onPressed: () {
+                        _ctrl.text = s;
+                        _ctrl.selection = TextSelection.collapsed(
+                          offset: s.length,
+                        );
+                        setState(() => _showSuggestions = false);
+                      },
+                    ),
+                    onTap: () => _search(s),
+                  );
+                },
+              ),
+            ),
+          // Results
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFFF0000)),
+                  )
+                : _results.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.search,
+                          size: 72,
+                          color: Colors.white12,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Search for videos, channels\nor playlists',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white38, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _results.length,
+                    itemBuilder: (_, i) => _VCard(
+                      video: _results[i],
+                      onTap: () {
+                        widget.onTap(_results[i]);
+                      },
+                      compact: true,
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shorts Tab
@@ -1376,22 +1759,32 @@ class _SearchPageState extends State<_SearchPage> {
 class _ShortsTab extends StatefulWidget {
   final void Function(YtVid) onTap;
   const _ShortsTab({required this.onTap});
-  @override State<_ShortsTab> createState() => _ShortsTabState();
+  @override
+  State<_ShortsTab> createState() => _ShortsTabState();
 }
 
-class _ShortsTabState extends State<_ShortsTab> with AutomaticKeepAliveClientMixin {
+class _ShortsTabState extends State<_ShortsTab>
+    with AutomaticKeepAliveClientMixin {
   List<YtVid> _shorts = [];
   bool _loading = true;
 
-  @override bool get wantKeepAlive => true;
+  @override
+  bool get wantKeepAlive => true;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
     setState(() => _loading = true);
     final v = await _YtSvc.shorts();
-    if (mounted) setState(() { _shorts = v; _loading = false; });
+    if (mounted)
+      setState(() {
+        _shorts = v;
+        _loading = false;
+      });
   }
 
   @override
@@ -1399,17 +1792,30 @@ class _ShortsTabState extends State<_ShortsTab> with AutomaticKeepAliveClientMix
     super.build(context);
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: _YtAppBar(onSearch: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => _SearchPage(onTap: widget.onTap)))),
+      appBar: _YtAppBar(
+        onSearch: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => _SearchPage(onTap: widget.onTap)),
+        ),
+      ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF0000)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFFF0000)),
+            )
           : _shorts.isEmpty
-              ? const Center(child: Text('No shorts loaded', style: TextStyle(color: Colors.white38)))
-              : PageView.builder(
-                  scrollDirection: Axis.vertical,
-                  itemCount: _shorts.length,
-                  itemBuilder: (_, i) => _ShortCard(video: _shorts[i], onTap: () => widget.onTap(_shorts[i])),
-                ),
+          ? const Center(
+              child: Text(
+                'No shorts loaded',
+                style: TextStyle(color: Colors.white38),
+              ),
+            )
+          : PageView.builder(
+              scrollDirection: Axis.vertical,
+              itemCount: _shorts.length,
+              itemBuilder: (_, i) => _ShortCard(
+                video: _shorts[i],
+                onTap: () => widget.onTap(_shorts[i]),
+              ),
+            ),
     );
   }
 }
@@ -1423,34 +1829,76 @@ class _ShortCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Stack(fit: StackFit.expand, children: [
-        Image.network(video.thumb, fit: BoxFit.cover, errorBuilder: (_, a, b) =>
-            Container(color: const Color(0xFF1A1A1A))),
-        Container(decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            colors: [Colors.transparent, Colors.black87],
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(
+            video.thumb,
+            fit: BoxFit.cover,
+            errorBuilder: (_, a, b) =>
+                Container(color: const Color(0xFF1A1A1A)),
           ),
-        )),
-        Positioned(bottom: 80, left: 12, right: 60, child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(video.channel, style: const TextStyle(color: Colors.white,
-              fontWeight: FontWeight.w600, fontSize: 14)),
-          const SizedBox(height: 4),
-          Text(video.title, maxLines: 2, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 13)),
-        ])),
-        Positioned(bottom: 80, right: 8, child: Column(children: [
-          _ShortAction(Icons.thumb_up_outlined, 'Like'),
-          const SizedBox(height: 20),
-          _ShortAction(Icons.comment_outlined, 'Comment'),
-          const SizedBox(height: 20),
-          _ShortAction(Icons.share_outlined, 'Share'),
-        ])),
-        const Positioned(top: 12, left: 16,
-          child: Text('Shorts', style: TextStyle(color: Colors.white,
-              fontSize: 16, fontWeight: FontWeight.w700))),
-      ]),
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black87],
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 80,
+            left: 12,
+            right: 60,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  video.channel,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  video.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 80,
+            right: 8,
+            child: Column(
+              children: [
+                _ShortAction(Icons.thumb_up_outlined, 'Like'),
+                const SizedBox(height: 20),
+                _ShortAction(Icons.comment_outlined, 'Comment'),
+                const SizedBox(height: 20),
+                _ShortAction(Icons.share_outlined, 'Share'),
+              ],
+            ),
+          ),
+          const Positioned(
+            top: 12,
+            left: 16,
+            child: Text(
+              'Shorts',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1459,11 +1907,14 @@ class _ShortAction extends StatelessWidget {
   final IconData icon;
   final String label;
   const _ShortAction(this.icon, this.label);
-  @override Widget build(BuildContext context) => Column(children: [
-    Icon(icon, color: Colors.white, size: 28),
-    const SizedBox(height: 2),
-    Text(label, style: const TextStyle(color: Colors.white, fontSize: 11)),
-  ]);
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Icon(icon, color: Colors.white, size: 28),
+      const SizedBox(height: 2),
+      Text(label, style: const TextStyle(color: Colors.white, fontSize: 11)),
+    ],
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1471,41 +1922,70 @@ class _ShortAction extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _CreateTab extends StatelessWidget {
   const _CreateTab();
-  @override Widget build(BuildContext context) => Scaffold(
+  @override
+  Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFF0F0F0F),
     appBar: const _YtAppBar(),
-    body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Icon(Icons.videocam_outlined, size: 80, color: Colors.white24),
-      const SizedBox(height: 16),
-      const Text('Create', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 8),
-      const Text('Upload a video or Go live', style: TextStyle(color: Colors.white54)),
-      const SizedBox(height: 24),
-      _CreateBtn(Icons.upload, 'Upload a video', () {}),
-      const SizedBox(height: 12),
-      _CreateBtn(Icons.circle, 'Create a Short', () {}),
-      const SizedBox(height: 12),
-      _CreateBtn(Icons.live_tv, 'Go live', () {}),
-    ])),
+    body: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.videocam_outlined, size: 80, color: Colors.white24),
+          const SizedBox(height: 16),
+          const Text(
+            'Create',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Upload a video or Go live',
+            style: TextStyle(color: Colors.white54),
+          ),
+          const SizedBox(height: 24),
+          _CreateBtn(Icons.upload, 'Upload a video', () {}),
+          const SizedBox(height: 12),
+          _CreateBtn(Icons.circle, 'Create a Short', () {}),
+          const SizedBox(height: 12),
+          _CreateBtn(Icons.live_tv, 'Go live', () {}),
+        ],
+      ),
+    ),
   );
 }
 
 class _CreateBtn extends StatelessWidget {
-  final IconData icon; final String label; final VoidCallback onTap;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
   const _CreateBtn(this.icon, this.label, this.onTap);
-  @override Widget build(BuildContext context) => InkWell(
+  @override
+  Widget build(BuildContext context) => InkWell(
     onTap: onTap,
     child: Container(
       width: 240,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF272727), borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFF272727),
+        borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(children: [
-        Icon(icon, color: Colors.white, size: 22),
-        const SizedBox(width: 14),
-        Text(label, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-      ]),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 22),
+          const SizedBox(width: 14),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -1517,7 +1997,8 @@ class _SubsTab extends StatefulWidget {
   final void Function(YtVid) onTap;
   final YtAccount account;
   const _SubsTab({required this.onTap, required this.account});
-  @override State<_SubsTab> createState() => _SubsTabState();
+  @override
+  State<_SubsTab> createState() => _SubsTabState();
 }
 
 class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
@@ -1535,7 +2016,8 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
   StreamIterator<YtVid>? _uploadIter;
   final _channelScrollCtrl = ScrollController();
 
-  @override bool get wantKeepAlive => true;
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -1559,7 +2041,8 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
 
   void _onChannelScroll() {
     if (_channelScrollCtrl.hasClients &&
-        _channelScrollCtrl.position.pixels >= _channelScrollCtrl.position.maxScrollExtent - 300) {
+        _channelScrollCtrl.position.pixels >=
+            _channelScrollCtrl.position.maxScrollExtent - 300) {
       _loadMoreVideos();
     }
   }
@@ -1595,7 +2078,11 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
       channels = await _SubStore.load();
     }
 
-    if (mounted) setState(() { _channels = channels; _loadingChans = false; });
+    if (mounted)
+      setState(() {
+        _channels = channels;
+        _loadingChans = false;
+      });
     // Don't auto-select a channel — let user pick
     _selChannel = null;
     _showingFeed = true;
@@ -1606,15 +2093,23 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
   Future<void> _loadSubsFeed() async {
     setState(() => _loadingFeed = true);
     final feed = await _InnertubeApi.subscriptionsFeed();
-    if (mounted) setState(() { _subsFeed = feed; _loadingFeed = false; });
+    if (mounted)
+      setState(() {
+        _subsFeed = feed;
+        _loadingFeed = false;
+      });
   }
 
   Future<void> _selectChannel(YtChannel ch) async {
     await _uploadIter?.cancel();
     _uploadIter = null;
     setState(() {
-      _selChannel = ch; _loadingVids = true; _videos = [];
-      _showingFeed = false; _hasMore = true; _loadingMore = false;
+      _selChannel = ch;
+      _loadingVids = true;
+      _videos = [];
+      _showingFeed = false;
+      _hasMore = true;
+      _loadingMore = false;
     });
     _uploadIter = StreamIterator(_YtSvc.channelVideoStream(ch.id));
     await _loadMoreVideos(isInitial: true);
@@ -1626,13 +2121,25 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
     int loaded = 0;
     while (loaded < 20) {
       bool hasNext = false;
-      try { hasNext = await _uploadIter!.moveNext().timeout(const Duration(seconds: 15)); }
-      catch (_) { break; }
-      if (!hasNext) { if (mounted) setState(() => _hasMore = false); break; }
+      try {
+        hasNext = await _uploadIter!.moveNext().timeout(
+          const Duration(seconds: 15),
+        );
+      } catch (_) {
+        break;
+      }
+      if (!hasNext) {
+        if (mounted) setState(() => _hasMore = false);
+        break;
+      }
       if (mounted) setState(() => _videos.add(_uploadIter!.current));
       loaded++;
     }
-    if (mounted) setState(() { _loadingMore = false; if (isInitial) _loadingVids = false; });
+    if (mounted)
+      setState(() {
+        _loadingMore = false;
+        if (isInitial) _loadingVids = false;
+      });
   }
 
   Future<void> _addChannel(String query) async {
@@ -1641,7 +2148,11 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
     if (ch == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Channel not found'), backgroundColor: Colors.red));
+          const SnackBar(
+            content: Text('Channel not found'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
       return;
     }
@@ -1656,16 +2167,28 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: Text('Unsubscribe from ${ch.name}?',
-            style: const TextStyle(color: Colors.white, fontSize: 16)),
-        content: const Text('You can resubscribe anytime.',
-            style: TextStyle(color: Colors.white54)),
+        title: Text(
+          'Unsubscribe from ${ch.name}?',
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
+        content: const Text(
+          'You can resubscribe anytime.',
+          style: TextStyle(color: Colors.white54),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Unsubscribe', style: TextStyle(color: Color(0xFFFF0000))),
+            child: const Text(
+              'Unsubscribe',
+              style: TextStyle(color: Color(0xFFFF0000)),
+            ),
           ),
         ],
       ),
@@ -1679,8 +2202,11 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
           _showingFeed = true;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unsubscribed from ${ch.name}'),
-              duration: const Duration(seconds: 2)));
+          SnackBar(
+            content: Text('Unsubscribed from ${ch.name}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     }
   }
@@ -1692,153 +2218,281 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: _YtAppBar(
         onSearch: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => _SearchPage(onTap: widget.onTap))),
+          MaterialPageRoute(builder: (_) => _SearchPage(onTap: widget.onTap)),
+        ),
         account: widget.account,
       ),
       body: _loadingChans
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF0000)))
-          : Column(children: [
-              // ── Tabs: All / channel avatars ──────────────────────────────
-              SizedBox(height: 100, child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                children: [
-                  // "All" / Feed button
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: GestureDetector(
-                      onTap: () => setState(() { _showingFeed = true; _selChannel = null; }),
-                      child: Column(children: [
-                        Container(
-                          width: 56, height: 56,
-                          decoration: BoxDecoration(
-                            color: _showingFeed ? const Color(0xFFFF0000) : const Color(0xFF272727),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.dynamic_feed, color: Colors.white, size: 26),
-                        ),
-                        const SizedBox(height: 4),
-                        Text('All', style: TextStyle(
-                          color: _showingFeed ? Colors.white : Colors.white54, fontSize: 11)),
-                      ]),
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFFF0000)),
+            )
+          : Column(
+              children: [
+                // ── Tabs: All / channel avatars ──────────────────────────────
+                SizedBox(
+                  height: 100,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                  ),
-                  // Add button
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: GestureDetector(
-                      onTap: () => _showAddDialog(context),
-                      child: Column(children: [
-                        Container(
-                          width: 56, height: 56,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF272727),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white24),
+                    children: [
+                      // "All" / Feed button
+                      Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: GestureDetector(
+                          onTap: () => setState(() {
+                            _showingFeed = true;
+                            _selChannel = null;
+                          }),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: _showingFeed
+                                      ? const Color(0xFFFF0000)
+                                      : const Color(0xFF272727),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.dynamic_feed,
+                                  color: Colors.white,
+                                  size: 26,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'All',
+                                style: TextStyle(
+                                  color: _showingFeed
+                                      ? Colors.white
+                                      : Colors.white54,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
                           ),
-                          child: const Icon(Icons.add, color: Colors.white, size: 26),
                         ),
-                        const SizedBox(height: 4),
-                        const Text('Add', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                      ]),
-                    ),
-                  ),
-                  // Channel avatars
-                  ..._channels.map((ch) => Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: GestureDetector(
-                      onTap: () => _selectChannel(ch),
-                      onLongPress: () => _confirmRemove(ch),
-                      child: Column(children: [
-                        Container(
-                          width: 56, height: 56,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: _selChannel?.id == ch.id
-                                  ? const Color(0xFFFF0000) : Colors.transparent,
-                              width: 2.5,
+                      ),
+                      // Add button
+                      Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: GestureDetector(
+                          onTap: () => _showAddDialog(context),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF272727),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white24),
+                                ),
+                                child: const Icon(
+                                  Icons.add,
+                                  color: Colors.white,
+                                  size: 26,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Add',
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Channel avatars
+                      ..._channels.map(
+                        (ch) => Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: GestureDetector(
+                            onTap: () => _selectChannel(ch),
+                            onLongPress: () => _confirmRemove(ch),
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: _selChannel?.id == ch.id
+                                          ? const Color(0xFFFF0000)
+                                          : Colors.transparent,
+                                      width: 2.5,
+                                    ),
+                                  ),
+                                  child: ClipOval(
+                                    child: ch.thumb.isNotEmpty
+                                        ? Image.network(
+                                            ch.thumb,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, a, b) =>
+                                                _avatarFallback(ch.name),
+                                          )
+                                        : _avatarFallback(ch.name),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                SizedBox(
+                                  width: 60,
+                                  child: Text(
+                                    ch.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: _selChannel?.id == ch.id
+                                          ? Colors.white
+                                          : Colors.white60,
+                                      fontSize: 11,
+                                      fontWeight: _selChannel?.id == ch.id
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: ClipOval(child: ch.thumb.isNotEmpty
-                              ? Image.network(ch.thumb, fit: BoxFit.cover,
-                                  errorBuilder: (_, a, b) => _avatarFallback(ch.name))
-                              : _avatarFallback(ch.name)),
                         ),
-                        const SizedBox(height: 4),
-                        SizedBox(width: 60, child: Text(ch.name,
-                            maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _selChannel?.id == ch.id ? Colors.white : Colors.white60,
-                              fontSize: 11, fontWeight: _selChannel?.id == ch.id
-                                  ? FontWeight.w600 : FontWeight.normal,
-                            ))),
-                      ]),
-                    ),
-                  )),
-                ],
-              )),
-              const Divider(color: Colors.white12, height: 1),
-
-              // ── Content area ─────────────────────────────────────────────
-              if (_showingFeed)
-                Expanded(child: _loadingFeed
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF0000)))
-                  : _subsFeed.isEmpty
-                    ? _emptySubsState(context)
-                    : ListView.builder(
-                        itemCount: _subsFeed.length,
-                        itemBuilder: (_, i) => _VCard(
-                          video: _subsFeed[i],
-                          onTap: () => widget.onTap(_subsFeed[i]),
-                          compact: true,
-                        ),
-                      ))
-              else if (_selChannel != null) ...[
-                // Channel header
-                Container(
-                  color: const Color(0xFF1A1A1A),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Row(children: [
-                    ClipOval(child: _selChannel!.thumb.isNotEmpty
-                        ? Image.network(_selChannel!.thumb, width: 40, height: 40, fit: BoxFit.cover)
-                        : _avatarFallback(_selChannel!.name)),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_selChannel!.name, style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15)),
-                      if (_selChannel!.subs.isNotEmpty)
-                        Text(_selChannel!.subs, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                    ])),
-                    OutlinedButton.icon(
-                      onPressed: () => _confirmRemove(_selChannel!),
-                      icon: const Icon(Icons.notifications_outlined, size: 16),
-                      label: const Text('Subscribed'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white24),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        textStyle: const TextStyle(fontSize: 12),
                       ),
-                    ),
-                  ]),
+                    ],
+                  ),
                 ),
-                Expanded(child: _loadingVids
-                    ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF0000)))
-                    : _videos.isEmpty
-                        ? const Center(child: Text('No videos found', style: TextStyle(color: Colors.white38)))
+                const Divider(color: Colors.white12, height: 1),
+
+                // ── Content area ─────────────────────────────────────────────
+                if (_showingFeed)
+                  Expanded(
+                    child: _loadingFeed
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFFF0000),
+                            ),
+                          )
+                        : _subsFeed.isEmpty
+                        ? _emptySubsState(context)
+                        : ListView.builder(
+                            itemCount: _subsFeed.length,
+                            itemBuilder: (_, i) => _VCard(
+                              video: _subsFeed[i],
+                              onTap: () => widget.onTap(_subsFeed[i]),
+                              compact: true,
+                            ),
+                          ),
+                  )
+                else if (_selChannel != null) ...[
+                  // Channel header
+                  Container(
+                    color: const Color(0xFF1A1A1A),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        ClipOval(
+                          child: _selChannel!.thumb.isNotEmpty
+                              ? Image.network(
+                                  _selChannel!.thumb,
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                )
+                              : _avatarFallback(_selChannel!.name),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _selChannel!.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              if (_selChannel!.subs.isNotEmpty)
+                                Text(
+                                  _selChannel!.subs,
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => _confirmRemove(_selChannel!),
+                          icon: const Icon(
+                            Icons.notifications_outlined,
+                            size: 16,
+                          ),
+                          label: const Text('Subscribed'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white24),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: _loadingVids
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFFF0000),
+                            ),
+                          )
+                        : _videos.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No videos found',
+                              style: TextStyle(color: Colors.white38),
+                            ),
+                          )
                         : ListView.builder(
                             controller: _channelScrollCtrl,
-                            itemCount: _videos.length + (_loadingMore || _hasMore ? 1 : 0),
+                            itemCount:
+                                _videos.length +
+                                (_loadingMore || _hasMore ? 1 : 0),
                             itemBuilder: (_, i) {
                               if (i == _videos.length) {
                                 return Padding(
                                   padding: const EdgeInsets.all(20),
                                   child: _loadingMore
-                                      ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF0000), strokeWidth: 2))
+                                      ? const Center(
+                                          child: CircularProgressIndicator(
+                                            color: Color(0xFFFF0000),
+                                            strokeWidth: 2,
+                                          ),
+                                        )
                                       : TextButton(
                                           onPressed: _loadMoreVideos,
-                                          child: const Text('Load more', style: TextStyle(color: Color(0xFFFF0000))),
+                                          child: const Text(
+                                            'Load more',
+                                            style: TextStyle(
+                                              color: Color(0xFFFF0000),
+                                            ),
+                                          ),
                                         ),
                                 );
                               }
@@ -1848,45 +2502,72 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
                                 compact: true,
                               );
                             },
-                          )),
-              ] else
-                Expanded(child: _emptySubsState(context)),
-            ]),
+                          ),
+                  ),
+                ] else
+                  Expanded(child: _emptySubsState(context)),
+              ],
+            ),
     );
   }
 
-  Widget _emptySubsState(BuildContext context) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-    const Icon(Icons.subscriptions_outlined, size: 80, color: Colors.white12),
-    const SizedBox(height: 16),
-    const Text('Your subscriptions will appear here',
-        style: TextStyle(color: Colors.white54, fontSize: 15)),
-    const SizedBox(height: 8),
-    const Text('Sign in to sync your YouTube subscriptions automatically',
-        textAlign: TextAlign.center,
-        style: TextStyle(color: Colors.white30, fontSize: 13)),
-    const SizedBox(height: 24),
-    ElevatedButton.icon(
-      onPressed: () => _showAddDialog(context),
-      icon: const Icon(Icons.add),
-      label: const Text('Add Channel'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFFF0000),
-        foregroundColor: Colors.white,
-      ),
+  Widget _emptySubsState(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.subscriptions_outlined,
+          size: 80,
+          color: Colors.white12,
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Your subscriptions will appear here',
+          style: TextStyle(color: Colors.white54, fontSize: 15),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Sign in to sync your YouTube subscriptions automatically',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white30, fontSize: 13),
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton.icon(
+          onPressed: () => _showAddDialog(context),
+          icon: const Icon(Icons.add),
+          label: const Text('Add Channel'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFF0000),
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
     ),
-  ]));
+  );
 
   Widget _avatarFallback(String name) => Container(
-    width: 56, height: 56, color: const Color(0xFF333333),
-    child: Center(child: Text(name.isEmpty ? '?' : name[0].toUpperCase(),
-        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold))),
+    width: 56,
+    height: 56,
+    color: const Color(0xFF333333),
+    child: Center(
+      child: Text(
+        name.isEmpty ? '?' : name[0].toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ),
   );
 
   void _showAddDialog(BuildContext context) {
     _addCtrl.clear();
-    showDialog(context: context, builder: (_) => AlertDialog(
-      backgroundColor: const Color(0xFF1E1E1E),
-      title: const Text('Add Channel', style: TextStyle(color: Colors.white)),
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Add Channel', style: TextStyle(color: Colors.white)),
         content: Autocomplete<String>(
           optionsBuilder: (TextEditingValue tv) async {
             if (tv.text.isEmpty) return const Iterable<String>.empty();
@@ -1910,10 +2591,17 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
               decoration: const InputDecoration(
                 hintText: '@channelname or channel name',
                 hintStyle: TextStyle(color: Colors.white38),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFF0000))),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFFFF0000)),
+                ),
               ),
-              onSubmitted: (q) { Navigator.pop(context); _addChannel(q); },
+              onSubmitted: (q) {
+                Navigator.pop(context);
+                _addChannel(q);
+              },
             );
           },
           optionsViewBuilder: (context, onSelected, options) {
@@ -1931,7 +2619,10 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
                     itemBuilder: (context, index) {
                       final option = options.elementAt(index);
                       return ListTile(
-                        title: Text(option, style: const TextStyle(color: Colors.white)),
+                        title: Text(
+                          option,
+                          style: const TextStyle(color: Colors.white),
+                        ),
                         onTap: () => onSelected(option),
                       );
                     },
@@ -1941,16 +2632,27 @@ class _SubsTabState extends State<_SubsTab> with AutomaticKeepAliveClientMixin {
             );
           },
         ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF0000)),
-          onPressed: () { Navigator.pop(context); _addChannel(_addCtrl.text); },
-          child: const Text('Add', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ));
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF0000),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _addChannel(_addCtrl.text);
+            },
+            child: const Text('Add', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1961,11 +2663,13 @@ class _YouTab extends StatefulWidget {
   final void Function(YtVid) onTap;
   final VoidCallback onAccountChange;
   const _YouTab({required this.onTap, required this.onAccountChange});
-  @override State<_YouTab> createState() => _YouTabState();
+  @override
+  State<_YouTab> createState() => _YouTabState();
 }
 
 class _YouTabState extends State<_YouTab> with AutomaticKeepAliveClientMixin {
-  @override bool get wantKeepAlive => true;
+  @override
+  bool get wantKeepAlive => true;
 
   // Ad-blocking script — injects CSS to hide ads and sponsorship banners
   static const _adblockCss = '''
@@ -2006,21 +2710,39 @@ class _YouTabState extends State<_YouTab> with AutomaticKeepAliveClientMixin {
           children: [
             const Icon(Icons.account_circle, size: 80, color: Colors.white54),
             const SizedBox(height: 16),
-            const Text('Sign in to YouTube', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Sign in to YouTube',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
-            const Text('Access your subscriptions & personalized feed', style: TextStyle(color: Colors.white70, fontSize: 14)),
+            const Text(
+              'Access your subscriptions & personalized feed',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
             const SizedBox(height: 24),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blueAccent,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 12,
+                ),
               ),
               onPressed: () {
                 _openGoogleSignIn();
               },
-              child: const Text('Continue with Google', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              child: const Text(
+                'Continue with Google',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         ),
@@ -2035,55 +2757,116 @@ class _YouTabState extends State<_YouTab> with AutomaticKeepAliveClientMixin {
           children: [
             CircleAvatar(
               radius: 36,
-              backgroundImage: acc.photoUrl.isNotEmpty ? NetworkImage(acc.photoUrl) : null,
-              child: acc.photoUrl.isEmpty ? Text(acc.name.isNotEmpty ? acc.name[0] : 'U', style: const TextStyle(fontSize: 24)) : null,
+              backgroundImage: acc.photoUrl.isNotEmpty
+                  ? NetworkImage(acc.photoUrl)
+                  : null,
+              child: acc.photoUrl.isEmpty
+                  ? Text(
+                      acc.name.isNotEmpty ? acc.name[0] : 'U',
+                      style: const TextStyle(fontSize: 24),
+                    )
+                  : null,
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   Text(acc.name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                   const SizedBox(height: 4),
-                   Text(acc.email.isNotEmpty ? acc.email : '@${acc.name.replaceAll(' ', '').toLowerCase()}', style: const TextStyle(color: Colors.white54, fontSize: 14)),
+                  Text(
+                    acc.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    acc.email.isNotEmpty
+                        ? acc.email
+                        : '@${acc.name.replaceAll(' ', '').toLowerCase()}',
+                    style: const TextStyle(color: Colors.white54, fontSize: 14),
+                  ),
                 ],
               ),
             ),
           ],
         ),
         const SizedBox(height: 32),
-        _buildListTile(Icons.history, 'History', onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => YtHistoryScreen(onTap: (v) {
-            Navigator.of(context).pop();
-            widget.onTap(v);
-          }))
-        )),
-        _buildListTile(Icons.playlist_play, 'Playlists', onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => YtPlaylistsScreen(onTap: (v) {
-            Navigator.of(context).pop();
-            widget.onTap(v);
-          }))
-        )),
-        _buildListTile(Icons.thumb_up_alt_outlined, 'Liked videos', onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => YtLikedScreen(onTap: (v) {
-            Navigator.of(context).pop();
-            widget.onTap(v);
-          }))
-        )),
-        _buildListTile(Icons.bookmark_outlined, 'Saved videos', onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => YtSavedScreen(onTap: (v) {
-            Navigator.of(context).pop();
-            widget.onTap(v);
-          }))
-        )),
-        _buildListTile(Icons.download_done_outlined, 'Downloads', onTap: () {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const YTDownloaderScreen()));
-        }),
+        _buildListTile(
+          Icons.history,
+          'History',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => YtHistoryScreen(
+                onTap: (v) {
+                  Navigator.of(context).pop();
+                  widget.onTap(v);
+                },
+              ),
+            ),
+          ),
+        ),
+        _buildListTile(
+          Icons.playlist_play,
+          'Playlists',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => YtPlaylistsScreen(
+                onTap: (v) {
+                  Navigator.of(context).pop();
+                  widget.onTap(v);
+                },
+              ),
+            ),
+          ),
+        ),
+        _buildListTile(
+          Icons.thumb_up_alt_outlined,
+          'Liked videos',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => YtLikedScreen(
+                onTap: (v) {
+                  Navigator.of(context).pop();
+                  widget.onTap(v);
+                },
+              ),
+            ),
+          ),
+        ),
+        _buildListTile(
+          Icons.bookmark_outlined,
+          'Saved videos',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => YtSavedScreen(
+                onTap: (v) {
+                  Navigator.of(context).pop();
+                  widget.onTap(v);
+                },
+              ),
+            ),
+          ),
+        ),
+        _buildListTile(
+          Icons.download_done_outlined,
+          'Downloads',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const YTDownloaderScreen()),
+            );
+          },
+        ),
         const SizedBox(height: 16),
         const Divider(color: Colors.white24),
-        _buildListTile(Icons.settings, 'Settings', onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const YtSettingsScreen())
-        )),
+        _buildListTile(
+          Icons.settings,
+          'Settings',
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const YtSettingsScreen())),
+        ),
         _buildListTile(Icons.help_outline, 'Help & Feedback'),
       ],
     );
@@ -2093,7 +2876,11 @@ class _YouTabState extends State<_YouTab> with AutomaticKeepAliveClientMixin {
     return ListTile(
       leading: Icon(icon, color: Colors.white),
       title: Text(title, style: const TextStyle(color: Colors.white)),
-      trailing: const Icon(Icons.chevron_right, color: Colors.white54, size: 20),
+      trailing: const Icon(
+        Icons.chevron_right,
+        color: Colors.white54,
+        size: 20,
+      ),
       onTap: onTap ?? () {},
     );
   }
@@ -2126,11 +2913,18 @@ class _YouTabState extends State<_YouTab> with AutomaticKeepAliveClientMixin {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.of(dialogContext).pop(),
         ),
-        title: const Text('Sign in with Google', style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: const Text(
+          'Sign in with Google',
+          style: TextStyle(color: Colors.white, fontSize: 16),
+        ),
       ),
       body: SafeArea(
         child: InAppWebView(
-          initialUrlRequest: URLRequest(url: WebUri('https://accounts.google.com/ServiceLogin?service=youtube')),
+          initialUrlRequest: URLRequest(
+            url: WebUri(
+              'https://accounts.google.com/ServiceLogin?service=youtube',
+            ),
+          ),
           initialSettings: InAppWebViewSettings(
             transparentBackground: true,
             useShouldOverrideUrlLoading: true,
@@ -2139,16 +2933,19 @@ class _YouTabState extends State<_YouTab> with AutomaticKeepAliveClientMixin {
             supportZoom: false,
             sharedCookiesEnabled: true,
             thirdPartyCookiesEnabled: true,
-            userAgent: "Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36",
+            userAgent:
+                "Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36",
           ),
           onWebViewCreated: (_) {},
           onLoadStop: (ctrl, url) async {
             await ctrl.evaluateJavascript(source: _adblockCss);
             final urlStr = url.toString();
-            if (urlStr.contains('youtube.com') && !urlStr.contains('accounts.google')) {
+            if (urlStr.contains('youtube.com') &&
+                !urlStr.contains('accounts.google')) {
               final loggedIn = await _InnertubeApi.isLoggedIn();
               if (loggedIn) {
-                final nameJs = await ctrl.evaluateJavascript(source: '''
+                final nameJs = await ctrl.evaluateJavascript(
+                  source: '''
                   (function() {
                     try {
                       var el = document.querySelector('ytm-account-option-renderer .account-name');
@@ -2158,8 +2955,10 @@ class _YouTabState extends State<_YouTab> with AutomaticKeepAliveClientMixin {
                     } catch(e) {}
                     return '';
                   })()
-                ''');
-                final photoJs = await ctrl.evaluateJavascript(source: '''
+                ''',
+                );
+                final photoJs = await ctrl.evaluateJavascript(
+                  source: '''
                   (function() {
                     try {
                       var img = document.querySelector('img.account-avatar, ytm-account-option-renderer img');
@@ -2167,19 +2966,34 @@ class _YouTabState extends State<_YouTab> with AutomaticKeepAliveClientMixin {
                     } catch(e) {}
                     return '';
                   })()
-                ''');
-                final name = (nameJs?.toString() ?? '').replaceAll('"', '').trim();
-                final photo = (photoJs?.toString() ?? '').replaceAll('"', '').trim();
-                
+                ''',
+                );
+                final name = (nameJs?.toString() ?? '')
+                    .replaceAll('"', '')
+                    .trim();
+                final photo = (photoJs?.toString() ?? '')
+                    .replaceAll('"', '')
+                    .trim();
+
                 if (name.isNotEmpty) {
-                  final account = YtAccount(name: name, email: '', photoUrl: photo);
+                  final account = YtAccount(
+                    name: name,
+                    email: '',
+                    photoUrl: photo,
+                  );
                   await _AccountStore.save(account);
                 } else {
                   final info = await _InnertubeApi.fetchAccountInfo();
                   if (info != null && info.isSignedIn) {
                     await _AccountStore.save(info);
                   } else {
-                    await _AccountStore.save(const YtAccount(name: 'YouTube User', email: '', photoUrl: ''));
+                    await _AccountStore.save(
+                      const YtAccount(
+                        name: 'YouTube User',
+                        email: '',
+                        photoUrl: '',
+                      ),
+                    );
                   }
                 }
                 if (mounted) {
@@ -2194,17 +3008,17 @@ class _YouTabState extends State<_YouTab> with AutomaticKeepAliveClientMixin {
             final reg = RegExp(r'(?:v=|youtu\.be/|shorts/)([^&?\s]+)');
             final match = reg.firstMatch(url);
             if (match != null) {
-               final String vidId = match.group(1) ?? '';
-               if (vidId.isNotEmpty) {
-                 try {
-                   final v = await _yt.videos.get(vidId);
-                   if (mounted) {
-                     Navigator.of(dialogContext).pop();
-                     widget.onTap(YtVid.fromVideo(v));
-                   }
-                 } catch (_) {}
-                 return NavigationActionPolicy.CANCEL;
-               }
+              final String vidId = match.group(1) ?? '';
+              if (vidId.isNotEmpty) {
+                try {
+                  final v = await _yt.videos.get(vidId);
+                  if (mounted) {
+                    Navigator.of(dialogContext).pop();
+                    widget.onTap(YtVid.fromVideo(v));
+                  }
+                } catch (_) {}
+                return NavigationActionPolicy.CANCEL;
+              }
             }
             return NavigationActionPolicy.ALLOW;
           },
@@ -2221,62 +3035,158 @@ class _VCard extends StatelessWidget {
   final YtVid video;
   final VoidCallback onTap;
   final bool compact;
-  const _VCard({required this.video, required this.onTap, this.compact = false});
+  const _VCard({
+    required this.video,
+    required this.onTap,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     if (compact) {
-      return InkWell(onTap: onTap, child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(children: [
-          Stack(children: [
-            ClipRRect(borderRadius: BorderRadius.circular(4),
-                child: _Thumb(url: video.thumb, w: 160, h: 90)),
-            if (video.duration.isNotEmpty)
-              Positioned(bottom: 4, right: 4, child: _DurBadge(video.duration)),
-          ]),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(video.title, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 4),
-            Text(video.channel, style: const TextStyle(color: Colors.white60, fontSize: 12)),
-            if (video.viewCount.isNotEmpty || video.age.isNotEmpty)
-              Text('${video.viewCount}${video.viewCount.isNotEmpty && video.age.isNotEmpty ? ' • ' : ''}${video.age}',
-                  style: const TextStyle(color: Colors.white38, fontSize: 11)),
-          ])),
-          IconButton(icon: const Icon(Icons.more_vert, color: Colors.white38, size: 18),
-            onPressed: () {}, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-        ]),
-      ));
+      return InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: _Thumb(url: video.thumb, w: 160, h: 90),
+                  ),
+                  if (video.duration.isNotEmpty)
+                    Positioned(
+                      bottom: 4,
+                      right: 4,
+                      child: _DurBadge(video.duration),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      video.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      video.channel,
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (video.viewCount.isNotEmpty || video.age.isNotEmpty)
+                      Text(
+                        '${video.viewCount}${video.viewCount.isNotEmpty && video.age.isNotEmpty ? ' • ' : ''}${video.age}',
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.more_vert,
+                  color: Colors.white38,
+                  size: 18,
+                ),
+                onPressed: () {},
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     // Full-width card (home feed)
-    return InkWell(onTap: onTap, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Stack(children: [
-        _Thumb(url: video.thumb, w: double.infinity, h: 210),
-        if (video.duration.isNotEmpty)
-          Positioned(bottom: 8, right: 8, child: _DurBadge(video.duration)),
-      ]),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const CircleAvatar(radius: 18, backgroundColor: Color(0xFF333333),
-              child: Icon(Icons.person, size: 18, color: Colors.white60)),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(video.title, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 3),
-            Text([video.channel, if (video.viewCount.isNotEmpty) video.viewCount,
-              if (video.age.isNotEmpty) video.age].join(' • '),
-                style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          ])),
-          IconButton(icon: const Icon(Icons.more_vert, color: Colors.white54, size: 20),
-            onPressed: () {}, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-        ]),
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              _Thumb(url: video.thumb, w: double.infinity, h: 210),
+              if (video.duration.isNotEmpty)
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: _DurBadge(video.duration),
+                ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Color(0xFF333333),
+                  child: Icon(Icons.person, size: 18, color: Colors.white60),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        video.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        [
+                          video.channel,
+                          if (video.viewCount.isNotEmpty) video.viewCount,
+                          if (video.age.isNotEmpty) video.age,
+                        ].join(' • '),
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.more_vert,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                  onPressed: () {},
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
       ),
-      const SizedBox(height: 4),
-    ]));
+    );
   }
 }
 
@@ -2287,16 +3197,17 @@ class _VideoPage extends StatefulWidget {
   final YtVid video;
   final void Function(YtVid) onMinimize;
   const _VideoPage({required this.video, required this.onMinimize});
-  @override State<_VideoPage> createState() => _VideoPageState();
+  @override
+  State<_VideoPage> createState() => _VideoPageState();
 }
 
 class _VideoPageState extends State<_VideoPage> {
   final _ytLocal = YoutubeExplode();
   VideoPlayerController? _vpc;
-  AudioPlayer? _adaptiveAudio;   // Synced audio for 720p+ dual-stream mode
-  bool _isAdaptive = false;      // true = videoOnly+audioOnly playing together
-  Timer? _syncTimer;             // Periodic drift correction (audio vs video)
-  String? _actualQualityLabel;   // Displayed quality badge, e.g. '720p' or '360p'
+  AudioPlayer? _adaptiveAudio; // Synced audio for 720p+ dual-stream mode
+  bool _isAdaptive = false; // true = videoOnly+audioOnly playing together
+  Timer? _syncTimer; // Periodic drift correction (audio vs video)
+  String? _actualQualityLabel; // Displayed quality badge, e.g. '720p' or '360p'
   bool _loading = true, _error = false, _audioOnly = false, _ctrlVisible = true;
   bool _isFullscreen = false;
   bool _liked = false, _disliked = false, _saved = false;
@@ -2309,8 +3220,16 @@ class _VideoPageState extends State<_VideoPage> {
 
   // ── Quality helpers ──────────────────────────────────────────────────────
   static int _qHeight(String label) {
-    const m = {'144p': 144, '240p': 240, '360p': 360, '480p': 480,
-                '720p': 720, '1080p': 1080, '1440p': 1440, '2160p': 2160};
+    const m = {
+      '144p': 144,
+      '240p': 240,
+      '360p': 360,
+      '480p': 480,
+      '720p': 720,
+      '1080p': 1080,
+      '1440p': 1440,
+      '2160p': 2160,
+    };
     return m[label.toLowerCase()] ?? 720;
   }
 
@@ -2331,8 +3250,12 @@ class _VideoPageState extends State<_VideoPage> {
     final subs = await _SubStore.load();
     if (mounted) {
       setState(() {
-        _liked = likedRaw.any((e) => (json.decode(e) as Map)['id'] == widget.video.id);
-        _saved = savedRaw.any((e) => (json.decode(e) as Map)['id'] == widget.video.id);
+        _liked = likedRaw.any(
+          (e) => (json.decode(e) as Map)['id'] == widget.video.id,
+        );
+        _saved = savedRaw.any(
+          (e) => (json.decode(e) as Map)['id'] == widget.video.id,
+        );
         _subscribed = subs.any((c) => c.id == widget.video.channelId);
       });
     }
@@ -2342,24 +3265,37 @@ class _VideoPageState extends State<_VideoPage> {
     final prefs = await SharedPreferences.getInstance();
     final v = widget.video;
     final raw = prefs.getStringList('yt_history') ?? [];
-    final entry = json.encode({'id': v.id, 'title': v.title, 'channel': v.channel,
-      'thumb': v.thumb, 'duration': v.duration, 'viewCount': v.viewCount, 'age': v.age, 'channelId': v.channelId});
+    final entry = json.encode({
+      'id': v.id,
+      'title': v.title,
+      'channel': v.channel,
+      'thumb': v.thumb,
+      'duration': v.duration,
+      'viewCount': v.viewCount,
+      'age': v.age,
+      'channelId': v.channelId,
+    });
     raw.removeWhere((e) => (json.decode(e) as Map)['id'] == v.id);
     raw.insert(0, entry);
     await prefs.setStringList('yt_history', raw.take(100).toList());
   }
 
   Future<void> _initPlayer() async {
-    setState(() { _loading = true; _error = false; _audioOnly = false; });
+    setState(() {
+      _loading = true;
+      _error = false;
+      _audioOnly = false;
+    });
 
     final prefs = await SharedPreferences.getInstance();
     final prefQuality = prefs.getString('yt_video_quality') ?? '480p';
-    final isSmart  = prefQuality == 'Smart';
-    final targetH  = isSmart ? 9999 : _qHeight(prefQuality);
+    final isSmart = prefQuality == 'Smart';
+    final targetH = isSmart ? 9999 : _qHeight(prefQuality);
 
     // Headers for ExoPlayer / just_audio CDN requests
     const dlHdrs = {
-      'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
+      'User-Agent':
+          'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
       'Referer': 'https://www.youtube.com/',
     };
 
@@ -2369,7 +3305,9 @@ class _VideoPageState extends State<_VideoPage> {
       if (bundle != null) {
         final audioFmt = bundle.bestAudio;
         final videoFmt = bundle.videoForQuality(targetH);
-        debugPrint('▶ InnerTube quality chosen: ${videoFmt?['height']}p  audio: ${audioFmt?['mimeType']}');
+        debugPrint(
+          '▶ InnerTube quality chosen: ${videoFmt?['height']}p  audio: ${audioFmt?['mimeType']}',
+        );
 
         if (videoFmt != null && audioFmt != null) {
           final videoUrl = videoFmt['url'] as String?;
@@ -2378,16 +3316,19 @@ class _VideoPageState extends State<_VideoPage> {
             try {
               _audioStreamUrl = audioUrl;
               final ctrl = VideoPlayerController.networkUrl(
-                  Uri.parse(videoUrl), httpHeaders: dlHdrs);
+                Uri.parse(videoUrl),
+                httpHeaders: dlHdrs,
+              );
               await ctrl.initialize().timeout(const Duration(seconds: 25));
               await ctrl.setVolume(0.0); // audio comes from _adaptiveAudio
 
               final adAudio = AudioPlayer();
-              await adAudio.setUrl(audioUrl,
-                headers: Map<String, String>.from(dlHdrs),
-              ).timeout(const Duration(seconds: 15));
+              await adAudio
+                  .setUrl(audioUrl, headers: Map<String, String>.from(dlHdrs))
+                  .timeout(const Duration(seconds: 15));
 
-              _vpc = ctrl; _adaptiveAudio = adAudio;
+              _vpc = ctrl;
+              _adaptiveAudio = adAudio;
               _isAdaptive = true;
               _actualQualityLabel = '${videoFmt['height']}p';
               _vpc!.addListener(_syncAudioState);
@@ -2400,9 +3341,12 @@ class _VideoPageState extends State<_VideoPage> {
               return; // ✅ InnerTube adaptive success
             } catch (e) {
               debugPrint('InnerTube adaptive init failed: $e');
-              _syncTimer?.cancel(); _syncTimer = null;
-              await _vpc?.dispose(); _vpc = null;
-              await _adaptiveAudio?.dispose(); _adaptiveAudio = null;
+              _syncTimer?.cancel();
+              _syncTimer = null;
+              await _vpc?.dispose();
+              _vpc = null;
+              await _adaptiveAudio?.dispose();
+              _adaptiveAudio = null;
               _isAdaptive = false;
             }
           }
@@ -2414,7 +3358,9 @@ class _VideoPageState extends State<_VideoPage> {
         if (muxedUrl != null) {
           try {
             _vpc = VideoPlayerController.networkUrl(
-                Uri.parse(muxedUrl), httpHeaders: dlHdrs);
+              Uri.parse(muxedUrl),
+              httpHeaders: dlHdrs,
+            );
             await _vpc!.initialize().timeout(const Duration(seconds: 20));
             _isAdaptive = false;
             _actualQualityLabel = '${muxedFmt!['height']}p';
@@ -2425,7 +3371,8 @@ class _VideoPageState extends State<_VideoPage> {
             return; // ✅ InnerTube muxed success
           } catch (e) {
             debugPrint('InnerTube muxed init failed: $e');
-            await _vpc?.dispose(); _vpc = null;
+            await _vpc?.dispose();
+            _vpc = null;
           }
         }
       }
@@ -2445,19 +3392,28 @@ class _VideoPageState extends State<_VideoPage> {
         final bestAudio = audioStreams.isNotEmpty
             ? audioStreams.firstWhere(
                 (s) => s.audioCodec.toLowerCase().contains('mp4a'),
-                orElse: () => audioStreams.first)
+                orElse: () => audioStreams.first,
+              )
             : null;
         if (bestAudio != null) _audioStreamUrl = bestAudio.url.toString();
 
         // Video-only: closest to target, H.264 tiebreaker
-        final videoValid = manifest.videoOnly.where((s) => s.videoResolution.height <= targetH).toList();
+        final videoValid = manifest.videoOnly
+            .where((s) => s.videoResolution.height <= targetH)
+            .toList();
         VideoOnlyStreamInfo? pick;
         if (videoValid.isEmpty) {
-          final all = manifest.videoOnly.toList()..sort((a, b) => a.videoResolution.height.compareTo(b.videoResolution.height));
+          final all = manifest.videoOnly.toList()
+            ..sort(
+              (a, b) =>
+                  a.videoResolution.height.compareTo(b.videoResolution.height),
+            );
           pick = all.isNotEmpty ? all.first : null;
         } else {
           videoValid.sort((a, b) {
-            final hCmp = b.videoResolution.height.compareTo(a.videoResolution.height);
+            final hCmp = b.videoResolution.height.compareTo(
+              a.videoResolution.height,
+            );
             if (hCmp != 0) return hCmp;
             final isAvcA = a.videoCodec.toLowerCase().contains('avc') ? 1 : 0;
             final isAvcB = b.videoCodec.toLowerCase().contains('avc') ? 1 : 0;
@@ -2469,16 +3425,22 @@ class _VideoPageState extends State<_VideoPage> {
         if (pick != null && bestAudio != null) {
           try {
             final ctrl = VideoPlayerController.networkUrl(
-                Uri.parse(pick.url.toString()), httpHeaders: dlHdrs);
+              Uri.parse(pick.url.toString()),
+              httpHeaders: dlHdrs,
+            );
             await ctrl.initialize().timeout(const Duration(seconds: 25));
             await ctrl.setVolume(0.0);
 
             final adAudio = AudioPlayer();
-            await adAudio.setUrl(_audioStreamUrl!,
-              headers: Map<String, String>.from(dlHdrs),
-            ).timeout(const Duration(seconds: 15));
+            await adAudio
+                .setUrl(
+                  _audioStreamUrl!,
+                  headers: Map<String, String>.from(dlHdrs),
+                )
+                .timeout(const Duration(seconds: 15));
 
-            _vpc = ctrl; _adaptiveAudio = adAudio;
+            _vpc = ctrl;
+            _adaptiveAudio = adAudio;
             _isAdaptive = true;
             _actualQualityLabel = '${pick.videoResolution.height}p';
             _vpc!.addListener(_syncAudioState);
@@ -2491,20 +3453,28 @@ class _VideoPageState extends State<_VideoPage> {
             return; // ✅ explode adaptive success
           } catch (e) {
             debugPrint('explode adaptive attempt $attempt: $e');
-            _syncTimer?.cancel(); _syncTimer = null;
-            await _vpc?.dispose(); _vpc = null;
-            await _adaptiveAudio?.dispose(); _adaptiveAudio = null;
+            _syncTimer?.cancel();
+            _syncTimer = null;
+            await _vpc?.dispose();
+            _vpc = null;
+            await _adaptiveAudio?.dispose();
+            _adaptiveAudio = null;
             _isAdaptive = false;
           }
         }
 
         // Muxed fallback
         final muxed = manifest.muxed.toList()
-          ..sort((a, b) => b.videoResolution.height.compareTo(a.videoResolution.height));
+          ..sort(
+            (a, b) =>
+                b.videoResolution.height.compareTo(a.videoResolution.height),
+          );
         for (final s in muxed) {
           try {
             _vpc = VideoPlayerController.networkUrl(
-                Uri.parse(s.url.toString()), httpHeaders: dlHdrs);
+              Uri.parse(s.url.toString()),
+              httpHeaders: dlHdrs,
+            );
             await _vpc!.initialize().timeout(const Duration(seconds: 20));
             _isAdaptive = false;
             _actualQualityLabel = '${s.videoResolution.height}p';
@@ -2513,21 +3483,30 @@ class _VideoPageState extends State<_VideoPage> {
             if (mounted) setState(() => _loading = false);
             _scheduleHide();
             return; // ✅ explode muxed success
-          } catch (_) { await _vpc?.dispose(); _vpc = null; }
+          } catch (_) {
+            await _vpc?.dispose();
+            _vpc = null;
+          }
         }
 
         // Audio-only last resort
         if (_audioStreamUrl != null) {
-          if (mounted) setState(() { _audioOnly = true; });
+          if (mounted)
+            setState(() {
+              _audioOnly = true;
+            });
           await _BgAudio.play(widget.video, streamUrl: _audioStreamUrl);
           if (mounted) setState(() => _loading = false);
           return;
         }
-
       } catch (e) {
         debugPrint('_initPlayer PASS2 attempt $attempt: $e');
         if (attempt == 2) {
-          if (mounted) setState(() { _loading = false; _error = true; });
+          if (mounted)
+            setState(() {
+              _loading = false;
+              _error = true;
+            });
         } else {
           await Future.delayed(const Duration(seconds: 3));
         }
@@ -2546,11 +3525,6 @@ class _VideoPageState extends State<_VideoPage> {
       }
     });
   }
-
-
-
-
-
 
   /// Sync audio play/pause state to video player state
   void _syncAudioState() {
@@ -2607,7 +3581,10 @@ class _VideoPageState extends State<_VideoPage> {
   void _toggleFullscreen() {
     setState(() => _isFullscreen = !_isFullscreen);
     if (_isFullscreen) {
-      SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -2624,40 +3601,78 @@ class _VideoPageState extends State<_VideoPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Row(children: [
-              const Expanded(child: Text('Video Quality',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600))),
-              if (_actualQualityLabel != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: _isAdaptive ? const Color(0xFFCC0000) : Colors.white12,
-                    borderRadius: BorderRadius.circular(4)),
-                  child: Text('Playing: $_actualQualityLabel',
-                    style: const TextStyle(color: Colors.white70, fontSize: 11))),
-            ]),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Video Quality',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (_actualQualityLabel != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _isAdaptive
+                          ? const Color(0xFFCC0000)
+                          : Colors.white12,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Playing: $_actualQualityLabel',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           ...options.map((q) {
             final isCurrent = q == savedPref; // highlight saved preference
             return ListTile(
               dense: true,
               leading: Icon(
-                q == 'Smart' ? Icons.auto_awesome
-                  : (q == '1080p' || q == '720p') ? Icons.hd : Icons.sd,
-                color: isCurrent ? const Color(0xFFFF0000) : Colors.white54, size: 20),
-              title: Text(q == 'Smart' ? 'Smart (Auto)' : q, style: TextStyle(
-                color: isCurrent ? const Color(0xFFFF0000) : Colors.white,
-                fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal)),
-              subtitle: q == 'Smart' ? const Text('Best for your network',
-                style: TextStyle(color: Colors.white38, fontSize: 11)) : null,
+                q == 'Smart'
+                    ? Icons.auto_awesome
+                    : (q == '1080p' || q == '720p')
+                    ? Icons.hd
+                    : Icons.sd,
+                color: isCurrent ? const Color(0xFFFF0000) : Colors.white54,
+                size: 20,
+              ),
+              title: Text(
+                q == 'Smart' ? 'Smart (Auto)' : q,
+                style: TextStyle(
+                  color: isCurrent ? const Color(0xFFFF0000) : Colors.white,
+                  fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+              subtitle: q == 'Smart'
+                  ? const Text(
+                      'Best for your network',
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                    )
+                  : null,
               trailing: isCurrent
-                ? const Icon(Icons.check, color: Color(0xFFFF0000), size: 18) : null,
+                  ? const Icon(Icons.check, color: Color(0xFFFF0000), size: 18)
+                  : null,
               onTap: () async {
                 Navigator.pop(context);
                 if (q != savedPref) await _changeQuality(q);
@@ -2675,17 +3690,24 @@ class _VideoPageState extends State<_VideoPage> {
     await prefs.setString('yt_video_quality', quality);
     if (!mounted) return;
     // Stop current streams cleanly
-    _syncTimer?.cancel(); _syncTimer = null;
+    _syncTimer?.cancel();
+    _syncTimer = null;
     _vpc?.removeListener(_syncAudioState);
     await _adaptiveAudio?.pause();
-    await _adaptiveAudio?.dispose(); _adaptiveAudio = null;
+    await _adaptiveAudio?.dispose();
+    _adaptiveAudio = null;
     await _vpc?.pause();
-    final oldVpc = _vpc; _vpc = null;
+    final oldVpc = _vpc;
+    _vpc = null;
     await oldVpc?.dispose();
     _isAdaptive = false;
     _actualQualityLabel = null;
     WakelockPlus.disable();
-    if (mounted) setState(() { _loading = true; _error = false; });
+    if (mounted)
+      setState(() {
+        _loading = true;
+        _error = false;
+      });
     await _initPlayer();
   }
 
@@ -2707,36 +3729,68 @@ class _VideoPageState extends State<_VideoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
-      body: SafeArea(child: Column(children: [
-        _buildPlayer(),
-        Expanded(child: CustomScrollView(slivers: [
-          SliverToBoxAdapter(child: _buildMeta()),
-          SliverToBoxAdapter(child: _buildActions()),
-          SliverToBoxAdapter(child: _buildDesc()),
-          const SliverToBoxAdapter(child: Divider(color: Colors.white12, height: 1)),
-          SliverToBoxAdapter(child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: const Text('Up next',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-          )),
-          if (_related.isEmpty)
-            const SliverToBoxAdapter(child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator(color: Color(0xFFFF0000), strokeWidth: 2)),
-            ))
-          else
-            SliverList(delegate: SliverChildBuilderDelegate(
-              (_, i) => _VCard(
-                video: _related[i],
-                compact: true,
-                onTap: () => Navigator.of(context).pushReplacement(MaterialPageRoute(
-                  builder: (_) => _VideoPage(video: _related[i], onMinimize: widget.onMinimize),
-                )),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildPlayer(),
+            Expanded(
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(child: _buildMeta()),
+                  SliverToBoxAdapter(child: _buildActions()),
+                  SliverToBoxAdapter(child: _buildDesc()),
+                  const SliverToBoxAdapter(
+                    child: Divider(color: Colors.white12, height: 1),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                      child: const Text(
+                        'Up next',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_related.isEmpty)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFFF0000),
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => _VCard(
+                          video: _related[i],
+                          compact: true,
+                          onTap: () => Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => _VideoPage(
+                                video: _related[i],
+                                onMinimize: widget.onMinimize,
+                              ),
+                            ),
+                          ),
+                        ),
+                        childCount: _related.length,
+                      ),
+                    ),
+                ],
               ),
-              childCount: _related.length,
-            )),
-        ])),
-      ])),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2745,315 +3799,521 @@ class _VideoPageState extends State<_VideoPage> {
     final h = w * 9 / 16;
     return GestureDetector(
       onTap: _toggleControls,
-      child: Container(width: w, height: h, color: Colors.black,
-        child: Stack(alignment: Alignment.center, children: [
-          if (_loading)
-            const CircularProgressIndicator(color: Color(0xFFFF0000))
-          else if (_error)
-            Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 40),
-              const SizedBox(height: 8),
-              const Text('Could not load video', style: TextStyle(color: Colors.white70)),
-              TextButton(onPressed: _initPlayer,
-                  child: const Text('Retry', style: TextStyle(color: Color(0xFF3EA6FF)))),
-            ])
-          else if (_audioOnly)
-            Stack(children: [
-              _Thumb(url: widget.video.thumb, w: w, h: h),
-              Container(width: w, height: h, color: Colors.black54),
-              const Center(child: Icon(Icons.music_note, color: Colors.white60, size: 64)),
-            ])
-          else if (_vpc != null && _vpc!.value.isInitialized)
-            AspectRatio(aspectRatio: _vpc!.value.aspectRatio, child: VideoPlayer(_vpc!)),
+      child: Container(
+        width: w,
+        height: h,
+        color: Colors.black,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (_loading)
+              const CircularProgressIndicator(color: Color(0xFFFF0000))
+            else if (_error)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 40),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Could not load video',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  TextButton(
+                    onPressed: _initPlayer,
+                    child: const Text(
+                      'Retry',
+                      style: TextStyle(color: Color(0xFF3EA6FF)),
+                    ),
+                  ),
+                ],
+              )
+            else if (_audioOnly)
+              Stack(
+                children: [
+                  _Thumb(url: widget.video.thumb, w: w, h: h),
+                  Container(width: w, height: h, color: Colors.black54),
+                  const Center(
+                    child: Icon(
+                      Icons.music_note,
+                      color: Colors.white60,
+                      size: 64,
+                    ),
+                  ),
+                ],
+              )
+            else if (_vpc != null && _vpc!.value.isInitialized)
+              AspectRatio(
+                aspectRatio: _vpc!.value.aspectRatio,
+                child: VideoPlayer(_vpc!),
+              ),
 
-          // Controls overlay
-          if (_ctrlVisible && !_loading && !_error)
-            _buildControls(w, h),
+            // Controls overlay
+            if (_ctrlVisible && !_loading && !_error) _buildControls(w, h),
 
-          // Back/minimize chevron + Fullscreen button + Quality button — auto-hide
-          IgnorePointer(
-            ignoring: !_ctrlVisible,
-            child: AnimatedOpacity(
-              opacity: _ctrlVisible ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 250),
-              child: SizedBox(width: w, height: h,
-                child: Stack(children: [
-                  // ← Minimize / close (top-left)
-                  Positioned(top: 8, left: 8,
-                    child: GestureDetector(
-                      onTap: _minimize,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                        child: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 24),
-                      ),
-                    ),
-                  ),
-                  // Quality picker button (top-right, left of fullscreen)
-                  Positioned(top: 10, right: 46,
-                    child: GestureDetector(
-                      onTap: _showQualityPicker,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: _isAdaptive ? const Color(0xFFCC0000) : Colors.black54,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _actualQualityLabel ?? '480p',
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+            // Back/minimize chevron + Fullscreen button + Quality button — auto-hide
+            IgnorePointer(
+              ignoring: !_ctrlVisible,
+              child: AnimatedOpacity(
+                opacity: _ctrlVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 250),
+                child: SizedBox(
+                  width: w,
+                  height: h,
+                  child: Stack(
+                    children: [
+                      // ← Minimize / close (top-left)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: GestureDetector(
+                          onTap: _minimize,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  // → Fullscreen / landscape toggle (top-right)
-                  Positioned(top: 8, right: 8,
-                    child: GestureDetector(
-                      onTap: _toggleFullscreen,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                        child: Icon(_isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen, color: Colors.white, size: 24),
+                      // Quality picker button (top-right, left of fullscreen)
+                      Positioned(
+                        top: 10,
+                        right: 46,
+                        child: GestureDetector(
+                          onTap: _showQualityPicker,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _isAdaptive
+                                  ? const Color(0xFFCC0000)
+                                  : Colors.black54,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _actualQualityLabel ?? '480p',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                      // → Fullscreen / landscape toggle (top-right)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: GestureDetector(
+                          onTap: _toggleFullscreen,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Icon(
+                              _isFullscreen
+                                  ? Icons.fullscreen_exit
+                                  : Icons.fullscreen,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ]),
+                ),
               ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildControls(double w, double h) {
-    final playing = _audioOnly ? _BgAudio.isPlaying : (_vpc?.value.isPlaying ?? false);
+    final playing = _audioOnly
+        ? _BgAudio.isPlaying
+        : (_vpc?.value.isPlaying ?? false);
     return AnimatedOpacity(
       opacity: _ctrlVisible ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 200),
-      child: Container(width: w, height: h,
-        decoration: const BoxDecoration(gradient: LinearGradient(
-          colors: [Colors.black54, Colors.transparent, Colors.black87],
-          begin: Alignment.topCenter, end: Alignment.bottomCenter,
-        )),
-        child: Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          // Quality badge
-          if (_actualQualityLabel != null)
-            Align(alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 40, 52, 0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: _isAdaptive ? const Color(0xFFFF0000) : Colors.black54,
-                    borderRadius: BorderRadius.circular(4),
+      child: Container(
+        width: w,
+        height: h,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.black54, Colors.transparent, Colors.black87],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Quality badge
+            if (_actualQualityLabel != null)
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 40, 52, 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _isAdaptive
+                          ? const Color(0xFFFF0000)
+                          : Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _actualQualityLabel!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                  child: Text(_actualQualityLabel!,
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
-              ),
-            )
-          else const SizedBox(),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            IconButton(
-              icon: const Icon(Icons.replay_10, color: Colors.white, size: 36),
-              onPressed: () {
-                if (_vpc != null) {
-                  _seekBoth(_vpc!.value.position - const Duration(seconds: 10));
-                }
-              },
-            ),
-            const SizedBox(width: 16),
-            IconButton(
-              iconSize: 60,
-              icon: Icon(playing ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                  color: Colors.white, size: 60),
-              onPressed: () {
-                setState(() {
-                  if (_audioOnly) {
-                    if (_BgAudio.isPlaying) { _BgAudio.player.pause(); } else { _BgAudio.player.play(); }
-                  } else if (_vpc != null) {
-                    if (_vpc!.value.isPlaying) {
-                      _vpc!.pause();
-                      if (_isAdaptive) _adaptiveAudio?.pause();
-                    } else {
-                      _vpc!.play();
-                      if (_isAdaptive) _adaptiveAudio?.play();
+              )
+            else
+              const SizedBox(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.replay_10,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                  onPressed: () {
+                    if (_vpc != null) {
+                      _seekBoth(
+                        _vpc!.value.position - const Duration(seconds: 10),
+                      );
                     }
-                  }
-                });
-                _scheduleHide();
-              },
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-            const SizedBox(width: 16),
-            IconButton(
-              icon: const Icon(Icons.forward_10, color: Colors.white, size: 36),
-              onPressed: () {
-                if (_vpc != null) {
-                  _seekBoth(_vpc!.value.position + const Duration(seconds: 10));
-                }
-              },
-            ),
-          ]),
-          if (!_audioOnly && _vpc != null)
-            ValueListenableBuilder<VideoPlayerValue>(
-              valueListenable: _vpc!,
-              builder: (_, value, __) {
-                final pos = value.position.inMilliseconds.toDouble();
-                final dur = value.duration.inMilliseconds.toDouble();
-                final buf = value.buffered.isNotEmpty ? value.buffered.last.end.inMilliseconds.toDouble() : 0.0;
-                return Column(children: [
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 3,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                      activeTrackColor: const Color(0xFFFF0000),
-                      inactiveTrackColor: Colors.white24,
-                      secondaryActiveTrackColor: Colors.white38, // buffered
-                      thumbColor: Colors.white,
-                      overlayColor: Colors.white24,
-                    ),
-                    child: Slider(
-                      value: dur > 0 ? pos.clamp(0.0, dur) : 0.0,
-                      max: dur > 0 ? dur : 1.0,
-                      secondaryTrackValue: dur > 0 ? buf.clamp(0.0, dur) : 0.0,
-                      onChanged: (v) {
-                        // Show position preview without seeking yet
-                        setState(() {});
-                      },
-                      onChangeEnd: (v) {
-                        _seekBoth(Duration(milliseconds: v.toInt()));
-                      },
-                    ),
+                  },
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  iconSize: 60,
+                  icon: Icon(
+                    playing
+                        ? Icons.pause_circle_filled
+                        : Icons.play_circle_filled,
+                    color: Colors.white,
+                    size: 60,
                   ),
-                  Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Text(_fmtDur(value.position), style: const TextStyle(color: Colors.white, fontSize: 11)),
-                      Text(_fmtDur(value.duration), style: const TextStyle(color: Colors.white60, fontSize: 11)),
-                    ]),
+                  onPressed: () {
+                    setState(() {
+                      if (_audioOnly) {
+                        if (_BgAudio.isPlaying) {
+                          _BgAudio.player.pause();
+                        } else {
+                          _BgAudio.player.play();
+                        }
+                      } else if (_vpc != null) {
+                        if (_vpc!.value.isPlaying) {
+                          _vpc!.pause();
+                          if (_isAdaptive) _adaptiveAudio?.pause();
+                        } else {
+                          _vpc!.play();
+                          if (_isAdaptive) _adaptiveAudio?.play();
+                        }
+                      }
+                    });
+                    _scheduleHide();
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  icon: const Icon(
+                    Icons.forward_10,
+                    color: Colors.white,
+                    size: 36,
                   ),
-                ]);
-              },
-            )
-          else
-            const SizedBox(height: 12),
-        ]),
+                  onPressed: () {
+                    if (_vpc != null) {
+                      _seekBoth(
+                        _vpc!.value.position + const Duration(seconds: 10),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+            if (!_audioOnly && _vpc != null)
+              ValueListenableBuilder<VideoPlayerValue>(
+                valueListenable: _vpc!,
+                builder: (_, value, __) {
+                  final pos = value.position.inMilliseconds.toDouble();
+                  final dur = value.duration.inMilliseconds.toDouble();
+                  final buf = value.buffered.isNotEmpty
+                      ? value.buffered.last.end.inMilliseconds.toDouble()
+                      : 0.0;
+                  return Column(
+                    children: [
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 3,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 6,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 14,
+                          ),
+                          activeTrackColor: const Color(0xFFFF0000),
+                          inactiveTrackColor: Colors.white24,
+                          secondaryActiveTrackColor: Colors.white38, // buffered
+                          thumbColor: Colors.white,
+                          overlayColor: Colors.white24,
+                        ),
+                        child: Slider(
+                          value: dur > 0 ? pos.clamp(0.0, dur) : 0.0,
+                          max: dur > 0 ? dur : 1.0,
+                          secondaryTrackValue: dur > 0
+                              ? buf.clamp(0.0, dur)
+                              : 0.0,
+                          onChanged: (v) {
+                            // Show position preview without seeking yet
+                            setState(() {});
+                          },
+                          onChangeEnd: (v) {
+                            _seekBoth(Duration(milliseconds: v.toInt()));
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _fmtDur(value.position),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                              ),
+                            ),
+                            Text(
+                              _fmtDur(value.duration),
+                              style: const TextStyle(
+                                color: Colors.white60,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              )
+            else
+              const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildMeta() => Padding(
     padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(widget.video.title,
-          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 4),
-      Text([if (widget.video.viewCount.isNotEmpty) widget.video.viewCount,
-        if (widget.video.age.isNotEmpty) widget.video.age].join(' • '),
-          style: const TextStyle(color: Colors.white54, fontSize: 13)),
-      const SizedBox(height: 12),
-      // Channel row
-      Row(children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: const Color(0xFF333333),
-          child: Text(
-            widget.video.channel.isNotEmpty ? widget.video.channel[0].toUpperCase() : 'C',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.video.title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(child: Text(widget.video.channel,
-          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-          maxLines: 1, overflow: TextOverflow.ellipsis,
-        )),
-        GestureDetector(
-          onTap: _toggleSubscribe,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: _subscribed ? const Color(0xFF272727) : const Color(0xFFFF0000),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              _subscribed ? 'Subscribed' : 'Subscribe',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-          ),
+        const SizedBox(height: 4),
+        Text(
+          [
+            if (widget.video.viewCount.isNotEmpty) widget.video.viewCount,
+            if (widget.video.age.isNotEmpty) widget.video.age,
+          ].join(' • '),
+          style: const TextStyle(color: Colors.white54, fontSize: 13),
         ),
-      ]),
-      const SizedBox(height: 4),
-    ]),
+        const SizedBox(height: 12),
+        // Channel row
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: const Color(0xFF333333),
+              child: Text(
+                widget.video.channel.isNotEmpty
+                    ? widget.video.channel[0].toUpperCase()
+                    : 'C',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                widget.video.channel,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            GestureDetector(
+              onTap: _toggleSubscribe,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _subscribed
+                      ? const Color(0xFF272727)
+                      : const Color(0xFFFF0000),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _subscribed ? 'Subscribed' : 'Subscribe',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+      ],
+    ),
   );
 
   Widget _buildActions() {
-    return SizedBox(height: 72, child: ListView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      children: [
-        // Like
-        _ActionChip(
-          icon: _liked ? Icons.thumb_up : Icons.thumb_up_outlined,
-          label: 'Like',
-          active: _liked,
-          onTap: () {
-            setState(() { _liked = !_liked; if (_liked) { _disliked = false; _saveLikedVideo(); } });
-          },
-        ),
-        // Dislike
-        _ActionChip(
-          icon: _disliked ? Icons.thumb_down : Icons.thumb_down_outlined,
-          label: 'Dislike',
-          active: _disliked,
-          onTap: () {
-            setState(() { _disliked = !_disliked; if (_disliked) { _liked = false; _saveLikedVideo(remove: true); } });
-          },
-        ),
-        // Share
-        _ActionChip(
-          icon: Icons.share_outlined,
-          label: 'Share',
-          onTap: () => Share.share('https://www.youtube.com/watch?v=${widget.video.id}', subject: widget.video.title),
-        ),
-        // Download — best quality
-        _ActionChip(
-          icon: Icons.download_outlined,
-          label: 'Download',
-          onTap: () async {
-            context.read<YTDownloadProvider>().addDownload(
-              'https://www.youtube.com/watch?v=${widget.video.id}', VideoQuality.p1080);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Downloading best quality...'), duration: Duration(seconds: 2)));
-            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const YTDownloaderScreen()));
-          },
-        ),
-        // Save to bookmarks
-        _ActionChip(
-          icon: _saved ? Icons.bookmark : Icons.bookmark_border,
-          label: 'Save',
-          active: _saved,
-          onTap: () => _showSaveSheet(context),
-        ),
-        // Background play — minimizes to mini-player, audio continues when screen off / app closed
-        _ActionChip(
-          icon: Icons.headphones,
-          label: 'BG Play',
-          onTap: () => _minimize(),
-        ),
-      ],
-    ));
+    return SizedBox(
+      height: 72,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        children: [
+          // Like
+          _ActionChip(
+            icon: _liked ? Icons.thumb_up : Icons.thumb_up_outlined,
+            label: 'Like',
+            active: _liked,
+            onTap: () {
+              setState(() {
+                _liked = !_liked;
+                if (_liked) {
+                  _disliked = false;
+                  _saveLikedVideo();
+                }
+              });
+            },
+          ),
+          // Dislike
+          _ActionChip(
+            icon: _disliked ? Icons.thumb_down : Icons.thumb_down_outlined,
+            label: 'Dislike',
+            active: _disliked,
+            onTap: () {
+              setState(() {
+                _disliked = !_disliked;
+                if (_disliked) {
+                  _liked = false;
+                  _saveLikedVideo(remove: true);
+                }
+              });
+            },
+          ),
+          // Share
+          _ActionChip(
+            icon: Icons.share_outlined,
+            label: 'Share',
+            onTap: () => Share.share(
+              'https://www.youtube.com/watch?v=${widget.video.id}',
+              subject: widget.video.title,
+            ),
+          ),
+          // Download — best quality
+          _ActionChip(
+            icon: Icons.download_outlined,
+            label: 'Download',
+            onTap: () async {
+              context.read<YTDownloadProvider>().addDownload(
+                'https://www.youtube.com/watch?v=${widget.video.id}',
+                VideoQuality.p1080,
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Downloading best quality...'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const YTDownloaderScreen()),
+              );
+            },
+          ),
+          // Save to bookmarks
+          _ActionChip(
+            icon: _saved ? Icons.bookmark : Icons.bookmark_border,
+            label: 'Save',
+            active: _saved,
+            onTap: () => _showSaveSheet(context),
+          ),
+          // Background play — minimizes to mini-player, audio continues when screen off / app closed
+          _ActionChip(
+            icon: Icons.headphones,
+            label: 'BG Play',
+            onTap: () => _minimize(),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _saveLikedVideo({bool remove = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final v = widget.video;
     final raw = prefs.getStringList('yt_liked') ?? [];
-    final entry = json.encode({'id': v.id, 'title': v.title, 'channel': v.channel,
-      'thumb': v.thumb, 'duration': v.duration, 'viewCount': v.viewCount, 'age': v.age, 'channelId': v.channelId});
+    final entry = json.encode({
+      'id': v.id,
+      'title': v.title,
+      'channel': v.channel,
+      'thumb': v.thumb,
+      'duration': v.duration,
+      'viewCount': v.viewCount,
+      'age': v.age,
+      'channelId': v.channelId,
+    });
     if (remove) {
       raw.removeWhere((e) => (json.decode(e) as Map)['id'] == v.id);
     } else {
@@ -3061,7 +4321,10 @@ class _VideoPageState extends State<_VideoPage> {
       raw.insert(0, entry);
       if (mounted) setState(() => _liked = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saved to Liked Videos'), duration: Duration(seconds: 1)),
+        const SnackBar(
+          content: Text('Saved to Liked Videos'),
+          duration: Duration(seconds: 1),
+        ),
       );
     }
     await prefs.setStringList('yt_liked', raw.take(500).toList());
@@ -3088,16 +4351,29 @@ class _VideoPageState extends State<_VideoPage> {
   Future<void> _toggleSubscribe() async {
     if (widget.video.channelId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Channel info not available'), duration: Duration(seconds: 1)));
+        const SnackBar(
+          content: Text('Channel info not available'),
+          duration: Duration(seconds: 1),
+        ),
+      );
       return;
     }
     if (_subscribed) {
       await _SubStore.remove(widget.video.channelId);
       if (mounted) setState(() => _subscribed = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unsubscribed from ${widget.video.channel}'), duration: const Duration(seconds: 1)));
+        SnackBar(
+          content: Text('Unsubscribed from ${widget.video.channel}'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
     } else {
-      final ch = YtChannel(id: widget.video.channelId, name: widget.video.channel, thumb: '', subs: '');
+      final ch = YtChannel(
+        id: widget.video.channelId,
+        name: widget.video.channel,
+        thumb: '',
+        subs: '',
+      );
       try {
         final found = await _YtSvc.findChannel(widget.video.channel);
         await _SubStore.add(found ?? ch);
@@ -3106,27 +4382,51 @@ class _VideoPageState extends State<_VideoPage> {
       }
       if (mounted) setState(() => _subscribed = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Subscribed to ${widget.video.channel}'), duration: const Duration(seconds: 1)));
+        SnackBar(
+          content: Text('Subscribed to ${widget.video.channel}'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
     }
   }
 
   Widget _buildDesc() {
-
     if (_desc.isEmpty) return const SizedBox(height: 8);
-    final show = _descExpanded ? _desc : (_desc.length > 120 ? _desc.substring(0, 120) : _desc);
+    final show = _descExpanded
+        ? _desc
+        : (_desc.length > 120 ? _desc.substring(0, 120) : _desc);
     return GestureDetector(
       onTap: () => setState(() => _descExpanded = !_descExpanded),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         child: Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(8)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(show, style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5)),
-            const SizedBox(height: 6),
-            Text(_descExpanded ? 'Show less' : 'Show more',
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-          ]),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                show,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _descExpanded ? 'Show less' : 'Show more',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3139,15 +4439,22 @@ class _VideoPageState extends State<_VideoPage> {
 class _MiniPlayer extends StatefulWidget {
   final YtVid video;
   final VoidCallback onExpand, onClose;
-  const _MiniPlayer({required this.video, required this.onExpand, required this.onClose});
-  @override State<_MiniPlayer> createState() => _MiniPlayerState();
+  const _MiniPlayer({
+    required this.video,
+    required this.onExpand,
+    required this.onClose,
+  });
+  @override
+  State<_MiniPlayer> createState() => _MiniPlayerState();
 }
 
 class _MiniPlayerState extends State<_MiniPlayer> {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: 56, left: 0, right: 0,
+      bottom: 56,
+      left: 0,
+      right: 0,
       child: GestureDetector(
         onTap: widget.onExpand,
         child: Container(
@@ -3157,34 +4464,66 @@ class _MiniPlayerState extends State<_MiniPlayer> {
             border: Border(top: BorderSide(color: Color(0xFF333333))),
             boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 8)],
           ),
-          child: Row(children: [
-            ClipRRect(child: _Thumb(url: widget.video.thumb, w: 100, h: 64)),
-            const SizedBox(width: 8),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(widget.video.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 2),
-              Text(widget.video.channel, maxLines: 1,
-                  style: const TextStyle(color: Colors.white54, fontSize: 11)),
-            ])),
-            // Play/pause
-            StreamBuilder<PlayerState>(
-              stream: _BgAudio.player.playerStateStream,
-              builder: (_, snap) {
-                final playing = snap.data?.playing ?? false;
-                return IconButton(
-                  icon: Icon(playing ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 24),
-                  onPressed: () {
-                    if (playing) { _BgAudio.player.pause(); } else { _BgAudio.player.play(); }
-                    setState(() {});
-                  },
-                );
-              },
-            ),
-            IconButton(icon: const Icon(Icons.close, color: Colors.white54, size: 20),
-              onPressed: widget.onClose, padding: const EdgeInsets.all(8)),
-          ]),
+          child: Row(
+            children: [
+              ClipRRect(child: _Thumb(url: widget.video.thumb, w: 100, h: 64)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.video.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.video.channel,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Play/pause
+              StreamBuilder<PlayerState>(
+                stream: _BgAudio.player.playerStateStream,
+                builder: (_, snap) {
+                  final playing = snap.data?.playing ?? false;
+                  return IconButton(
+                    icon: Icon(
+                      playing ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    onPressed: () {
+                      if (playing) {
+                        _BgAudio.player.pause();
+                      } else {
+                        _BgAudio.player.play();
+                      }
+                      setState(() {});
+                    },
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                onPressed: widget.onClose,
+                padding: const EdgeInsets.all(8),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3195,28 +4534,53 @@ class _MiniPlayerState extends State<_MiniPlayer> {
 // Shared Widgets
 // ─────────────────────────────────────────────────────────────────────────────
 class _Thumb extends StatelessWidget {
-  final String url; final double w, h;
+  final String url;
+  final double w, h;
   const _Thumb({required this.url, required this.w, required this.h});
 
   @override
   Widget build(BuildContext context) {
     if (url.isEmpty) {
-      return Container(width: w, height: h, color: const Color(0xFF1A1A1A),
-          child: const Icon(Icons.videocam, color: Colors.white24));
+      return Container(
+        width: w,
+        height: h,
+        color: const Color(0xFF1A1A1A),
+        child: const Icon(Icons.videocam, color: Colors.white24),
+      );
     }
-    return Image.network(url, width: w, height: h, fit: BoxFit.cover,
-        errorBuilder: (_, a, b) => Container(width: w, height: h, color: const Color(0xFF1A1A1A),
-            child: const Icon(Icons.broken_image, color: Colors.white24)));
+    return Image.network(
+      url,
+      width: w,
+      height: h,
+      fit: BoxFit.cover,
+      errorBuilder: (_, a, b) => Container(
+        width: w,
+        height: h,
+        color: const Color(0xFF1A1A1A),
+        child: const Icon(Icons.broken_image, color: Colors.white24),
+      ),
+    );
   }
 }
 
 class _DurBadge extends StatelessWidget {
   final String dur;
   const _DurBadge(this.dur);
-  @override Widget build(BuildContext context) => Container(
+  @override
+  Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-    decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(3)),
-    child: Text(dur, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+    decoration: BoxDecoration(
+      color: Colors.black87,
+      borderRadius: BorderRadius.circular(3),
+    ),
+    child: Text(
+      dur,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
   );
 }
 
@@ -3228,7 +4592,12 @@ class _ActionChip extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final bool active;
-  const _ActionChip({required this.icon, required this.label, required this.onTap, this.active = false});
+  const _ActionChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+  });
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -3239,15 +4608,32 @@ class _ActionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFFF0000).withValues(alpha: 0.25) : const Color(0xFF272727),
+          color: active
+              ? const Color(0xFFFF0000).withValues(alpha: 0.25)
+              : const Color(0xFF272727),
           borderRadius: BorderRadius.circular(20),
-          border: active ? Border.all(color: const Color(0xFFFF0000), width: 1.5) : null,
+          border: active
+              ? Border.all(color: const Color(0xFFFF0000), width: 1.5)
+              : null,
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, color: active ? const Color(0xFFFF0000) : Colors.white, size: 18),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: active ? const Color(0xFFFF0000) : Colors.white, fontSize: 13)),
-        ]),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: active ? const Color(0xFFFF0000) : Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: active ? const Color(0xFFFF0000) : Colors.white,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -3259,19 +4645,27 @@ class _ActionChip extends StatelessWidget {
 class YtHistoryScreen extends StatefulWidget {
   final void Function(YtVid) onTap;
   const YtHistoryScreen({super.key, required this.onTap});
-  @override State<YtHistoryScreen> createState() => _YtHistoryScreenState();
+  @override
+  State<YtHistoryScreen> createState() => _YtHistoryScreenState();
 }
 
 class _YtHistoryScreenState extends State<YtHistoryScreen> {
   List<YtVid> _history = [];
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList('yt_history') ?? [];
-    setState(() => _history = raw.map((e) => YtVid.fromJson(json.decode(e) as Map<String, dynamic>)).toList());
+    setState(
+      () => _history = raw
+          .map((e) => YtVid.fromJson(json.decode(e) as Map<String, dynamic>))
+          .toList(),
+    );
   }
 
   Future<void> _clear() async {
@@ -3289,15 +4683,27 @@ class _YtHistoryScreenState extends State<YtHistoryScreen> {
       iconTheme: const IconThemeData(color: Colors.white),
       actions: [
         if (_history.isNotEmpty)
-          TextButton(onPressed: _clear, child: const Text('Clear', style: TextStyle(color: Colors.red))),
+          TextButton(
+            onPressed: _clear,
+            child: const Text('Clear', style: TextStyle(color: Colors.red)),
+          ),
       ],
     ),
     body: _history.isEmpty
-      ? const Center(child: Text('No watch history', style: TextStyle(color: Colors.white38)))
-      : ListView.builder(
-          itemCount: _history.length,
-          itemBuilder: (_, i) => _VCard(video: _history[i], onTap: () => widget.onTap(_history[i]), compact: true),
-        ),
+        ? const Center(
+            child: Text(
+              'No watch history',
+              style: TextStyle(color: Colors.white38),
+            ),
+          )
+        : ListView.builder(
+            itemCount: _history.length,
+            itemBuilder: (_, i) => _VCard(
+              video: _history[i],
+              onTap: () => widget.onTap(_history[i]),
+              compact: true,
+            ),
+          ),
   );
 }
 
@@ -3307,19 +4713,28 @@ class _YtHistoryScreenState extends State<YtHistoryScreen> {
 class YtLikedScreen extends StatefulWidget {
   final void Function(YtVid) onTap;
   const YtLikedScreen({super.key, required this.onTap});
-  @override State<YtLikedScreen> createState() => _YtLikedScreenState();
+  @override
+  State<YtLikedScreen> createState() => _YtLikedScreenState();
 }
 
 class _YtLikedScreenState extends State<YtLikedScreen> {
   List<YtVid> _liked = [];
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList('yt_liked') ?? [];
-    if (mounted) setState(() => _liked = raw.map((e) => YtVid.fromJson(json.decode(e) as Map<String, dynamic>)).toList());
+    if (mounted)
+      setState(
+        () => _liked = raw
+            .map((e) => YtVid.fromJson(json.decode(e) as Map<String, dynamic>))
+            .toList(),
+      );
   }
 
   Future<void> _remove(int index) async {
@@ -3330,21 +4745,23 @@ class _YtLikedScreenState extends State<YtLikedScreen> {
     raw.removeWhere((e) => (json.decode(e) as Map)['id'] == removed.id);
     await prefs.setStringList('yt_liked', raw);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Removed from Liked Videos'),
-        duration: const Duration(seconds: 2),
-        action: SnackBarAction(
-          label: 'Undo',
-          textColor: const Color(0xFFFF0000),
-          onPressed: () async {
-            final prefs2 = await SharedPreferences.getInstance();
-            final raw2 = prefs2.getStringList('yt_liked') ?? [];
-            raw2.insert(0, json.encode(removed.toJson()));
-            await prefs2.setStringList('yt_liked', raw2.take(500).toList());
-            _load();
-          },
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Removed from Liked Videos'),
+          duration: const Duration(seconds: 2),
+          action: SnackBarAction(
+            label: 'Undo',
+            textColor: const Color(0xFFFF0000),
+            onPressed: () async {
+              final prefs2 = await SharedPreferences.getInstance();
+              final raw2 = prefs2.getStringList('yt_liked') ?? [];
+              raw2.insert(0, json.encode(removed.toJson()));
+              await prefs2.setStringList('yt_liked', raw2.take(500).toList());
+              _load();
+            },
+          ),
         ),
-      ));
+      );
     }
   }
 
@@ -3353,29 +4770,40 @@ class _YtLikedScreenState extends State<YtLikedScreen> {
     backgroundColor: const Color(0xFF0F0F0F),
     appBar: AppBar(
       backgroundColor: const Color(0xFF0F0F0F),
-      title: Text('Liked Videos (${_liked.length})', style: const TextStyle(color: Colors.white)),
+      title: Text(
+        'Liked Videos (${_liked.length})',
+        style: const TextStyle(color: Colors.white),
+      ),
       iconTheme: const IconThemeData(color: Colors.white),
     ),
     body: _liked.isEmpty
-      ? const Center(child: Text('No liked videos yet', style: TextStyle(color: Colors.white38)))
-      : ListView.builder(
-          itemCount: _liked.length,
-          itemBuilder: (_, i) => Dismissible(
-            key: ValueKey(_liked[i].id),
-            direction: DismissDirection.endToStart,
-            background: Container(
-              alignment: Alignment.centerRight,
-              padding: const EdgeInsets.only(right: 20),
-              color: Colors.red.shade800,
-              child: const Icon(Icons.delete, color: Colors.white),
+        ? const Center(
+            child: Text(
+              'No liked videos yet',
+              style: TextStyle(color: Colors.white38),
             ),
-            onDismissed: (_) => _remove(i),
-            child: _VCard(video: _liked[i], onTap: () => widget.onTap(_liked[i]), compact: true),
+          )
+        : ListView.builder(
+            itemCount: _liked.length,
+            itemBuilder: (_, i) => Dismissible(
+              key: ValueKey(_liked[i].id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                color: Colors.red.shade800,
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
+              onDismissed: (_) => _remove(i),
+              child: _VCard(
+                video: _liked[i],
+                onTap: () => widget.onTap(_liked[i]),
+                compact: true,
+              ),
+            ),
           ),
-        ),
   );
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Playlists Screen (local user-created playlists)
@@ -3383,7 +4811,8 @@ class _YtLikedScreenState extends State<YtLikedScreen> {
 class YtPlaylistsScreen extends StatefulWidget {
   final void Function(YtVid) onTap;
   const YtPlaylistsScreen({super.key, required this.onTap});
-  @override State<YtPlaylistsScreen> createState() => _YtPlaylistsScreenState();
+  @override
+  State<YtPlaylistsScreen> createState() => _YtPlaylistsScreenState();
 }
 
 class _YtPlaylistsScreenState extends State<YtPlaylistsScreen> {
@@ -3391,16 +4820,24 @@ class _YtPlaylistsScreenState extends State<YtPlaylistsScreen> {
   final _ctrl = TextEditingController();
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys().where((k) => k.startsWith('yt_playlist_')).toList();
+    final keys = prefs
+        .getKeys()
+        .where((k) => k.startsWith('yt_playlist_'))
+        .toList();
     final result = <String, List<YtVid>>{};
     for (final k in keys) {
       final name = k.replaceFirst('yt_playlist_', '');
       final raw = prefs.getStringList(k) ?? [];
-      result[name] = raw.map((e) => YtVid.fromJson(json.decode(e) as Map<String, dynamic>)).toList();
+      result[name] = raw
+          .map((e) => YtVid.fromJson(json.decode(e) as Map<String, dynamic>))
+          .toList();
     }
     setState(() => _playlists = result);
   }
@@ -3420,23 +4857,44 @@ class _YtPlaylistsScreenState extends State<YtPlaylistsScreen> {
 
   void _showCreate() {
     _ctrl.clear();
-    showDialog(context: context, builder: (_) => AlertDialog(
-      backgroundColor: const Color(0xFF1E1E1E),
-      title: const Text('New Playlist', style: TextStyle(color: Colors.white)),
-      content: TextField(
-        controller: _ctrl, autofocus: true,
-        style: const TextStyle(color: Colors.white),
-        decoration: const InputDecoration(hintText: 'Playlist name', hintStyle: TextStyle(color: Colors.white38)),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF0000)),
-          onPressed: () { Navigator.pop(context); _createPlaylist(_ctrl.text); },
-          child: const Text('Create', style: TextStyle(color: Colors.white)),
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text(
+          'New Playlist',
+          style: TextStyle(color: Colors.white),
         ),
-      ],
-    ));
+        content: TextField(
+          controller: _ctrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Playlist name',
+            hintStyle: TextStyle(color: Colors.white38),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF0000),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _createPlaylist(_ctrl.text);
+            },
+            child: const Text('Create', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -3447,33 +4905,76 @@ class _YtPlaylistsScreenState extends State<YtPlaylistsScreen> {
       title: const Text('Playlists', style: TextStyle(color: Colors.white)),
       iconTheme: const IconThemeData(color: Colors.white),
       actions: [
-        IconButton(icon: const Icon(Icons.add, color: Colors.white), onPressed: _showCreate),
+        IconButton(
+          icon: const Icon(Icons.add, color: Colors.white),
+          onPressed: _showCreate,
+        ),
       ],
     ),
     body: _playlists.isEmpty
-      ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.playlist_play, size: 80, color: Colors.white12),
-          const SizedBox(height: 12),
-          const Text('No playlists yet', style: TextStyle(color: Colors.white38)),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _showCreate,
-            icon: const Icon(Icons.add),
-            label: const Text('Create Playlist'),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF0000), foregroundColor: Colors.white),
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.playlist_play,
+                  size: 80,
+                  color: Colors.white12,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'No playlists yet',
+                  style: TextStyle(color: Colors.white38),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _showCreate,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create Playlist'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF0000),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : ListView(
+            children: _playlists.entries
+                .map(
+                  (e) => ListTile(
+                    leading: const Icon(
+                      Icons.playlist_play,
+                      color: Colors.white,
+                    ),
+                    title: Text(
+                      e.key,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    subtitle: Text(
+                      '${e.value.length} videos',
+                      style: const TextStyle(color: Colors.white54),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.white38,
+                      ),
+                      onPressed: () => _deletePlaylist(e.key),
+                    ),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => _PlaylistDetailScreen(
+                          name: e.key,
+                          videos: e.value,
+                          onTap: widget.onTap,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
           ),
-        ]))
-      : ListView(children: _playlists.entries.map((e) => ListTile(
-          leading: const Icon(Icons.playlist_play, color: Colors.white),
-          title: Text(e.key, style: const TextStyle(color: Colors.white)),
-          subtitle: Text('${e.value.length} videos', style: const TextStyle(color: Colors.white54)),
-          trailing: IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.white38),
-            onPressed: () => _deletePlaylist(e.key),
-          ),
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) =>
-            _PlaylistDetailScreen(name: e.key, videos: e.value, onTap: widget.onTap))),
-        )).toList()),
   );
 }
 
@@ -3481,7 +4982,11 @@ class _PlaylistDetailScreen extends StatelessWidget {
   final String name;
   final List<YtVid> videos;
   final void Function(YtVid) onTap;
-  const _PlaylistDetailScreen({required this.name, required this.videos, required this.onTap});
+  const _PlaylistDetailScreen({
+    required this.name,
+    required this.videos,
+    required this.onTap,
+  });
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFF0F0F0F),
@@ -3491,11 +4996,20 @@ class _PlaylistDetailScreen extends StatelessWidget {
       iconTheme: const IconThemeData(color: Colors.white),
     ),
     body: videos.isEmpty
-      ? const Center(child: Text('No videos in this playlist', style: TextStyle(color: Colors.white38)))
-      : ListView.builder(
-          itemCount: videos.length,
-          itemBuilder: (_, i) => _VCard(video: videos[i], onTap: () => onTap(videos[i]), compact: true),
-        ),
+        ? const Center(
+            child: Text(
+              'No videos in this playlist',
+              style: TextStyle(color: Colors.white38),
+            ),
+          )
+        : ListView.builder(
+            itemCount: videos.length,
+            itemBuilder: (_, i) => _VCard(
+              video: videos[i],
+              onTap: () => onTap(videos[i]),
+              compact: true,
+            ),
+          ),
   );
 }
 
@@ -3504,7 +5018,8 @@ class _PlaylistDetailScreen extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class YtSettingsScreen extends StatefulWidget {
   const YtSettingsScreen({super.key});
-  @override State<YtSettingsScreen> createState() => _YtSettingsScreenState();
+  @override
+  State<YtSettingsScreen> createState() => _YtSettingsScreenState();
 }
 
 class _YtSettingsScreenState extends State<YtSettingsScreen> {
@@ -3512,10 +5027,21 @@ class _YtSettingsScreenState extends State<YtSettingsScreen> {
   bool _autoplay = true;
   bool _hdOnWifi = true;
   String _videoQuality = '480p'; // default
-  static const _qualityOptions = ['Smart', '144p', '240p', '360p', '480p', '720p', '1080p'];
+  static const _qualityOptions = [
+    'Smart',
+    '144p',
+    '240p',
+    '360p',
+    '480p',
+    '720p',
+    '1080p',
+  ];
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -3526,7 +5052,6 @@ class _YtSettingsScreenState extends State<YtSettingsScreen> {
       _videoQuality = prefs.getString('yt_video_quality') ?? '480p';
     });
   }
-
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
@@ -3544,134 +5069,242 @@ class _YtSettingsScreenState extends State<YtSettingsScreen> {
     backgroundColor: const Color(0xFF0F0F0F),
     appBar: AppBar(
       backgroundColor: const Color(0xFF0F0F0F),
-      title: const Text('YouTube Settings', style: TextStyle(color: Colors.white)),
+      title: const Text(
+        'YouTube Settings',
+        style: TextStyle(color: Colors.white),
+      ),
       iconTheme: const IconThemeData(color: Colors.white),
     ),
-    body: ListView(children: [
-      // Audio Boost
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-        child: Row(children: [
-          const Icon(Icons.volume_up, color: Colors.white, size: 20),
-          const SizedBox(width: 8),
-          const Text('Audio Boost', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: const Color(0xFFFF0000), borderRadius: BorderRadius.circular(12)),
-            child: Text(
-              _audioBoost > 1.0
-                  ? '+${(((_audioBoost - 1.0) / 2.0) * 15).toStringAsFixed(1)} dB'
-                  : 'Normal',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-          ),
-        ]),
-      ),
-      Slider(
-        value: _audioBoost,
-        min: 1.0, max: 3.0,
-        divisions: 40,
-        activeColor: const Color(0xFFFF0000),
-        inactiveColor: Colors.white24,
-        onChanged: (v) { setState(() => _audioBoost = v); _save(); },
-      ),
-      // Quick preset buttons
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-          for (final preset in [1.0, 1.5, 2.0, 2.5, 3.0])
-            GestureDetector(
-              onTap: () { setState(() => _audioBoost = preset); _save(); },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _audioBoost == preset ? const Color(0xFFFF0000) : Colors.white12,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  preset == 1.0 ? 'Normal' : '${preset}x',
-                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+    body: ListView(
+      children: [
+        // Audio Boost
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+          child: Row(
+            children: [
+              const Icon(Icons.volume_up, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Audio Boost',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF0000),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _audioBoost > 1.0
+                      ? '+${(((_audioBoost - 1.0) / 2.0) * 15).toStringAsFixed(1)} dB'
+                      : 'Normal',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Slider(
+          value: _audioBoost,
+          min: 1.0,
+          max: 3.0,
+          divisions: 40,
+          activeColor: const Color(0xFFFF0000),
+          inactiveColor: Colors.white24,
+          onChanged: (v) {
+            setState(() => _audioBoost = v);
+            _save();
+          },
+        ),
+        // Quick preset buttons
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (final preset in [1.0, 1.5, 2.0, 2.5, 3.0])
+                GestureDetector(
+                  onTap: () {
+                    setState(() => _audioBoost = preset);
+                    _save();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _audioBoost == preset
+                          ? const Color(0xFFFF0000)
+                          : Colors.white12,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      preset == 1.0 ? 'Normal' : '${preset}x',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+          child: Text(
+            _audioBoost > 1.0
+                ? 'Hardware boost: +${(((_audioBoost - 1.0) / 2.0) * 15).toStringAsFixed(1)} dB via LoudnessEnhancer'
+                : 'Normal volume (no boost)',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+        ),
+        const Divider(color: Colors.white12, height: 32),
+        SwitchListTile(
+          title: const Text(
+            'Autoplay next video',
+            style: TextStyle(color: Colors.white),
+          ),
+          subtitle: const Text(
+            'Automatically plays next recommended video',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          value: _autoplay,
+          activeColor: const Color(0xFFFF0000),
+          onChanged: (v) {
+            setState(() => _autoplay = v);
+            _save();
+          },
+        ),
+        SwitchListTile(
+          title: const Text(
+            'HD on Wi-Fi only',
+            style: TextStyle(color: Colors.white),
+          ),
+          subtitle: const Text(
+            'Stream best quality when connected to Wi-Fi',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          value: _hdOnWifi,
+          activeColor: const Color(0xFFFF0000),
+          onChanged: (v) {
+            setState(() => _hdOnWifi = v);
+            _save();
+          },
+        ),
+        const Divider(color: Colors.white12),
+        // Video Quality Selector
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            children: [
+              const Icon(Icons.hd, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Video Quality',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          child: Text(
+            _videoQuality == 'Smart'
+                ? 'Smart: auto-selects best quality for your network'
+                : 'Fixed at $_videoQuality',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+        ),
+        ..._qualityOptions.map(
+          (q) => RadioListTile<String>(
+            title: Text(
+              q == 'Smart' ? '⚡ Smart (auto)' : q,
+              style: const TextStyle(color: Colors.white),
             ),
-        ]),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-        child: Text(
-          _audioBoost > 1.0
-              ? 'Hardware boost: +${(((_audioBoost - 1.0) / 2.0) * 15).toStringAsFixed(1)} dB via LoudnessEnhancer'
-              : 'Normal volume (no boost)',
-          style: const TextStyle(color: Colors.white54, fontSize: 12),
+            subtitle: q == 'Smart'
+                ? const Text(
+                    'Adapts to network speed',
+                    style: TextStyle(color: Colors.white54, fontSize: 11),
+                  )
+                : q == '480p'
+                ? const Text(
+                    'Default — balanced quality & speed',
+                    style: TextStyle(color: Colors.white54, fontSize: 11),
+                  )
+                : q == '1080p'
+                ? const Text(
+                    'Full HD — needs fast connection',
+                    style: TextStyle(color: Colors.white54, fontSize: 11),
+                  )
+                : q == '144p'
+                ? const Text(
+                    'Lowest — very slow connections',
+                    style: TextStyle(color: Colors.white54, fontSize: 11),
+                  )
+                : null,
+            value: q,
+            groupValue: _videoQuality,
+            activeColor: const Color(0xFFFF0000),
+            onChanged: (v) {
+              if (v != null) {
+                setState(() => _videoQuality = v);
+                _save();
+              }
+            },
+          ),
         ),
-      ),
-      const Divider(color: Colors.white12, height: 32),
-      SwitchListTile(
-        title: const Text('Autoplay next video', style: TextStyle(color: Colors.white)),
-        subtitle: const Text('Automatically plays next recommended video', style: TextStyle(color: Colors.white54, fontSize: 12)),
-        value: _autoplay,
-        activeColor: const Color(0xFFFF0000),
-        onChanged: (v) { setState(() => _autoplay = v); _save(); },
-      ),
-      SwitchListTile(
-        title: const Text('HD on Wi-Fi only', style: TextStyle(color: Colors.white)),
-        subtitle: const Text('Stream best quality when connected to Wi-Fi', style: TextStyle(color: Colors.white54, fontSize: 12)),
-        value: _hdOnWifi,
-        activeColor: const Color(0xFFFF0000),
-        onChanged: (v) { setState(() => _hdOnWifi = v); _save(); },
-      ),
-      const Divider(color: Colors.white12),
-      // Video Quality Selector
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-        child: Row(children: [
-          const Icon(Icons.hd, color: Colors.white, size: 20),
-          const SizedBox(width: 8),
-          const Text('Video Quality', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-        ]),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-        child: Text(
-          _videoQuality == 'Smart'
-              ? 'Smart: auto-selects best quality for your network'
-              : 'Fixed at $_videoQuality',
-          style: const TextStyle(color: Colors.white54, fontSize: 12),
+        const Divider(color: Colors.white12),
+        ListTile(
+          leading: const Icon(Icons.delete_outline, color: Colors.red),
+          title: const Text(
+            'Clear Watch History',
+            style: TextStyle(color: Colors.white),
+          ),
+          onTap: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('yt_history');
+            if (context.mounted)
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('History cleared')));
+          },
         ),
-      ),
-      ..._qualityOptions.map((q) => RadioListTile<String>(
-        title: Text(q == 'Smart' ? '⚡ Smart (auto)' : q,
-            style: const TextStyle(color: Colors.white)),
-        subtitle: q == 'Smart' ? const Text('Adapts to network speed', style: TextStyle(color: Colors.white54, fontSize: 11)) :
-                  q == '480p'  ? const Text('Default — balanced quality & speed', style: TextStyle(color: Colors.white54, fontSize: 11)) :
-                  q == '1080p' ? const Text('Full HD — needs fast connection', style: TextStyle(color: Colors.white54, fontSize: 11)) :
-                  q == '144p'  ? const Text('Lowest — very slow connections', style: TextStyle(color: Colors.white54, fontSize: 11)) : null,
-        value: q,
-        groupValue: _videoQuality,
-        activeColor: const Color(0xFFFF0000),
-        onChanged: (v) { if (v != null) { setState(() => _videoQuality = v); _save(); } },
-      )),
-      const Divider(color: Colors.white12),
-      ListTile(
-        leading: const Icon(Icons.delete_outline, color: Colors.red),
-        title: const Text('Clear Watch History', style: TextStyle(color: Colors.white)),
-        onTap: () async {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.remove('yt_history');
-          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('History cleared')));
-        },
-      ),
-      ListTile(
-        leading: const Icon(Icons.thumb_up_outlined, color: Colors.white),
-        title: const Text('Clear Liked Videos', style: TextStyle(color: Colors.white)),
-        onTap: () async {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.remove('yt_liked');
-          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Liked videos cleared')));
-        },
-      ),
-    ]),
+        ListTile(
+          leading: const Icon(Icons.thumb_up_outlined, color: Colors.white),
+          title: const Text(
+            'Clear Liked Videos',
+            style: TextStyle(color: Colors.white),
+          ),
+          onTap: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('yt_liked');
+            if (context.mounted)
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Liked videos cleared')),
+              );
+          },
+        ),
+      ],
+    ),
   );
 }
 
@@ -3681,19 +5314,27 @@ class _YtSettingsScreenState extends State<YtSettingsScreen> {
 class YtSavedScreen extends StatefulWidget {
   final void Function(YtVid) onTap;
   const YtSavedScreen({super.key, required this.onTap});
-  @override State<YtSavedScreen> createState() => _YtSavedScreenState();
+  @override
+  State<YtSavedScreen> createState() => _YtSavedScreenState();
 }
 
 class _YtSavedScreenState extends State<YtSavedScreen> {
   List<YtVid> _saved = [];
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList('yt_saved') ?? [];
-    setState(() => _saved = raw.map((e) => YtVid.fromJson(json.decode(e) as Map<String, dynamic>)).toList());
+    setState(
+      () => _saved = raw
+          .map((e) => YtVid.fromJson(json.decode(e) as Map<String, dynamic>))
+          .toList(),
+    );
   }
 
   Future<void> _remove(int index) async {
@@ -3713,32 +5354,47 @@ class _YtSavedScreenState extends State<YtSavedScreen> {
       iconTheme: const IconThemeData(color: Colors.white),
     ),
     body: _saved.isEmpty
-      ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.bookmark_border, size: 80, color: Colors.white12),
-          const SizedBox(height: 12),
-          const Text('No saved videos yet', style: TextStyle(color: Colors.white38)),
-          const SizedBox(height: 8),
-          const Text('Tap Save on any video to add it here', style: TextStyle(color: Colors.white24, fontSize: 13)),
-        ]))
-      : ListView.builder(
-          itemCount: _saved.length,
-          itemBuilder: (_, i) => Dismissible(
-            key: ValueKey(_saved[i].id),
-            direction: DismissDirection.endToStart,
-            onDismissed: (_) => _remove(i),
-            background: Container(
-              color: Colors.red,
-              alignment: Alignment.centerRight,
-              padding: const EdgeInsets.only(right: 16),
-              child: const Icon(Icons.delete, color: Colors.white),
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.bookmark_border,
+                  size: 80,
+                  color: Colors.white12,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'No saved videos yet',
+                  style: TextStyle(color: Colors.white38),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tap Save on any video to add it here',
+                  style: TextStyle(color: Colors.white24, fontSize: 13),
+                ),
+              ],
             ),
-            child: _VCard(
-              video: _saved[i],
-              onTap: () => widget.onTap(_saved[i]),
-              compact: true,
+          )
+        : ListView.builder(
+            itemCount: _saved.length,
+            itemBuilder: (_, i) => Dismissible(
+              key: ValueKey(_saved[i].id),
+              direction: DismissDirection.endToStart,
+              onDismissed: (_) => _remove(i),
+              background: Container(
+                color: Colors.red,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 16),
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
+              child: _VCard(
+                video: _saved[i],
+                onTap: () => widget.onTap(_saved[i]),
+                compact: true,
+              ),
             ),
           ),
-        ),
   );
 }
 
@@ -3749,8 +5405,13 @@ class _SaveToSheet extends StatefulWidget {
   final YtVid video;
   final bool isSaved;
   final void Function(bool saved) onSavedChanged;
-  const _SaveToSheet({required this.video, required this.isSaved, required this.onSavedChanged});
-  @override State<_SaveToSheet> createState() => _SaveToSheetState();
+  const _SaveToSheet({
+    required this.video,
+    required this.isSaved,
+    required this.onSavedChanged,
+  });
+  @override
+  State<_SaveToSheet> createState() => _SaveToSheetState();
 }
 
 class _SaveToSheetState extends State<_SaveToSheet> {
@@ -3768,7 +5429,9 @@ class _SaveToSheetState extends State<_SaveToSheet> {
   /// matching the format used by YtPlaylistsScreen
   Future<void> _loadPlaylists() async {
     final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys().where((k) => k.startsWith('yt_playlist_')).toList()..sort();
+    final keys =
+        prefs.getKeys().where((k) => k.startsWith('yt_playlist_')).toList()
+          ..sort();
     final result = <Map<String, dynamic>>[];
     for (final k in keys) {
       final name = k.replaceFirst('yt_playlist_', '');
@@ -3782,8 +5445,16 @@ class _SaveToSheetState extends State<_SaveToSheet> {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList('yt_saved') ?? [];
     final v = widget.video;
-    final entry = json.encode({'id': v.id, 'title': v.title, 'channel': v.channel,
-      'thumb': v.thumb, 'duration': v.duration, 'viewCount': v.viewCount, 'age': v.age, 'channelId': v.channelId});
+    final entry = json.encode({
+      'id': v.id,
+      'title': v.title,
+      'channel': v.channel,
+      'thumb': v.thumb,
+      'duration': v.duration,
+      'viewCount': v.viewCount,
+      'age': v.age,
+      'channelId': v.channelId,
+    });
     if (_inSaved) {
       raw.removeWhere((e) => (json.decode(e) as Map)['id'] == v.id);
       setState(() => _inSaved = false);
@@ -3804,13 +5475,22 @@ class _SaveToSheetState extends State<_SaveToSheet> {
     final raw = prefs.getStringList(plKey) ?? [];
     final v = widget.video;
     final entry = json.encode({
-      'id': v.id, 'title': v.title, 'channel': v.channel,
-      'thumb': v.thumb, 'duration': v.duration, 'viewCount': v.viewCount,
-      'age': v.age, 'channelId': v.channelId,
+      'id': v.id,
+      'title': v.title,
+      'channel': v.channel,
+      'thumb': v.thumb,
+      'duration': v.duration,
+      'viewCount': v.viewCount,
+      'age': v.age,
+      'channelId': v.channelId,
     });
     // Avoid duplicate by video ID
     final alreadyIn = raw.any((e) {
-      try { return (json.decode(e) as Map)['id'] == v.id; } catch (_) { return false; }
+      try {
+        return (json.decode(e) as Map)['id'] == v.id;
+      } catch (_) {
+        return false;
+      }
     });
     if (!alreadyIn) {
       raw.insert(0, entry);
@@ -3822,61 +5502,94 @@ class _SaveToSheetState extends State<_SaveToSheet> {
         SnackBar(
           content: Text(alreadyIn ? 'Already in $plName' : 'Added to $plName'),
           duration: const Duration(seconds: 1),
-        ));
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          width: 40, height: 4,
-          decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-        ),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
-          child: Align(alignment: Alignment.centerLeft,
-            child: Text('Save video to…',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600))),
-        ),
-        ListTile(
-          leading: Icon(_inSaved ? Icons.bookmark : Icons.bookmark_border,
-              color: _inSaved ? const Color(0xFFFF0000) : Colors.white),
-          title: const Text('Saved Videos', style: TextStyle(color: Colors.white)),
-          subtitle: Text(_inSaved ? 'Tap to remove' : 'Add to your saved list',
-              style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          trailing: _inSaved
-              ? const Icon(Icons.check_circle, color: Color(0xFFFF0000), size: 20)
-              : null,
-          onTap: () async {
-            await _toggleSaved();
-            if (mounted) Navigator.pop(context);
-          },
-        ),
-        const Divider(color: Colors.white12, height: 1),
-        if (_playlists.isEmpty)
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
           const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('No playlists yet — create one in the You tab',
-                style: TextStyle(color: Colors.white38, fontSize: 13)),
-          )
-        else
-          ...List.generate(_playlists.length, (i) {
-            final pl = _playlists[i];
-            final count = pl['count'] as int? ?? 0;
-            return ListTile(
-              leading: const Icon(Icons.playlist_add, color: Colors.white70),
-              title: Text(pl['name'] as String? ?? 'Playlist',
-                  style: const TextStyle(color: Colors.white)),
-              subtitle: Text('$count video${count == 1 ? '' : 's'}',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12)),
-              onTap: () => _addToPlaylist(i),
-            );
-          }),
-        const SizedBox(height: 12),
-      ]),
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Save video to…',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: Icon(
+              _inSaved ? Icons.bookmark : Icons.bookmark_border,
+              color: _inSaved ? const Color(0xFFFF0000) : Colors.white,
+            ),
+            title: const Text(
+              'Saved Videos',
+              style: TextStyle(color: Colors.white),
+            ),
+            subtitle: Text(
+              _inSaved ? 'Tap to remove' : 'Add to your saved list',
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+            trailing: _inSaved
+                ? const Icon(
+                    Icons.check_circle,
+                    color: Color(0xFFFF0000),
+                    size: 20,
+                  )
+                : null,
+            onTap: () async {
+              await _toggleSaved();
+              if (mounted) Navigator.pop(context);
+            },
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          if (_playlists.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'No playlists yet — create one in the You tab',
+                style: TextStyle(color: Colors.white38, fontSize: 13),
+              ),
+            )
+          else
+            ...List.generate(_playlists.length, (i) {
+              final pl = _playlists[i];
+              final count = pl['count'] as int? ?? 0;
+              return ListTile(
+                leading: const Icon(Icons.playlist_add, color: Colors.white70),
+                title: Text(
+                  pl['name'] as String? ?? 'Playlist',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                subtitle: Text(
+                  '$count video${count == 1 ? '' : 's'}',
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                onTap: () => _addToPlaylist(i),
+              );
+            }),
+          const SizedBox(height: 12),
+        ],
+      ),
     );
   }
 }

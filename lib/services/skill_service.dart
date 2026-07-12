@@ -23,7 +23,9 @@ class SkillService extends ChangeNotifier {
 
   Future<void> _seedAwesomeSkills() async {
     try {
-      final jsonString = await rootBundle.loadString('assets/config/awesome_skills.json');
+      final jsonString = await rootBundle.loadString(
+        'assets/config/awesome_skills.json',
+      );
       final List<dynamic> decoded = jsonDecode(jsonString);
       for (final item in decoded) {
         final skillMap = item as Map<String, dynamic>;

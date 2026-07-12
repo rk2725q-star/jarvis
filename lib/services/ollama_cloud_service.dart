@@ -108,11 +108,11 @@ class OllamaCloudService {
     _apiKey = await _secureStorage.getApiKey('ollamaCloud') ?? '';
 
     var savedCloudUrl =
-        await _secureStorage.getBaseUrl('ollamaCloud') ??
-        'https://ollama.com';
-    
+        await _secureStorage.getBaseUrl('ollamaCloud') ?? 'https://ollama.com';
+
     // Dynamic migration: if they had the old api.ollama.com default, migrate it to ollama.com
-    if (savedCloudUrl == 'https://api.ollama.com' || savedCloudUrl == 'https://api.ollama.com/') {
+    if (savedCloudUrl == 'https://api.ollama.com' ||
+        savedCloudUrl == 'https://api.ollama.com/') {
       savedCloudUrl = 'https://ollama.com';
       await _secureStorage.saveBaseUrl('ollamaCloud', 'https://ollama.com');
     }
@@ -149,9 +149,7 @@ class OllamaCloudService {
       await _secureStorage.saveApiKey('ollamaCloud', apiKey);
     }
     if (baseUrl != null) {
-      var url = baseUrl.trim().isEmpty
-          ? 'https://ollama.com'
-          : baseUrl.trim();
+      var url = baseUrl.trim().isEmpty ? 'https://ollama.com' : baseUrl.trim();
       if (url == 'https://api.ollama.com' || url == 'https://api.ollama.com/') {
         url = 'https://ollama.com';
       }
@@ -313,18 +311,18 @@ class OllamaCloudService {
     if (useOpenAiEndpoint) {
       for (int i = 0; i < messages.length; i++) {
         final m = messages[i];
-        if (imageBase64 != null && m.role == 'user' && i == messages.length - 1) {
+        if (imageBase64 != null &&
+            m.role == 'user' &&
+            i == messages.length - 1) {
           allMessages.add({
             'role': 'user',
             'content': [
               {'type': 'text', 'text': m.content},
               {
                 'type': 'image_url',
-                'image_url': {
-                  'url': 'data:image/jpeg;base64,$imageBase64',
-                }
-              }
-            ]
+                'image_url': {'url': 'data:image/jpeg;base64,$imageBase64'},
+              },
+            ],
           });
         } else {
           allMessages.add(m.toJson());
@@ -368,12 +366,16 @@ class OllamaCloudService {
             )
             .timeout(const Duration(seconds: 120));
 
-        if (res.statusCode == 401) throw Exception('API key invalid or expired');
-        if (res.statusCode == 404) throw Exception('Model "$targetModel" not found on cloud');
-        if (res.statusCode != 200) throw Exception('Ollama error ${res.statusCode}: ${res.body}');
+        if (res.statusCode == 401)
+          throw Exception('API key invalid or expired');
+        if (res.statusCode == 404)
+          throw Exception('Model "$targetModel" not found on cloud');
+        if (res.statusCode != 200)
+          throw Exception('Ollama error ${res.statusCode}: ${res.body}');
 
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final content = data['choices']?[0]?['message']?['content'] as String? ?? '';
+        final content =
+            data['choices']?[0]?['message']?['content'] as String? ?? '';
         return OllamaResponse(content: content, done: true);
       } else {
         // Legacy Ollama /api/chat path
@@ -460,18 +462,18 @@ class OllamaCloudService {
     if (useOpenAiEndpoint) {
       for (int i = 0; i < messages.length; i++) {
         final m = messages[i];
-        if (imageBase64 != null && m.role == 'user' && i == messages.length - 1) {
+        if (imageBase64 != null &&
+            m.role == 'user' &&
+            i == messages.length - 1) {
           allMessages.add({
             'role': 'user',
             'content': [
               {'type': 'text', 'text': m.content},
               {
                 'type': 'image_url',
-                'image_url': {
-                  'url': 'data:image/jpeg;base64,$imageBase64',
-                }
-              }
-            ]
+                'image_url': {'url': 'data:image/jpeg;base64,$imageBase64'},
+              },
+            ],
           });
         } else {
           allMessages.add(m.toJson());
@@ -610,24 +612,30 @@ class OllamaCloudService {
 
     final targetModel = model ?? _selectedModel;
     final body = jsonEncode({
-      'model': targetModel.contains('minimax') || targetModel.contains('m3') ? 'minimax-m3' : targetModel,
+      'model': targetModel.contains('minimax') || targetModel.contains('m3')
+          ? 'minimax-m3'
+          : targetModel,
       'prompt': prompt,
       'n': 1,
       'size': '1024x1024',
       'response_format': 'b64_json',
     });
 
-    final res = await _client.post(
-      Uri.parse('$_cloudBaseUrl/v1/images/generations'),
-      headers: {
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: body,
-    ).timeout(const Duration(seconds: 90));
+    final res = await _client
+        .post(
+          Uri.parse('$_cloudBaseUrl/v1/images/generations'),
+          headers: {
+            'Authorization': 'Bearer $_apiKey',
+            'Content-Type': 'application/json',
+          },
+          body: body,
+        )
+        .timeout(const Duration(seconds: 90));
 
     if (res.statusCode != 200) {
-      throw Exception('Ollama Cloud Image Gen error ${res.statusCode}: ${res.body}');
+      throw Exception(
+        'Ollama Cloud Image Gen error ${res.statusCode}: ${res.body}',
+      );
     }
 
     final data = jsonDecode(res.body) as Map<String, dynamic>;

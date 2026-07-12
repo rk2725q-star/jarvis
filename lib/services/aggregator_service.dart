@@ -15,22 +15,23 @@ import 'package:duckduckgo_search/duckduckgo_search.dart';
 /// ─────────────────────────────────────────────────────────────────────────────
 class AggregatorService {
   final DDGInstantAnswerSource _instantAnswerSource;
-  final DDGNewsSearchSource    _newsSource;
-  final DedupService           _dedup;
-  final RankingService         _ranking;
+  final DDGNewsSearchSource _newsSource;
+  final DedupService _dedup;
+  final RankingService _ranking;
 
   /// Per-category BehaviorSubjects for UI streams (populated on first fetch).
-  final Map<AriaCategory, BehaviorSubject<List<AriaSearchResult>>> _categoryStreams = {};
+  final Map<AriaCategory, BehaviorSubject<List<AriaSearchResult>>>
+  _categoryStreams = {};
 
   AggregatorService({
     DDGInstantAnswerSource? instantAnswerSource,
-    DDGNewsSearchSource?    newsSource,
-    DedupService?           dedup,
-    RankingService?         ranking,
-  })  : _instantAnswerSource = instantAnswerSource ?? DDGInstantAnswerSource(),
-        _newsSource  = newsSource  ?? DDGNewsSearchSource(),
-        _dedup       = dedup       ?? DedupService(),
-        _ranking     = ranking     ?? RankingService();
+    DDGNewsSearchSource? newsSource,
+    DedupService? dedup,
+    RankingService? ranking,
+  }) : _instantAnswerSource = instantAnswerSource ?? DDGInstantAnswerSource(),
+       _newsSource = newsSource ?? DDGNewsSearchSource(),
+       _dedup = dedup ?? DedupService(),
+       _ranking = ranking ?? RankingService();
 
   /// No-op init — no background schedulers, keeps startup instant.
   Future<void> initialize() async {}
@@ -61,10 +62,9 @@ class AggregatorService {
     bool forceRefresh = false,
     int limit = 20,
   }) async {
-    final results = await _fetchForCategory(category).timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => [],
-    );
+    final results = await _fetchForCategory(
+      category,
+    ).timeout(const Duration(seconds: 10), onTimeout: () => []);
     // Update the stream so UI widgets reflect fresh data
     _categoryStreams[category]?.add(results);
     return results.take(limit).toList();
@@ -80,14 +80,14 @@ class AggregatorService {
   }) async {
     final results = <AriaSearchResult>[];
 
-    await Future.wait(
-      [
-        _fetchDDGText(query, results, limit),
-        _fetchDDGNews(query, results, limit),
-        _fetchInstantAnswer(query, results),
-      ],
-      eagerError: false,
-    ).timeout(const Duration(seconds: 5), onTimeout: () => []);
+    await Future.wait([
+      _fetchDDGText(query, results, limit),
+      _fetchDDGNews(query, results, limit),
+      _fetchInstantAnswer(query, results),
+    ], eagerError: false).timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => [],
+    );
 
     if (results.isEmpty) return [];
     final deduped = _dedup.deduplicate(results);
@@ -100,13 +100,16 @@ class AggregatorService {
     _fetchForCategory(category)
         .timeout(const Duration(seconds: 12), onTimeout: () => [])
         .then((results) {
-      if (results.isNotEmpty) {
-        _categoryStreams[category]?.add(results);
-      }
-    }).catchError((_) {});
+          if (results.isNotEmpty) {
+            _categoryStreams[category]?.add(results);
+          }
+        })
+        .catchError((_) {});
   }
 
-  Future<List<AriaSearchResult>> _fetchForCategory(AriaCategory category) async {
+  Future<List<AriaSearchResult>> _fetchForCategory(
+    AriaCategory category,
+  ) async {
     final allResults = <AriaSearchResult>[];
     final queries = CategoryConstants.defaultQueries[category] ?? [];
 
@@ -118,11 +121,13 @@ class AggregatorService {
             .text(q, maxResults: 3)
             .timeout(const Duration(seconds: 5));
         for (final item in items) {
-          allResults.add(AriaSearchResult.fromDDGText(
-            raw: item as Map<String, dynamic>,
-            category: category.name,
-            sourceTrustScore: 0.78,
-          ));
+          allResults.add(
+            AriaSearchResult.fromDDGText(
+              raw: item as Map<String, dynamic>,
+              category: category.name,
+              sourceTrustScore: 0.78,
+            ),
+          );
         }
       } catch (_) {}
     }
@@ -161,11 +166,13 @@ class AggregatorService {
           .text(query, maxResults: limit)
           .timeout(const Duration(seconds: 4));
       for (final item in items) {
-        out.add(AriaSearchResult.fromDDGText(
-          raw: item as Map<String, dynamic>,
-          category: 'Search',
-          sourceTrustScore: 0.80,
-        ));
+        out.add(
+          AriaSearchResult.fromDDGText(
+            raw: item as Map<String, dynamic>,
+            category: 'Search',
+            sourceTrustScore: 0.80,
+          ),
+        );
       }
     } catch (_) {}
   }
@@ -181,11 +188,13 @@ class AggregatorService {
           .news(query, maxResults: limit)
           .timeout(const Duration(seconds: 4));
       for (final item in items) {
-        out.add(AriaSearchResult.fromDDGNews(
-          raw: item as Map<String, dynamic>,
-          category: 'Search',
-          sourceTrustScore: 0.82,
-        ));
+        out.add(
+          AriaSearchResult.fromDDGNews(
+            raw: item as Map<String, dynamic>,
+            category: 'Search',
+            sourceTrustScore: 0.82,
+          ),
+        );
       }
     } catch (_) {}
   }

@@ -57,34 +57,36 @@ class JarvisTheme {
         surface: JarvisColors.surface,
         error: JarvisColors.error,
       ),
-      textTheme: GoogleFonts.outfitTextTheme(const TextTheme(
-        displayLarge: TextStyle(
-          color: JarvisColors.textPrimary,
-          fontSize: 32,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.5,
+      textTheme: GoogleFonts.outfitTextTheme(
+        const TextTheme(
+          displayLarge: TextStyle(
+            color: JarvisColors.textPrimary,
+            fontSize: 32,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+          ),
+          displayMedium: TextStyle(
+            color: JarvisColors.textPrimary,
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+          ),
+          bodyLarge: TextStyle(
+            color: JarvisColors.textPrimary,
+            fontSize: 16,
+            height: 1.6,
+          ),
+          bodyMedium: TextStyle(
+            color: JarvisColors.textSecondary,
+            fontSize: 14,
+            height: 1.5,
+          ),
+          labelSmall: TextStyle(
+            color: JarvisColors.textMuted,
+            fontSize: 11,
+            letterSpacing: 0.5,
+          ),
         ),
-        displayMedium: TextStyle(
-          color: JarvisColors.textPrimary,
-          fontSize: 24,
-          fontWeight: FontWeight.w600,
-        ),
-        bodyLarge: TextStyle(
-          color: JarvisColors.textPrimary,
-          fontSize: 16,
-          height: 1.6,
-        ),
-        bodyMedium: TextStyle(
-          color: JarvisColors.textSecondary,
-          fontSize: 14,
-          height: 1.5,
-        ),
-        labelSmall: TextStyle(
-          color: JarvisColors.textMuted,
-          fontSize: 11,
-          letterSpacing: 0.5,
-        ),
-      )),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: JarvisColors.surfaceElevated,
@@ -94,10 +96,16 @@ class JarvisTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: JarvisColors.accentPrimary, width: 1.5),
+          borderSide: const BorderSide(
+            color: JarvisColors.accentPrimary,
+            width: 1.5,
+          ),
         ),
         hintStyle: const TextStyle(color: JarvisColors.textMuted),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 16,
+        ),
       ),
       dividerColor: JarvisColors.border,
       appBarTheme: const AppBarTheme(

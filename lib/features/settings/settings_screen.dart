@@ -37,10 +37,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             pinned: true,
             backgroundColor: JarvisColors.surface,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: JarvisColors.textPrimary),
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: JarvisColors.textPrimary,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
-            title: const Text('Settings', style: TextStyle(color: JarvisColors.textPrimary)),
+            title: const Text(
+              'Settings',
+              style: TextStyle(color: JarvisColors.textPrimary),
+            ),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(0.5),
               child: Divider(height: 0.5, color: JarvisColors.border),
@@ -53,42 +59,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // AI Providers reference link
-                  _SectionHeader(title: 'AI Providers', icon: Icons.hub_rounded),
+                  _SectionHeader(
+                    title: 'AI Providers',
+                    icon: Icons.hub_rounded,
+                  ),
                   const SizedBox(height: 12),
                   GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIProvidersScreen())),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AIProvidersScreen(),
+                      ),
+                    ),
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [JarvisColors.accentPrimary.withValues(alpha: 0.12), JarvisColors.accentSecondary.withValues(alpha: 0.06)],
-                          begin: Alignment.topLeft, end: Alignment.bottomRight,
+                          colors: [
+                            JarvisColors.accentPrimary.withValues(alpha: 0.12),
+                            JarvisColors.accentSecondary.withValues(
+                              alpha: 0.06,
+                            ),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: JarvisColors.accentPrimary.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: JarvisColors.accentPrimary.withValues(
+                            alpha: 0.3,
+                          ),
+                        ),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            width: 40, height: 40,
+                            width: 40,
+                            height: 40,
                             decoration: BoxDecoration(
-                              color: JarvisColors.accentPrimary.withValues(alpha: 0.15),
+                              color: JarvisColors.accentPrimary.withValues(
+                                alpha: 0.15,
+                              ),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.hub_rounded, color: JarvisColors.accentPrimary, size: 20),
+                            child: const Icon(
+                              Icons.hub_rounded,
+                              color: JarvisColors.accentPrimary,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           const Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Browse All AI Providers', style: TextStyle(color: JarvisColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
+                                Text(
+                                  'Browse All AI Providers',
+                                  style: TextStyle(
+                                    color: JarvisColors.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
                                 SizedBox(height: 2),
-                                Text('Get API keys, view docs, compare 7 providers + 200+ models', style: TextStyle(color: JarvisColors.textMuted, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                Text(
+                                  'Get API keys, view docs, compare 7 providers + 200+ models',
+                                  style: TextStyle(
+                                    color: JarvisColors.textMuted,
+                                    fontSize: 11,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ],
                             ),
                           ),
-                          const Icon(Icons.chevron_right_rounded, color: JarvisColors.textMuted),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            color: JarvisColors.textMuted,
+                          ),
                         ],
                       ),
                     ),
@@ -96,7 +145,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 20),
 
                   // ── Netless (Offline AI) ────────────────────────────────
-                  _SectionHeader(title: 'Netless — Offline AI', icon: Icons.wifi_off_rounded),
+                  _SectionHeader(
+                    title: 'Netless — Offline AI',
+                    icon: Icons.wifi_off_rounded,
+                  ),
                   const SizedBox(height: 12),
                   ChangeNotifierProvider.value(
                     value: NetlessService(),
@@ -104,59 +156,106 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       builder: (context, svc, _) {
                         final isReady = svc.isAvailable;
                         final hasFile = svc.modelPath != null;
-                        final color = isReady ? const Color(0xFF00E676) : const Color(0xFF7B5FFF);
+                        final color = isReady
+                            ? const Color(0xFF00E676)
+                            : const Color(0xFF7B5FFF);
                         return GestureDetector(
-                          onTap: () => Navigator.push(context,
-                            MaterialPageRoute(builder: (_) => const NetlessManagementScreen())),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const NetlessManagementScreen(),
+                            ),
+                          ),
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [color.withValues(alpha: 0.12), color.withValues(alpha: 0.04)],
-                                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                                colors: [
+                                  color.withValues(alpha: 0.12),
+                                  color.withValues(alpha: 0.04),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: color.withValues(alpha: 0.35)),
+                              border: Border.all(
+                                color: color.withValues(alpha: 0.35),
+                              ),
                             ),
                             child: Row(
                               children: [
                                 Container(
-                                  width: 44, height: 44,
-                                  decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                   child: Icon(
-                                    isReady ? Icons.hub_rounded : svc.isDownloading ? Icons.download_rounded : Icons.wifi_off_rounded,
-                                    color: color, size: 22,
+                                    isReady
+                                        ? Icons.hub_rounded
+                                        : svc.isDownloading
+                                        ? Icons.download_rounded
+                                        : Icons.wifi_off_rounded,
+                                    color: color,
+                                    size: 22,
                                   ),
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        isReady ? 'Netless Active' : hasFile ? 'Gemma Downloaded — Tap to Load' : 'Gemma 4 E2B-it (Offline)',
-                                        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
-                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        isReady
+                                            ? 'Netless Active'
+                                            : hasFile
+                                            ? 'Gemma Downloaded — Tap to Load'
+                                            : 'Gemma 4 E2B-it (Offline)',
+                                        style: TextStyle(
+                                          color: color,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 3),
                                       Text(
-                                        svc.isDownloading ? '${(svc.downloadProgress * 100).toInt()}% — ${svc.status}' : svc.status,
-                                        style: const TextStyle(color: JarvisColors.textMuted, fontSize: 11),
-                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        svc.isDownloading
+                                            ? '${(svc.downloadProgress * 100).toInt()}% — ${svc.status}'
+                                            : svc.status,
+                                        style: const TextStyle(
+                                          color: JarvisColors.textMuted,
+                                          fontSize: 11,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: color.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: color.withValues(alpha: 0.3)),
+                                    border: Border.all(
+                                      color: color.withValues(alpha: 0.3),
+                                    ),
                                   ),
                                   child: Text(
                                     isReady ? 'READY' : 'MANAGE',
-                                    style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                                    style: TextStyle(
+                                      color: color,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.8,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -169,7 +268,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 28),
 
                   // Provider API key settings
-                  _SectionHeader(title: 'API Keys', icon: Icons.vpn_key_rounded),
+                  _SectionHeader(
+                    title: 'API Keys',
+                    icon: Icons.vpn_key_rounded,
+                  ),
                   const SizedBox(height: 12),
                   Consumer<AIRouter>(
                     builder: (context, router, _) {
@@ -201,7 +303,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             provider: AIProvider.anthropic,
                             label: 'Anthropic Claude',
                             icon: Icons.auto_stories_rounded,
-                            iconColor: const Color(0xFFD97757), 
+                            iconColor: const Color(0xFFD97757),
                             secureStorage: secureStorage,
                             router: router,
                             apiKeyHint: 'sk-ant-api03-...',
@@ -268,9 +370,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
 
                   const SizedBox(height: 28),
-                  
+
                   // Voice section
-                  _SectionHeader(title: 'Voice & Speech', icon: Icons.record_voice_over_rounded),
+                  _SectionHeader(
+                    title: 'Voice & Speech',
+                    icon: Icons.record_voice_over_rounded,
+                  ),
                   const SizedBox(height: 12),
                   Consumer<ChatProvider>(
                     builder: (context, chat, _) {
@@ -301,7 +406,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 28),
 
                   // Memory section
-                  _SectionHeader(title: 'Memory', icon: Icons.psychology_alt_rounded),
+                  _SectionHeader(
+                    title: 'Memory',
+                    icon: Icons.psychology_alt_rounded,
+                  ),
                   const SizedBox(height: 12),
                   Builder(
                     builder: (context) {
@@ -314,10 +422,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const MemoryManagerScreen()),
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const MemoryManagerScreen(),
+                                  ),
                                 );
                               },
-                              child: const Text('MANAGE', style: TextStyle(color: JarvisColors.accentPrimary, fontSize: 13, fontWeight: FontWeight.bold)),
+                              child: const Text(
+                                'MANAGE',
+                                style: TextStyle(
+                                  color: JarvisColors.accentPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
                           const Divider(color: JarvisColors.border, height: 1),
@@ -331,12 +449,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text('Memories cleared'),
-                                      backgroundColor: JarvisColors.surfaceElevated,
+                                      backgroundColor:
+                                          JarvisColors.surfaceElevated,
                                     ),
                                   );
                                 }
                               },
-                              child: const Text('Clear', style: TextStyle(color: JarvisColors.error)),
+                              child: const Text(
+                                'Clear',
+                                style: TextStyle(color: JarvisColors.error),
+                              ),
                             ),
                           ),
                         ],
@@ -346,11 +468,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 28),
 
-
                   const SizedBox(height: 28),
 
                   // About & Legal section
-                  _SectionHeader(title: 'About & Legal', icon: Icons.info_outline_rounded),
+                  _SectionHeader(
+                    title: 'About & Legal',
+                    icon: Icons.info_outline_rounded,
+                  ),
                   const SizedBox(height: 12),
                   _InfoCard(
                     children: [
@@ -361,10 +485,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             showLicensePage(
                               context: context,
                               applicationName: 'WFY (JARVIS)',
-                              applicationLegalese: 'Licensed under the Apache License, Version 2.0',
+                              applicationLegalese:
+                                  'Licensed under the Apache License, Version 2.0',
                             );
                           },
-                          child: const Text('VIEW', style: TextStyle(color: JarvisColors.accentPrimary, fontSize: 13, fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            'VIEW',
+                            style: TextStyle(
+                              color: JarvisColors.accentPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -373,11 +505,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 28),
 
                   // Meta Intelligence section
-                  _SectionHeader(title: 'Meta Intelligence', icon: Icons.mediation_rounded),
+                  _SectionHeader(
+                    title: 'Meta Intelligence',
+                    icon: Icons.mediation_rounded,
+                  ),
                   const SizedBox(height: 12),
                   Consumer<AIRouter>(
                     builder: (context, router, _) {
-                      return _ZeeraSettingsCard(router: router, secureStorage: secureStorage);
+                      return _ZeeraSettingsCard(
+                        router: router,
+                        secureStorage: secureStorage,
+                      );
                     },
                   ),
 
@@ -433,7 +571,9 @@ class _ZeeraSettingsCardState extends State<_ZeeraSettingsCard> {
       await _fetchModels(key);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Zeera synthesis key saved and models updated')),
+          const SnackBar(
+            content: Text('Zeera synthesis key saved and models updated'),
+          ),
         );
       }
     }
@@ -470,9 +610,21 @@ class _ZeeraSettingsCardState extends State<_ZeeraSettingsCard> {
           SwitchListTile(
             value: widget.router.zeeraEnabled,
             onChanged: (val) => widget.router.setZeeraEnabled(val),
-            secondary: const Icon(Icons.auto_awesome_rounded, color: Colors.amber),
-            title: const Text("ZEERA Mode", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            subtitle: const Text("Enable Dual-Model Collaborative Intelligence", style: TextStyle(color: JarvisColors.textMuted, fontSize: 11)),
+            secondary: const Icon(
+              Icons.auto_awesome_rounded,
+              color: Colors.amber,
+            ),
+            title: const Text(
+              "ZEERA Mode",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: const Text(
+              "Enable Dual-Model Collaborative Intelligence",
+              style: TextStyle(color: JarvisColors.textMuted, fontSize: 11),
+            ),
             activeThumbColor: Colors.amber,
           ),
           const Divider(height: 1, color: JarvisColors.border),
@@ -488,13 +640,19 @@ class _ZeeraSettingsCardState extends State<_ZeeraSettingsCard> {
                     children: [
                       const Text(
                         "Zeera uses Nvidia Cloud for the final high-complexity synthesis pass.",
-                        style: TextStyle(color: JarvisColors.textMuted, fontSize: 11),
+                        style: TextStyle(
+                          color: JarvisColors.textMuted,
+                          fontSize: 11,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: _keyController,
                         obscureText: _obscureKey,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           hintText: "Enter NVIDIA API Key...",
                           hintStyle: const TextStyle(color: Colors.white24),
@@ -502,11 +660,14 @@ class _ZeeraSettingsCardState extends State<_ZeeraSettingsCard> {
                           fillColor: Colors.black26,
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureKey ? Icons.visibility_off : Icons.visibility,
+                              _obscureKey
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                               color: Colors.white54,
                               size: 18,
                             ),
-                            onPressed: () => setState(() => _obscureKey = !_obscureKey),
+                            onPressed: () =>
+                                setState(() => _obscureKey = !_obscureKey),
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -517,28 +678,54 @@ class _ZeeraSettingsCardState extends State<_ZeeraSettingsCard> {
                       if (_isLoadingModels)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
-                          child: LinearProgressIndicator(backgroundColor: Colors.transparent, color: Colors.amber),
+                          child: LinearProgressIndicator(
+                            backgroundColor: Colors.transparent,
+                            color: Colors.amber,
+                          ),
                         )
                       else if (_availableModels.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: DropdownButtonFormField<String>(
                             // ignore: deprecated_member_use
-                            value: _availableModels.contains(widget.router.zeeraSynthesisModel) 
-                                ? widget.router.zeeraSynthesisModel 
+                            value:
+                                _availableModels.contains(
+                                  widget.router.zeeraSynthesisModel,
+                                )
+                                ? widget.router.zeeraSynthesisModel
                                 : null,
                             dropdownColor: JarvisColors.surfaceElevated,
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
                             decoration: InputDecoration(
                               labelText: "Synthesis Model",
-                              labelStyle: const TextStyle(color: Colors.amber, fontSize: 11),
+                              labelStyle: const TextStyle(
+                                color: Colors.amber,
+                                fontSize: 11,
+                              ),
                               filled: true,
                               fillColor: Colors.black26,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
                             ),
-                            items: _availableModels.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                            onChanged: (val) => widget.router.setZeeraSynthesisModel(val),
+                            items: _availableModels
+                                .map(
+                                  (m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(m),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) =>
+                                widget.router.setZeeraSynthesisModel(val),
                           ),
                         ),
                       const SizedBox(height: 12),
@@ -549,9 +736,14 @@ class _ZeeraSettingsCardState extends State<_ZeeraSettingsCard> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.amber,
                             foregroundColor: Colors.black,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          child: const Text("Update Synthesis Key", style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            "Update Synthesis Key",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
                     ],
@@ -575,11 +767,22 @@ class _ZeeraSettingsCardState extends State<_ZeeraSettingsCard> {
                     Expanded(
                       child: _ConfigColumn(
                         label: "MODEL A",
-                        value: widget.router.getSelectedModel(widget.router.zeeraProviderA)?.toUpperCase() ?? 
-                               widget.router.zeeraProviderA.name.toUpperCase(),
+                        value:
+                            widget.router
+                                .getSelectedModel(widget.router.zeeraProviderA)
+                                ?.toUpperCase() ??
+                            widget.router.zeeraProviderA.name.toUpperCase(),
                         onTap: () {
-                          final providers = [AIProvider.nvidia, AIProvider.ollamaCloud, AIProvider.anthropic, AIProvider.openRouter, AIProvider.gemini];
-                          int currentIdx = providers.indexOf(widget.router.zeeraProviderA);
+                          final providers = [
+                            AIProvider.nvidia,
+                            AIProvider.ollamaCloud,
+                            AIProvider.anthropic,
+                            AIProvider.openRouter,
+                            AIProvider.gemini,
+                          ];
+                          int currentIdx = providers.indexOf(
+                            widget.router.zeeraProviderA,
+                          );
                           if (currentIdx == -1) currentIdx = 0;
                           int nextIdx = (currentIdx + 1) % providers.length;
                           widget.router.setZeeraProviderA(providers[nextIdx]);
@@ -590,11 +793,22 @@ class _ZeeraSettingsCardState extends State<_ZeeraSettingsCard> {
                     Expanded(
                       child: _ConfigColumn(
                         label: "MODEL B",
-                        value: widget.router.getSelectedModel(widget.router.zeeraProviderB)?.toUpperCase() ?? 
-                               widget.router.zeeraProviderB.name.toUpperCase(),
+                        value:
+                            widget.router
+                                .getSelectedModel(widget.router.zeeraProviderB)
+                                ?.toUpperCase() ??
+                            widget.router.zeeraProviderB.name.toUpperCase(),
                         onTap: () {
-                          final providers = [AIProvider.ollamaCloud, AIProvider.nvidia, AIProvider.anthropic, AIProvider.openRouter, AIProvider.gemini];
-                          int currentIdx = providers.indexOf(widget.router.zeeraProviderB);
+                          final providers = [
+                            AIProvider.ollamaCloud,
+                            AIProvider.nvidia,
+                            AIProvider.anthropic,
+                            AIProvider.openRouter,
+                            AIProvider.gemini,
+                          ];
+                          int currentIdx = providers.indexOf(
+                            widget.router.zeeraProviderB,
+                          );
                           if (currentIdx == -1) currentIdx = 0;
                           int nextIdx = (currentIdx + 1) % providers.length;
                           widget.router.setZeeraProviderB(providers[nextIdx]);
@@ -617,7 +831,11 @@ class _ZeeraPanel extends StatelessWidget {
   final IconData icon;
   final Widget child;
 
-  const _ZeeraPanel({required this.title, required this.icon, required this.child});
+  const _ZeeraPanel({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -651,7 +869,11 @@ class _ConfigColumn extends StatelessWidget {
   final String value;
   final VoidCallback onTap;
 
-  const _ConfigColumn({required this.label, required this.value, required this.onTap});
+  const _ConfigColumn({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -666,9 +888,24 @@ class _ConfigColumn extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(label, style: const TextStyle(color: JarvisColors.textMuted, fontSize: 9, fontWeight: FontWeight.bold)),
+            Text(
+              label,
+              style: const TextStyle(
+                color: JarvisColors.textMuted,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(value, style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.amber,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
@@ -734,7 +971,13 @@ class _SettingsRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 14)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: JarvisColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
           trailing,
         ],
       ),

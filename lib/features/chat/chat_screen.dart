@@ -14,7 +14,6 @@ import 'package:flutter/services.dart';
 import '../files/jarvis_file_viewer.dart';
 import '../youtube/youtube_screen.dart';
 
-
 import '../integrations/integrations_model.dart';
 import '../integrations/integration_browser_screen.dart';
 import 'chat_provider.dart';
@@ -52,36 +51,49 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   static const _shortcutChannel = MethodChannel('jarvis.ai.os/shortcuts');
 
   void _initShortcutChannel() {
-    _shortcutChannel.invokeMethod<String>('getInitialIntegrationId').then((id) {
-      if (id != null && id.isNotEmpty && mounted) {
-        // Special handling for native integrations
-        if (id == 'youtube') {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const YouTubeScreen()),
-          );
-          return;
-        }
-        final integration = kAIIntegrations.firstWhere(
-          (i) => i.id == id,
-          orElse: () => kAIIntegrations.first,
-        );
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => IntegrationBrowserScreen(integration: integration)),
-        );
-      }
-    }).catchError((_) {});
+    _shortcutChannel
+        .invokeMethod<String>('getInitialIntegrationId')
+        .then((id) {
+          if (id != null && id.isNotEmpty && mounted) {
+            // Special handling for native integrations
+            if (id == 'youtube') {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const YouTubeScreen()));
+              return;
+            }
+            final integration = kAIIntegrations.firstWhere(
+              (i) => i.id == id,
+              orElse: () => kAIIntegrations.first,
+            );
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    IntegrationBrowserScreen(integration: integration),
+              ),
+            );
+          }
+        })
+        .catchError((_) {});
   }
 
   void _initReceiveSharingIntent() {
     // Listen to media/text shared while the app is in memory
-    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((List<SharedMediaFile> value) {
-      _processSharedFiles(value);
-    }, onError: (err) {
-      debugPrint("getIntentDataStream error: $err");
-    });
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance
+        .getMediaStream()
+        .listen(
+          (List<SharedMediaFile> value) {
+            _processSharedFiles(value);
+          },
+          onError: (err) {
+            debugPrint("getIntentDataStream error: $err");
+          },
+        );
 
     // Get the media/text shared while app was closed
-    ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
+    ReceiveSharingIntent.instance.getInitialMedia().then((
+      List<SharedMediaFile> value,
+    ) {
       if (value.isNotEmpty) {
         _processSharedFiles(value);
       }
@@ -95,16 +107,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (file.type == SharedMediaType.text) {
         final text = file.path;
         // Check if it's a YouTube link
-        final isYtLink = text.contains('youtube.com/') || text.contains('youtu.be/');
+        final isYtLink =
+            text.contains('youtube.com/') || text.contains('youtu.be/');
         if (isYtLink) {
           // Extract ID using basic logic since youtube_explode_dart.VideoId can do it:
           final reg = RegExp(r'(?:v=|youtu\.be/|shorts/)([^&?\s]+)');
           final match = reg.firstMatch(text);
           final String vidId = match != null ? match.group(1) ?? '' : '';
           if (vidId.isNotEmpty) {
-            Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => YouTubeScreen(initialVideoId: vidId),
-            ));
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => YouTubeScreen(initialVideoId: vidId),
+              ),
+            );
             return; // Stop processing further for youtube share
           }
         }
@@ -118,11 +133,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Handles files opened from Android "Open With" – e.g., long-press a PDF → JARVIS
   void _initFileOpenChannel() {
     // Get the initial file if the app was launched via "Open With"
-    _fileOpenChannel.invokeMethod<String>('getInitialFile').then((path) {
-      if (path != null && path.isNotEmpty && mounted) {
-        _openFileInViewer(path);
-      }
-    }).catchError((_) {});
+    _fileOpenChannel
+        .invokeMethod<String>('getInitialFile')
+        .then((path) {
+          if (path != null && path.isNotEmpty && mounted) {
+            _openFileInViewer(path);
+          }
+        })
+        .catchError((_) {});
 
     // Listen while app is already open (onNewIntent)
     _fileOpenChannel.setMethodCallHandler((call) async {
@@ -136,9 +154,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   void _openFileInViewer(String path) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => JarvisFileViewer(filePath: path)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => JarvisFileViewer(filePath: path)));
   }
 
   @override
@@ -277,13 +295,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       decoration: const BoxDecoration(
         color: Colors.transparent,
-        border: Border(bottom: BorderSide(color: JarvisColors.border, width: 0.5)),
+        border: Border(
+          bottom: BorderSide(color: JarvisColors.border, width: 0.5),
+        ),
       ),
       child: Row(
         children: [
           // Drawer button
           IconButton(
-            icon: const Icon(Icons.menu_rounded, color: JarvisColors.textSecondary),
+            icon: const Icon(
+              Icons.menu_rounded,
+              color: JarvisColors.textSecondary,
+            ),
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             tooltip: 'Sessions',
           ),
@@ -294,7 +317,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 ShaderMask(
-                  shaderCallback: (b) => JarvisColors.primaryGradient.createShader(b),
+                  shaderCallback: (b) =>
+                      JarvisColors.primaryGradient.createShader(b),
                   child: const Text(
                     'JARVIS',
                     style: TextStyle(
@@ -319,24 +343,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
           // Phone Conversation
           IconButton(
-            icon: const Icon(Icons.phone_in_talk_rounded, color: JarvisColors.accentPrimary, size: 22),
+            icon: const Icon(
+              Icons.phone_in_talk_rounded,
+              color: JarvisColors.accentPrimary,
+              size: 22,
+            ),
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const VoiceConversationScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const VoiceConversationScreen(),
+                ),
               );
             },
             tooltip: 'Voice Conversation',
           ),
 
-
-
-
           // Settings
           IconButton(
-            icon: const Icon(Icons.settings_rounded, color: JarvisColors.textSecondary, size: 22),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            icon: const Icon(
+              Icons.settings_rounded,
+              color: JarvisColors.textSecondary,
+              size: 22,
             ),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
             tooltip: 'Settings',
           ),
         ],
@@ -377,17 +408,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 24),
             ShaderMask(
-              shaderCallback: (b) => JarvisColors.primaryGradient.createShader(b),
-              child: const Text(
-                'Hello, I\'m JARVIS.',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ).animate().fadeIn(delay: 200.ms, duration: 500.ms).slideY(begin: 0.2, end: 0),
+                  shaderCallback: (b) =>
+                      JarvisColors.primaryGradient.createShader(b),
+                  child: const Text(
+                    'Hello, I\'m JARVIS.',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                )
+                .animate()
+                .fadeIn(delay: 200.ms, duration: 500.ms)
+                .slideY(begin: 0.2, end: 0),
             const SizedBox(height: 8),
             const Text(
               'Your multi-provider AI assistant.',
@@ -415,23 +450,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       alignment: WrapAlignment.center,
       children: suggestions.asMap().entries.map((e) {
         return GestureDetector(
-          onTap: () => context.read<ChatProvider>().sendMessage(e.value.$2),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: JarvisColors.surfaceElevated,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: JarvisColors.border),
-            ),
-            child: Text(
-              '${e.value.$1} ${e.value.$2}',
-              style: const TextStyle(
-                color: JarvisColors.textSecondary,
-                fontSize: 13,
+              onTap: () => context.read<ChatProvider>().sendMessage(e.value.$2),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: JarvisColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: JarvisColors.border),
+                ),
+                child: Text(
+                  '${e.value.$1} ${e.value.$2}',
+                  style: const TextStyle(
+                    color: JarvisColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
               ),
-            ),
-          ),
-        ).animate(delay: Duration(milliseconds: 450 + e.key * 80))
+            )
+            .animate(delay: Duration(milliseconds: 450 + e.key * 80))
             .fadeIn(duration: 300.ms)
             .slideY(begin: 0.3, end: 0);
       }).toList(),
@@ -451,11 +490,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ActionChip(
-              label: Text(s, style: const TextStyle(fontSize: 12, color: JarvisColors.textSecondary)),
+              label: Text(
+                s,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: JarvisColors.textSecondary,
+                ),
+              ),
               backgroundColor: JarvisColors.surfaceElevated,
               side: const BorderSide(color: JarvisColors.border, width: 0.5),
               onPressed: () => chatProvider.sendMessage(s),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
           );
         },
@@ -470,19 +517,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       decoration: BoxDecoration(
         color: JarvisColors.surfaceElevated.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: JarvisColors.accentPrimary.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: JarvisColors.accentPrimary.withValues(alpha: 0.5),
+        ),
         boxShadow: [
           BoxShadow(
             color: JarvisColors.accentPrimary.withValues(alpha: 0.1),
             blurRadius: 10,
             spreadRadius: 1,
-          )
+          ),
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.notifications_active_rounded, color: JarvisColors.accentPrimary, size: 18),
+          const Icon(
+            Icons.notifications_active_rounded,
+            color: JarvisColors.accentPrimary,
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -497,7 +550,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close_rounded, size: 18, color: JarvisColors.textMuted),
+            icon: const Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: JarvisColors.textMuted,
+            ),
             onPressed: () => chatProvider.cancelPendingNotification(),
             constraints: const BoxConstraints(),
             padding: EdgeInsets.zero,
@@ -524,23 +581,28 @@ class _ProviderStatusBar extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: router.isGenerating
-                      ? JarvisColors.accentPrimary
-                      : JarvisColors.success,
-                  boxShadow: [
-                    BoxShadow(
-                      color: (router.isGenerating
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: router.isGenerating
                           ? JarvisColors.accentPrimary
-                          : JarvisColors.success).withValues(alpha: 0.6),
-                      blurRadius: 8,
+                          : JarvisColors.success,
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              (router.isGenerating
+                                      ? JarvisColors.accentPrimary
+                                      : JarvisColors.success)
+                                  .withValues(alpha: 0.6),
+                          blurRadius: 8,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ).animate(onPlay: (c) => router.isGenerating ? c.repeat() : null)
+                  )
+                  .animate(
+                    onPlay: (c) => router.isGenerating ? c.repeat() : null,
+                  )
                   .fadeOut(duration: 500.ms)
                   .then()
                   .fadeIn(duration: 500.ms),

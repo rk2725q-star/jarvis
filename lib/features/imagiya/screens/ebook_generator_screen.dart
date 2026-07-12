@@ -18,15 +18,15 @@ class EBookGeneratorScreen extends StatefulWidget {
 
 class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
   // ── Form controllers ──────────────────────────────────────────────────────
-  final _titleCtrl    = TextEditingController();
+  final _titleCtrl = TextEditingController();
   final _synopsisCtrl = TextEditingController();
 
-  String _genre    = 'Comics';
+  String _genre = 'Comics';
   String _audience = 'Teen';
-  String _tone     = 'Adventurous';
+  String _tone = 'Adventurous';
   String _artStyle = 'comic-book';
   String _language = 'English';
-  int    _pageCount = 10;
+  int _pageCount = 10;
 
   // ── Generation state ──────────────────────────────────────────────────────
   bool _isGenerating = false;
@@ -38,11 +38,42 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
   int _viewPage = 0;
   final _pageCtrl = PageController();
 
-  static const _genreOptions    = ['Comics', 'Fantasy', 'Sci-Fi', 'Adventure', 'Educational', 'Horror', 'Romance', 'Mystery'];
+  static const _genreOptions = [
+    'Comics',
+    'Fantasy',
+    'Sci-Fi',
+    'Adventure',
+    'Educational',
+    'Horror',
+    'Romance',
+    'Mystery',
+  ];
   static const _audienceOptions = ['Children', 'Teen', 'Adult'];
-  static const _toneOptions     = ['Adventurous', 'Humorous', 'Dramatic', 'Educational', 'Suspenseful', 'Romantic'];
-  static const _styleOptions    = ['comic-book', 'anime', 'realistic', 'watercolor', 'sketch', 'cyberpunk', '3d-render'];
-  static const _langOptions     = ['English', 'Tamil', 'Hindi', 'Telugu', 'Malayalam', 'Kannada'];
+  static const _toneOptions = [
+    'Adventurous',
+    'Humorous',
+    'Dramatic',
+    'Educational',
+    'Suspenseful',
+    'Romantic',
+  ];
+  static const _styleOptions = [
+    'comic-book',
+    'anime',
+    'realistic',
+    'watercolor',
+    'sketch',
+    'cyberpunk',
+    '3d-render',
+  ];
+  static const _langOptions = [
+    'English',
+    'Tamil',
+    'Hindi',
+    'Telugu',
+    'Malayalam',
+    'Kannada',
+  ];
 
   @override
   void dispose() {
@@ -83,36 +114,40 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
     });
 
     _sub?.cancel();
-    _sub = service.generate(config).listen(
-      (event) {
-        setState(() {
-          _progress = event.progress;
-          if (event.page != null) {
-            final idx = _pages.indexWhere((p) => p.pageNumber == event.page!.pageNumber);
-            if (idx >= 0) {
-              _pages[idx] = event.page!;
-            } else {
-              _pages.add(event.page!);
-              _pages.sort((a, b) => a.pageNumber.compareTo(b.pageNumber));
-            }
-          }
-          if (event.progress.isDone) _isGenerating = false;
-        });
-      },
-      onError: (e) {
-        setState(() {
-          _isGenerating = false;
-          _progress = EBookProgress(
-            stage: 'error',
-            currentPage: 0,
-            totalPages: _pageCount,
-            message: 'Error: $e',
-            hasError: true,
-            errorMessage: e.toString(),
-          );
-        });
-      },
-    );
+    _sub = service
+        .generate(config)
+        .listen(
+          (event) {
+            setState(() {
+              _progress = event.progress;
+              if (event.page != null) {
+                final idx = _pages.indexWhere(
+                  (p) => p.pageNumber == event.page!.pageNumber,
+                );
+                if (idx >= 0) {
+                  _pages[idx] = event.page!;
+                } else {
+                  _pages.add(event.page!);
+                  _pages.sort((a, b) => a.pageNumber.compareTo(b.pageNumber));
+                }
+              }
+              if (event.progress.isDone) _isGenerating = false;
+            });
+          },
+          onError: (e) {
+            setState(() {
+              _isGenerating = false;
+              _progress = EBookProgress(
+                stage: 'error',
+                currentPage: 0,
+                totalPages: _pageCount,
+                message: 'Error: $e',
+                hasError: true,
+                errorMessage: e.toString(),
+              );
+            });
+          },
+        );
   }
 
   void _cancelGeneration() {
@@ -131,14 +166,24 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
           children: [
             Icon(Icons.auto_stories, color: Color(0xFFB388FF), size: 22),
             SizedBox(width: 8),
-            Text('eBook Generator', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
+            Text(
+              'eBook Generator',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+              ),
+            ),
           ],
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           if (_pages.isNotEmpty && !_isGenerating)
             IconButton(
-              icon: const Icon(Icons.picture_as_pdf, color: Colors.orangeAccent),
+              icon: const Icon(
+                Icons.picture_as_pdf,
+                color: Colors.orangeAccent,
+              ),
               tooltip: 'Download PDF',
               onPressed: _isDownloading ? null : _downloadPdf,
             ),
@@ -173,17 +218,28 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFB388FF).withValues(alpha: 0.3)),
+              border: Border.all(
+                color: const Color(0xFFB388FF).withValues(alpha: 0.3),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('📚 AI eBook Generator',
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                const Text(
+                  '📚 AI eBook Generator',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 Text(
                   'Generate a complete illustrated eBook with up to 45 pages using your AI provider.',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -195,29 +251,75 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
 
           _inputField(_titleCtrl, 'eBook Title', 'e.g. "The Last Star Knight"'),
           const SizedBox(height: 12),
-          _inputField(_synopsisCtrl, 'Synopsis / Story Idea', 'Describe your story in 1–3 sentences...', lines: 4),
+          _inputField(
+            _synopsisCtrl,
+            'Synopsis / Story Idea',
+            'Describe your story in 1–3 sentences...',
+            lines: 4,
+          ),
 
           const SizedBox(height: 20),
           _sectionLabel('🎨 Style & Settings'),
           const SizedBox(height: 12),
 
-          Row(children: [
-            Expanded(child: _dropdownField('Genre', _genre, _genreOptions, (v) => setState(() => _genre = v!))),
-            const SizedBox(width: 12),
-            Expanded(child: _dropdownField('Audience', _audience, _audienceOptions, (v) => setState(() => _audience = v!))),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: _dropdownField(
+                  'Genre',
+                  _genre,
+                  _genreOptions,
+                  (v) => setState(() => _genre = v!),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _dropdownField(
+                  'Audience',
+                  _audience,
+                  _audienceOptions,
+                  (v) => setState(() => _audience = v!),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _dropdownField('Tone', _tone, _toneOptions, (v) => setState(() => _tone = v!))),
-            const SizedBox(width: 12),
-            Expanded(child: _dropdownField('Art Style', _artStyle, _styleOptions, (v) => setState(() => _artStyle = v!))),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: _dropdownField(
+                  'Tone',
+                  _tone,
+                  _toneOptions,
+                  (v) => setState(() => _tone = v!),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _dropdownField(
+                  'Art Style',
+                  _artStyle,
+                  _styleOptions,
+                  (v) => setState(() => _artStyle = v!),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _dropdownField('Language', _language, _langOptions, (v) => setState(() => _language = v!))),
-            const SizedBox(width: 12),
-            Expanded(child: _pageCountSlider()),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: _dropdownField(
+                  'Language',
+                  _language,
+                  _langOptions,
+                  (v) => setState(() => _language = v!),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: _pageCountSlider()),
+            ],
+          ),
 
           const SizedBox(height: 28),
 
@@ -234,19 +336,36 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
                 ? ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4A1A1A),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
-                    icon: const Icon(Icons.stop_circle, color: Colors.redAccent),
-                    label: const Text('Cancel Generation', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
+                    icon: const Icon(
+                      Icons.stop_circle,
+                      color: Colors.redAccent,
+                    ),
+                    label: const Text(
+                      'Cancel Generation',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 16),
+                    ),
                     onPressed: _cancelGeneration,
                   )
                 : ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF7C3AED),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     icon: const Icon(Icons.auto_stories, color: Colors.white),
-                    label: const Text('Generate eBook', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                    label: const Text(
+                      'Generate eBook',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     onPressed: _startGeneration,
                   ),
           ),
@@ -259,41 +378,56 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
     final p = _progress!;
     final pct = p.totalPages > 0 ? p.currentPage / p.totalPages : 0.0;
     final stageIcon = switch (p.stage) {
-      'outline'      => '📋',
-      'writing'      => '✍️',
+      'outline' => '📋',
+      'writing' => '✍️',
       'illustrating' => '🎨',
-      'done'         => '✅',
-      _              => '⚙️',
+      'done' => '✅',
+      _ => '⚙️',
     };
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFB388FF).withValues(alpha: 0.25)),
+        border: Border.all(
+          color: const Color(0xFFB388FF).withValues(alpha: 0.25),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Text('$stageIcon ', style: const TextStyle(fontSize: 18)),
-            Expanded(
-              child: Text(p.message, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-            ),
-          ]),
+          Row(
+            children: [
+              Text('$stageIcon ', style: const TextStyle(fontSize: 18)),
+              Expanded(
+                child: Text(
+                  p.message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: pct,
               backgroundColor: Colors.white12,
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFB388FF)),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFFB388FF),
+              ),
               minHeight: 8,
             ),
           ),
           const SizedBox(height: 6),
-          Text('${p.currentPage} / ${p.totalPages} pages  •  ${_pages.length} written',
-              style: const TextStyle(color: Colors.white38, fontSize: 11)),
+          Text(
+            '${p.currentPage} / ${p.totalPages} pages  •  ${_pages.length} written',
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
         ],
       ),
     );
@@ -309,11 +443,27 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('${_viewPage + 1} / ${_pages.length}',
-                  style: const TextStyle(color: Colors.white54, fontSize: 13)),
-              Text(_pages[_viewPage].chapterTitle,
-                  style: const TextStyle(color: Color(0xFFB388FF), fontWeight: FontWeight.w600, fontSize: 13)),
-              TextButton(onPressed: () => setState(() { _pages.clear(); }), child: const Text('← New Book', style: TextStyle(color: Colors.white54, fontSize: 12))),
+              Text(
+                '${_viewPage + 1} / ${_pages.length}',
+                style: const TextStyle(color: Colors.white54, fontSize: 13),
+              ),
+              Text(
+                _pages[_viewPage].chapterTitle,
+                style: const TextStyle(
+                  color: Color(0xFFB388FF),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() {
+                  _pages.clear();
+                }),
+                child: const Text(
+                  '← New Book',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ),
             ],
           ),
         ),
@@ -334,7 +484,12 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.chevron_left, color: Colors.white),
-                onPressed: _viewPage > 0 ? () => _pageCtrl.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut) : null,
+                onPressed: _viewPage > 0
+                    ? () => _pageCtrl.previousPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      )
+                    : null,
               ),
               Row(
                 children: List.generate(
@@ -344,7 +499,9 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
                     width: i == _viewPage ? 18 : 6,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: i == _viewPage ? const Color(0xFFB388FF) : Colors.white24,
+                      color: i == _viewPage
+                          ? const Color(0xFFB388FF)
+                          : Colors.white24,
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
@@ -352,7 +509,12 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right, color: Colors.white),
-                onPressed: _viewPage < _pages.length - 1 ? () => _pageCtrl.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut) : null,
+                onPressed: _viewPage < _pages.length - 1
+                    ? () => _pageCtrl.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      )
+                    : null,
               ),
             ],
           ),
@@ -368,9 +530,23 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Page header
-          Text('Page ${page.pageNumber}', style: const TextStyle(color: Colors.white38, fontSize: 12, letterSpacing: 1.5)),
+          Text(
+            'Page ${page.pageNumber}',
+            style: const TextStyle(
+              color: Colors.white38,
+              fontSize: 12,
+              letterSpacing: 1.5,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(page.chapterTitle, style: const TextStyle(color: Color(0xFFB388FF), fontSize: 18, fontWeight: FontWeight.w800)),
+          Text(
+            page.chapterTitle,
+            style: const TextStyle(
+              color: Color(0xFFB388FF),
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 16),
           // Image (shown for even pages)
           if (page.imageUrl != null) ...[
@@ -389,12 +565,25 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
                           color: const Color(0xFF1A1A2E),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Center(child: CircularProgressIndicator(color: Color(0xFFB388FF))),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFB388FF),
+                          ),
+                        ),
                       ),
                 errorBuilder: (_, _, _) => Container(
                   height: 120,
-                  decoration: BoxDecoration(color: const Color(0xFF1A1A2E), borderRadius: BorderRadius.circular(12)),
-                  child: const Center(child: Icon(Icons.image_not_supported, color: Colors.white24, size: 40)),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A2E),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.image_not_supported,
+                      color: Colors.white24,
+                      size: 40,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -403,7 +592,11 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
           // Content
           Text(
             page.content,
-            style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.7),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              height: 1.7,
+            ),
           ),
           const SizedBox(height: 30),
         ],
@@ -425,25 +618,36 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
       final pdf = pw.Document();
 
       // Title Page
-      pdf.addPage(pw.Page(
-        build: (pw.Context context) {
-          return pw.Center(
-            child: pw.Column(
-              mainAxisAlignment: pw.MainAxisAlignment.center,
-              children: [
-                pw.Text(_titleCtrl.text, style: pw.TextStyle(fontSize: 32, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 20),
-                pw.Text('Generated by JARVIS AI', style: const pw.TextStyle(fontSize: 16)),
-              ],
-            ),
-          );
-        },
-      ));
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Center(
+              child: pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Text(
+                    _titleCtrl.text,
+                    style: pw.TextStyle(
+                      fontSize: 32,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 20),
+                  pw.Text(
+                    'Generated by JARVIS AI',
+                    style: const pw.TextStyle(fontSize: 16),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
 
       // Content Pages
       for (final page in _pages) {
         pw.MemoryImage? pdfImage;
-        
+
         if (page.imageUrl != null) {
           try {
             final response = await http.get(Uri.parse(page.imageUrl!));
@@ -458,33 +662,50 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
             margin: const pw.EdgeInsets.all(32),
             build: (pw.Context context) {
               return [
-                pw.Text(page.chapterTitle, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  page.chapterTitle,
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
                 pw.SizedBox(height: 20),
                 if (pdfImage != null) ...[
                   pw.Image(pdfImage, fit: pw.BoxFit.contain, height: 300),
                   pw.SizedBox(height: 20),
                 ],
-                pw.Text(page.content, style: const pw.TextStyle(fontSize: 14, lineSpacing: 1.5)),
+                pw.Text(
+                  page.content,
+                  style: const pw.TextStyle(fontSize: 14, lineSpacing: 1.5),
+                ),
               ];
             },
-          )
+          ),
         );
       }
 
       final outputDir = await getApplicationDocumentsDirectory();
-      final sanitizedTitle = _titleCtrl.text.replaceAll(RegExp(r'[^\w\s]+'), '').trim().replaceAll(' ', '_');
-      final fileName = '${sanitizedTitle}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final sanitizedTitle = _titleCtrl.text
+          .replaceAll(RegExp(r'[^\w\s]+'), '')
+          .trim()
+          .replaceAll(' ', '_');
+      final fileName =
+          '${sanitizedTitle}_${DateTime.now().millisecondsSinceEpoch}.pdf';
       final file = File('${outputDir.path}/$fileName');
-      
+
       await file.writeAsBytes(await pdf.save());
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ PDF Saved Successfully!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ PDF Saved Successfully!')),
+        );
         await OpenFilex.open(file.path);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Error saving PDF: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ Error saving PDF: $e')));
       }
     } finally {
       if (mounted) {
@@ -496,10 +717,19 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
   // ── Helpers ───────────────────────────────────────────────────────────────
   Widget _sectionLabel(String text) => Text(
     text,
-    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+    style: const TextStyle(
+      color: Colors.white,
+      fontWeight: FontWeight.w700,
+      fontSize: 15,
+    ),
   );
 
-  Widget _inputField(TextEditingController ctrl, String label, String hint, {int lines = 1}) {
+  Widget _inputField(
+    TextEditingController ctrl,
+    String label,
+    String hint, {
+    int lines = 1,
+  }) {
     return TextField(
       controller: ctrl,
       maxLines: lines,
@@ -517,7 +747,10 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: const Color(0xFFB388FF).withValues(alpha: 0.3), width: 0.5),
+          borderSide: BorderSide(
+            color: const Color(0xFFB388FF).withValues(alpha: 0.3),
+            width: 0.5,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -527,13 +760,21 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
     );
   }
 
-  Widget _dropdownField(String label, String value, List<String> options, ValueChanged<String?> onChanged) {
+  Widget _dropdownField(
+    String label,
+    String value,
+    List<String> options,
+    ValueChanged<String?> onChanged,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFB388FF).withValues(alpha: 0.3), width: 0.5),
+        border: Border.all(
+          color: const Color(0xFFB388FF).withValues(alpha: 0.3),
+          width: 0.5,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -541,8 +782,13 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
           isExpanded: true,
           dropdownColor: const Color(0xFF1A1A2E),
           style: const TextStyle(color: Colors.white, fontSize: 14),
-          hint: Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          items: options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+          hint: Text(
+            label,
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          items: options
+              .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+              .toList(),
           onChanged: onChanged,
         ),
       ),
@@ -555,12 +801,18 @@ class _EBookGeneratorScreenState extends State<EBookGeneratorScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFB388FF).withValues(alpha: 0.3), width: 0.5),
+        border: Border.all(
+          color: const Color(0xFFB388FF).withValues(alpha: 0.3),
+          width: 0.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Pages: $_pageCount', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          Text(
+            'Pages: $_pageCount',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: const Color(0xFFB388FF),

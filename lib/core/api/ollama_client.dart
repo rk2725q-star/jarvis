@@ -27,27 +27,27 @@ class OllamaApiClient {
 
   Future<List<String>> fetchModels() async {
     try {
-      final res = await http.get(
-        Uri.parse('$_adjustedBaseUrl/api/tags'),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 4));
+      final res = await http
+          .get(Uri.parse('$_adjustedBaseUrl/api/tags'), headers: _headers)
+          .timeout(const Duration(seconds: 4));
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final models = (data['models'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final models =
+            (data['models'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         return models.map((m) => m['name'] as String).toList();
       }
     } catch (e) {
       // Endpoint doesn't support tags, or timeout
     }
-    
+
     // Fallback if cloud endpoint model listing fails
     return [
       'deepseek-v3.1:671b-cloud',
       'deepseek-v3',
       'llama3',
       'llama3.1',
-      model // Include currently set model
+      model, // Include currently set model
     ];
   }
 
@@ -57,15 +57,17 @@ class OllamaApiClient {
       {'role': 'user', 'content': prompt},
     ];
 
-    final res = await http.post(
-      Uri.parse('$_adjustedBaseUrl/api/chat'),
-      headers: _headers,
-      body: jsonEncode({
-        'model': model,
-        'messages': messages,
-        'stream': false,
-      }),
-    ).timeout(const Duration(seconds: 120));
+    final res = await http
+        .post(
+          Uri.parse('$_adjustedBaseUrl/api/chat'),
+          headers: _headers,
+          body: jsonEncode({
+            'model': model,
+            'messages': messages,
+            'stream': false,
+          }),
+        )
+        .timeout(const Duration(seconds: 120));
 
     if (res.statusCode != 200) {
       throw Exception('Ollama error ${res.statusCode}');
@@ -85,9 +87,9 @@ class OllamaApiClient {
       final req = http.Request('POST', Uri.parse('$_adjustedBaseUrl/api/chat'));
       req.headers.addAll(_headers);
       req.body = jsonEncode({
-        'model': model, 
-        'messages': messages, 
-        'stream': true
+        'model': model,
+        'messages': messages,
+        'stream': true,
       });
 
       final resp = await client.send(req);

@@ -18,7 +18,8 @@ class DownloadTask {
   String savePath = '';
 
   double progress = 0;
-  String status = 'pending'; // pending | downloading | completed | error | paused | cancelled
+  String status =
+      'pending'; // pending | downloading | completed | error | paused | cancelled
   String speed = '0 B/s';
   int totalBytes = 0;
   int downloadedBytes = 0;
@@ -51,23 +52,27 @@ class BrowserDownloadManager extends ChangeNotifier {
   static final BrowserDownloadManager globalState = BrowserDownloadManager();
 
   final List<DownloadTask> tasks = [];
-  final Dio dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(hours: 6),
-    sendTimeout: const Duration(seconds: 60),
-    followRedirects: true,
-    maxRedirects: 15,
-    validateStatus: (status) => (status ?? 0) < 500, // Accept 2xx, 3xx, 4xx (some CDNs return 206)
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
-      'Accept': '*/*',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'identity',
-      'Connection': 'keep-alive',
-      'DNT': '1',
-      'Upgrade-Insecure-Requests': '1',
-    },
-  ));
+  final Dio dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(hours: 6),
+      sendTimeout: const Duration(seconds: 60),
+      followRedirects: true,
+      maxRedirects: 15,
+      validateStatus: (status) =>
+          (status ?? 0) < 500, // Accept 2xx, 3xx, 4xx (some CDNs return 206)
+      headers: {
+        'User-Agent':
+            'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'identity',
+        'Connection': 'keep-alive',
+        'DNT': '1',
+        'Upgrade-Insecure-Requests': '1',
+      },
+    ),
+  );
   int _blockedAdsCount = 0;
   bool isAdBlockEnabled = true;
 
@@ -117,7 +122,9 @@ class BrowserDownloadManager extends ChangeNotifier {
                 color: Color(0xFF0D0D22),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              child: BrowserDownloadManagerWidget(scrollController: scrollController),
+              child: BrowserDownloadManagerWidget(
+                scrollController: scrollController,
+              ),
             );
           },
         );
@@ -127,8 +134,9 @@ class BrowserDownloadManager extends ChangeNotifier {
 
   // ── Native MediaScanner ──────────────────────────────────────
 
-  static const _mediaScannerChannel =
-      MethodChannel('com.jarvis.jarvis_ai/media_scanner');
+  static const _mediaScannerChannel = MethodChannel(
+    'com.jarvis.jarvis_ai/media_scanner',
+  );
 
   Future<void> _scanMediaFile(String filePath) async {
     try {
@@ -167,7 +175,9 @@ class BrowserDownloadManager extends ChangeNotifier {
         caseSensitive: false,
       ).firstMatch(cd);
       if (m != null) {
-        final name = Uri.decodeComponent(m.group(1)!.trim().replaceAll('"', ''));
+        final name = Uri.decodeComponent(
+          m.group(1)!.trim().replaceAll('"', ''),
+        );
         if (name.isNotEmpty) return _sanitize(name);
       }
     }
@@ -179,7 +189,9 @@ class BrowserDownloadManager extends ChangeNotifier {
     }
     // 3. Last path segment of the URL
     try {
-      final segs = Uri.parse(url).pathSegments.where((s) => s.isNotEmpty).toList();
+      final segs = Uri.parse(
+        url,
+      ).pathSegments.where((s) => s.isNotEmpty).toList();
       if (segs.isNotEmpty) {
         final last = _sanitize(Uri.decodeComponent(segs.last));
         if (last.isNotEmpty) return last;
@@ -202,7 +214,8 @@ class BrowserDownloadManager extends ChangeNotifier {
     String? referer,
     DownloadTask? existingTask,
   }) async {
-    final task = existingTask ??
+    final task =
+        existingTask ??
         DownloadTask(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           url: url,
@@ -218,7 +231,7 @@ class BrowserDownloadManager extends ChangeNotifier {
     final ua = (userAgent?.isNotEmpty == true)
         ? userAgent!
         : 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 '
-            '(KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36';
+              '(KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36';
 
     final baseHeaders = <String, String>{
       'User-Agent': ua,
@@ -265,7 +278,8 @@ class BrowserDownloadManager extends ChangeNotifier {
             : '$dirPath/${resolvedName}_$counter';
         counter++;
       }
-      if (task.savePath.isEmpty || existingTask == null) task.savePath = savePath;
+      if (task.savePath.isEmpty || existingTask == null)
+        task.savePath = savePath;
       notifyListeners();
 
       // Progress callback
@@ -394,7 +408,10 @@ class BrowserDownloadManager extends ChangeNotifier {
 class BrowserDownloadManagerWidget extends StatefulWidget {
   final ScrollController scrollController;
 
-  const BrowserDownloadManagerWidget({super.key, required this.scrollController});
+  const BrowserDownloadManagerWidget({
+    super.key,
+    required this.scrollController,
+  });
 
   @override
   State<BrowserDownloadManagerWidget> createState() =>
@@ -409,12 +426,17 @@ class _BrowserDownloadManagerWidgetState
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: const Color(0xFF10102A),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('AdBlocker',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'AdBlocker',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           content: Text(
             state.isAdBlockEnabled
                 ? 'AdBlocker is currently ON.\nWould you like to turn it off?'
@@ -424,8 +446,10 @@ class _BrowserDownloadManagerWidgetState
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel',
-                  style: TextStyle(color: Colors.white38)),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white38),
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -473,17 +497,17 @@ class _BrowserDownloadManagerWidgetState
 
             // Header
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     '⬇ Download Manager',
                     style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Row(
                     children: [
@@ -491,7 +515,9 @@ class _BrowserDownloadManagerWidgetState
                         onTap: () => _showAdBlockPopup(context, state),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: state.isAdBlockEnabled
                                 ? Colors.blueAccent.withAlpha(25)
@@ -541,8 +567,7 @@ class _BrowserDownloadManagerWidgetState
                   : ListView.builder(
                       controller: widget.scrollController,
                       itemCount: tasks.length,
-                      itemBuilder: (context, index) =>
-                          _buildItem(tasks[index]),
+                      itemBuilder: (context, index) => _buildItem(tasks[index]),
                     ),
             ),
           ],
@@ -603,7 +628,9 @@ class _BrowserDownloadManagerWidgetState
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               // Actions
@@ -617,8 +644,7 @@ class _BrowserDownloadManagerWidgetState
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon:
-                      const Icon(Icons.stop_circle, color: Colors.redAccent),
+                  icon: const Icon(Icons.stop_circle, color: Colors.redAccent),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () =>
@@ -668,13 +694,17 @@ class _BrowserDownloadManagerWidgetState
                   itemBuilder: (ctx) => [
                     const PopupMenuItem(
                       value: 'share',
-                      child: Text('Share',
-                          style: TextStyle(color: Colors.white)),
+                      child: Text(
+                        'Share',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
                     const PopupMenuItem(
                       value: 'delete',
-                      child: Text('Delete File',
-                          style: TextStyle(color: Colors.redAccent)),
+                      child: Text(
+                        'Delete File',
+                        style: TextStyle(color: Colors.redAccent),
+                      ),
                     ),
                   ],
                 ),
@@ -688,8 +718,7 @@ class _BrowserDownloadManagerWidgetState
               child: LinearProgressIndicator(
                 value: task.progress > 0 ? task.progress : null,
                 backgroundColor: Colors.white10,
-                valueColor:
-                    const AlwaysStoppedAnimation<Color>(Colors.blue),
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
                 minHeight: 6,
               ),
             ),
@@ -712,14 +741,14 @@ class _BrowserDownloadManagerWidgetState
                 ),
               ],
             ),
-          ] else if (task.status == 'error' &&
-              task.errorMessage != null) ...[
+          ] else if (task.status == 'error' && task.errorMessage != null) ...[
             Text(
               task.status.toUpperCase(),
               style: TextStyle(
-                  color: statusColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold),
+                color: statusColor,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 2),
             Text(
@@ -732,9 +761,10 @@ class _BrowserDownloadManagerWidgetState
             Text(
               task.status.toUpperCase(),
               style: TextStyle(
-                  color: statusColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold),
+                color: statusColor,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ],

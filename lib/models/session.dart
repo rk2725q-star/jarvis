@@ -27,11 +27,7 @@ class Session extends HiveObject {
     this.lastMessage,
   });
 
-  Session copyWith({
-    String? title,
-    DateTime? updatedAt,
-    String? lastMessage,
-  }) {
+  Session copyWith({String? title, DateTime? updatedAt, String? lastMessage}) {
     return Session(
       id: id,
       title: title ?? this.title,

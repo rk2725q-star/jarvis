@@ -1,4 +1,10 @@
-enum CodesignArtifactType { landingPage, dashboard, slidesDeck, mobileUI, pricingPage }
+enum CodesignArtifactType {
+  landingPage,
+  dashboard,
+  slidesDeck,
+  mobileUI,
+  pricingPage,
+}
 
 class CodesignRequest {
   final String prompt;

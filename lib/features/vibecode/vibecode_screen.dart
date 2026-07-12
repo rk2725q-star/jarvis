@@ -37,10 +37,7 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
               Expanded(
                 child: IndexedStack(
                   index: _selectedIndex,
-                  children: [
-                    const ChatPanel(),
-                    _buildWorkspaceView(vc),
-                  ],
+                  children: [const ChatPanel(), _buildWorkspaceView(vc)],
                 ),
               ),
             ],
@@ -58,15 +55,26 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
 
   Widget _buildAppBar(VibeCodeController vc) {
     return Container(
-      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8, bottom: 8, left: 16, right: 16),
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        bottom: 8,
+        left: 16,
+        right: 16,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFF0A0A0F),
-        border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+        ),
       ),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20),
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white70,
+              size: 20,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           const Expanded(
@@ -103,26 +111,61 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
             onPressed: () => setState(() => _showLogs = !_showLogs),
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.rocket_launch_rounded, color: Colors.white70, size: 20),
+            icon: const Icon(
+              Icons.rocket_launch_rounded,
+              color: Colors.white70,
+              size: 20,
+            ),
             color: const Color(0xFF1E1E2E),
             tooltip: 'Deploy & Connect',
             onSelected: (val) {
               if (val == 'vercel') {
-                showDialog(context: context, builder: (_) => const VercelDialog());
+                showDialog(
+                  context: context,
+                  builder: (_) => const VercelDialog(),
+                );
               } else if (val == 'github') {
-                showDialog(context: context, builder: (_) => const GithubDialog());
+                showDialog(
+                  context: context,
+                  builder: (_) => const GithubDialog(),
+                );
               } else if (val == 'supabase') {
-                showDialog(context: context, builder: (_) => const SupabaseDialog());
+                showDialog(
+                  context: context,
+                  builder: (_) => const SupabaseDialog(),
+                );
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'vercel', child: Text('▲ Deploy to Vercel', style: TextStyle(color: Colors.white))),
-              const PopupMenuItem(value: 'github', child: Text('🐙 Push to GitHub', style: TextStyle(color: Colors.white))),
-              const PopupMenuItem(value: 'supabase', child: Text('⚡ Connect Supabase', style: TextStyle(color: Colors.white))),
+              const PopupMenuItem(
+                value: 'vercel',
+                child: Text(
+                  '▲ Deploy to Vercel',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'github',
+                child: Text(
+                  '🐙 Push to GitHub',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'supabase',
+                child: Text(
+                  '⚡ Connect Supabase',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
             ],
           ),
           IconButton(
-            icon: const Icon(Icons.tune_rounded, color: Colors.white70, size: 20),
+            icon: const Icon(
+              Icons.tune_rounded,
+              color: Colors.white70,
+              size: 20,
+            ),
             onPressed: () => _showBuildSettings(context, vc),
           ),
         ],
@@ -158,16 +201,24 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF7C3AED).withValues(alpha: 0.15) : Colors.transparent,
+            color: isSelected
+                ? const Color(0xFF7C3AED).withValues(alpha: 0.15)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? const Color(0xFF7C3AED).withValues(alpha: 0.3) : Colors.transparent,
+              color: isSelected
+                  ? const Color(0xFF7C3AED).withValues(alpha: 0.3)
+                  : Colors.transparent,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: isSelected ? const Color(0xFF7C3AED) : Colors.white38, size: 16),
+              Icon(
+                icon,
+                color: isSelected ? const Color(0xFF7C3AED) : Colors.white38,
+                size: 16,
+              ),
               const SizedBox(width: 8),
               Text(
                 label,
@@ -215,7 +266,9 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
                   width: 60,
                   height: 60,
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF7C3AED),
+                    ),
                     strokeWidth: 2,
                   ),
                 ),
@@ -233,7 +286,11 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
                 Text(
                   vc.thinkingMessage,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 ClipRRect(
@@ -241,14 +298,20 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
                   child: LinearProgressIndicator(
                     value: vc.buildProgress,
                     backgroundColor: Colors.white.withValues(alpha: 0.05),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFF7C3AED),
+                    ),
                     minHeight: 4,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   '${(vc.buildProgress * 100).toInt()}% COMPLETE',
-                  style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -271,26 +334,51 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
             color: const Color(0xFF0D0D12),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white10),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 20)],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 20,
+              ),
+            ],
           ),
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.terminal_rounded, color: Colors.white38, size: 16),
+                    const Icon(
+                      Icons.terminal_rounded,
+                      color: Colors.white38,
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     const Text(
                       'BUILD LOGS',
-                      style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1),
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white38, size: 16),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white38,
+                        size: 16,
+                      ),
                       onPressed: () => setState(() => _showLogs = false),
                     ),
                   ],
@@ -309,13 +397,21 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
                         children: [
                           Text(
                             '[${log.phase.name.substring(0, 3).toUpperCase()}]',
-                            style: const TextStyle(color: Color(0xFF7C3AED), fontSize: 11, fontFamily: 'monospace'),
+                            style: const TextStyle(
+                              color: Color(0xFF7C3AED),
+                              fontSize: 11,
+                              fontFamily: 'monospace',
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               log.message,
-                              style: const TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'monospace'),
+                              style: const TextStyle(
+                                color: Colors.white60,
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                              ),
                             ),
                           ),
                         ],
@@ -335,7 +431,9 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF16161E),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) {
         return Padding(
           padding: const EdgeInsets.all(32),
@@ -345,10 +443,22 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
             children: [
               const Text(
                 'GENESIS CONFIG',
-                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
               ),
               const SizedBox(height: 24),
-              const Text('AI ARCHITECT PROVIDER', style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+              const Text(
+                'AI ARCHITECT PROVIDER',
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -385,7 +495,14 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -396,7 +513,11 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
             ),
             child: Text(
               status,
-              style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                color: color,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -404,7 +525,11 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
     );
   }
 
-  Widget _providerChip(AIProvider? provider, String label, VibeCodeController vc) {
+  Widget _providerChip(
+    AIProvider? provider,
+    String label,
+    VibeCodeController vc,
+  ) {
     final isSelected = vc.preferredProvider == provider;
     return GestureDetector(
       onTap: () {
@@ -416,7 +541,9 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF1E1E2E),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isSelected ? Colors.white30 : Colors.white10),
+          border: Border.all(
+            color: isSelected ? Colors.white30 : Colors.white10,
+          ),
         ),
         child: Text(
           label,
@@ -444,12 +571,21 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
               ),
-              child: const Icon(Icons.rocket_launch_rounded, size: 40, color: Colors.white10),
+              child: const Icon(
+                Icons.rocket_launch_rounded,
+                size: 40,
+                color: Colors.white10,
+              ),
             ),
             const SizedBox(height: 24),
             const Text(
               'AWAITING GENESIS',
-              style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2),
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -467,9 +603,15 @@ class _VibeCodeScreenState extends State<VibeCodeScreen> {
           return Row(
             children: [
               const SizedBox(width: 240, child: FileExplorerPanel()),
-              VerticalDivider(color: Colors.white.withValues(alpha: 0.05), width: 1),
+              VerticalDivider(
+                color: Colors.white.withValues(alpha: 0.05),
+                width: 1,
+              ),
               const Expanded(flex: 3, child: CodeEditorPanel()),
-              VerticalDivider(color: Colors.white.withValues(alpha: 0.05), width: 1),
+              VerticalDivider(
+                color: Colors.white.withValues(alpha: 0.05),
+                width: 1,
+              ),
               const Expanded(flex: 2, child: PreviewPanel()),
             ],
           );

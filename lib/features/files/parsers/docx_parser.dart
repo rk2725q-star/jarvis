@@ -27,10 +27,9 @@ class DocxParser {
     final relFile = _archive.findFile('word/_rels/document.xml.rels');
     if (relFile == null) return;
     try {
-      final doc = XmlDocument.parse(
-          utf8.decode(relFile.content as List<int>));
+      final doc = XmlDocument.parse(utf8.decode(relFile.content as List<int>));
       for (final rel in doc.findAllElements('Relationship')) {
-        final id     = rel.getAttribute('Id')     ?? '';
+        final id = rel.getAttribute('Id') ?? '';
         final target = rel.getAttribute('Target') ?? '';
         if (target.startsWith('http')) {
           _hyperlinks[id] = target;
@@ -49,25 +48,31 @@ class DocxParser {
       return ParsedDocument(
         title: fileName,
         format: 'docx',
-        blocks: [DocBlock(type: BlockType.paragraph, plainText: 'Could not read document.')],
+        blocks: [
+          DocBlock(
+            type: BlockType.paragraph,
+            plainText: 'Could not read document.',
+          ),
+        ],
       );
     }
 
     late XmlDocument doc;
     try {
-      doc = XmlDocument.parse(
-          utf8.decode(docFile.content as List<int>));
+      doc = XmlDocument.parse(utf8.decode(docFile.content as List<int>));
     } catch (e) {
       return ParsedDocument(
         title: fileName,
         format: 'docx',
-        blocks: [DocBlock(type: BlockType.paragraph, plainText: 'Parse error: $e')],
+        blocks: [
+          DocBlock(type: BlockType.paragraph, plainText: 'Parse error: $e'),
+        ],
       );
     }
 
-    final blocks  = <DocBlock>[];
-    int imgCount   = 0;
-    int pageCount  = 1;
+    final blocks = <DocBlock>[];
+    int imgCount = 0;
+    int pageCount = 1;
 
     final body = doc.findAllElements('w:body').firstOrNull;
     if (body == null) {
@@ -80,7 +85,9 @@ class DocxParser {
           // Check for page break
           if (_hasPageBreak(child)) {
             pageCount++;
-            blocks.add(DocBlock(type: BlockType.pageBreak, pageNumber: pageCount));
+            blocks.add(
+              DocBlock(type: BlockType.pageBreak, pageNumber: pageCount),
+            );
           }
           final block = _parseParagraph(child);
           if (block != null) {
@@ -95,12 +102,14 @@ class DocxParser {
               .map((e) => e.innerText)
               .join();
           if (mathText.isNotEmpty) {
-             final latex = "\$ $mathText \$";
-             blocks.add(DocBlock(
-                 type: BlockType.paragraph,
-                 runs: [TextRun(text: latex, isItalic: true)],
-                 plainText: latex,
-             ));
+            final latex = "\$ $mathText \$";
+            blocks.add(
+              DocBlock(
+                type: BlockType.paragraph,
+                runs: [TextRun(text: latex, isItalic: true)],
+                plainText: latex,
+              ),
+            );
           }
           break;
         case 'tbl':
@@ -135,8 +144,9 @@ class DocxParser {
 
   bool _hasPageBreak(XmlElement para) {
     return para.findAllElements('w:pageBreakBefore').isNotEmpty ||
-        para.findAllElements('w:br').any(
-            (e) => e.getAttribute('w:type') == 'page');
+        para
+            .findAllElements('w:br')
+            .any((e) => e.getAttribute('w:type') == 'page');
   }
 
   DocBlock? _parseParagraph(XmlElement para) {
@@ -145,7 +155,7 @@ class DocxParser {
       final blip = drawing.findAllElements('a:blip').firstOrNull;
       if (blip != null) {
         final rEmbed = blip.getAttribute('r:embed') ?? '';
-        final path   = _rels[rEmbed];
+        final path = _rels[rEmbed];
         if (path != null) {
           final imgData = _images[path];
           if (imgData != null) {
@@ -176,11 +186,14 @@ class DocxParser {
     }
 
     // ── Style ──────────────────────────────────────────────────────────────
-    final pPr    = para.findAllElements('w:pPr').firstOrNull;
-    final pStyle = pPr?.findAllElements('w:pStyle')
+    final pPr = para.findAllElements('w:pPr').firstOrNull;
+    final pStyle =
+        pPr
+            ?.findAllElements('w:pStyle')
             .firstOrNull
             ?.getAttribute('w:val')
-            ?.toLowerCase() ?? '';
+            ?.toLowerCase() ??
+        '';
 
     BlockType blockType = BlockType.paragraph;
     if (pStyle.contains('heading1') || pStyle == 'title') {
@@ -202,15 +215,21 @@ class DocxParser {
     }
 
     // ── Bullet / Numbered ─────────────────────────────────────────────────
-    int indentLevel   = 0;
+    int indentLevel = 0;
     int? bulletNumber;
     final numPr = pPr?.findAllElements('w:numPr').firstOrNull;
     if (numPr != null) {
-      final ilvl = int.tryParse(
-              numPr.findAllElements('w:ilvl')
-                  .firstOrNull
-                  ?.getAttribute('w:val') ?? '0') ?? 0;
-      final numId = numPr.findAllElements('w:numId')
+      final ilvl =
+          int.tryParse(
+            numPr
+                    .findAllElements('w:ilvl')
+                    .firstOrNull
+                    ?.getAttribute('w:val') ??
+                '0',
+          ) ??
+          0;
+      final numId = numPr
+          .findAllElements('w:numId')
           .firstOrNull
           ?.getAttribute('w:val');
       indentLevel = ilvl;
@@ -235,8 +254,8 @@ class DocxParser {
         if (run != null) runs.add(run);
       } else if (elem.name.local == 'hyperlink') {
         // Hyperlink runs
-        final rId   = elem.getAttribute('r:id') ?? '';
-        final url   = _hyperlinks[rId];
+        final rId = elem.getAttribute('r:id') ?? '';
+        final url = _hyperlinks[rId];
         for (final r in elem.findAllElements('w:r')) {
           final run = _parseRun(r, hyperlink: url);
           if (run != null) runs.add(run);
@@ -254,10 +273,7 @@ class DocxParser {
             .map((e) => e.innerText)
             .join();
         if (mathText.isNotEmpty) {
-          runs.add(TextRun(
-            text: "\$ $mathText \$",
-            isItalic: true,
-          ));
+          runs.add(TextRun(text: "\$ $mathText \$", isItalic: true));
         }
       }
     }
@@ -268,11 +284,11 @@ class DocxParser {
     }
 
     return DocBlock(
-      type:         blockType,
-      runs:         runs,
-      plainText:    plainText,
-      alignment:    alignment,
-      indentLevel:  indentLevel,
+      type: blockType,
+      runs: runs,
+      plainText: plainText,
+      alignment: alignment,
+      indentLevel: indentLevel,
       bulletNumber: bulletNumber,
     );
   }
@@ -283,30 +299,32 @@ class DocxParser {
     // Skip deleted text
     if (run.findAllElements('w:del').isNotEmpty) return null;
 
-    bool isBold      = false;
-    bool isItalic    = false;
+    bool isBold = false;
+    bool isItalic = false;
     bool isUnderline = false;
-    bool isStrike    = false;
+    bool isStrike = false;
     bool isSuperscript = false;
-    bool isSubscript   = false;
+    bool isSubscript = false;
     double? fontSize;
     String? color;
     String? highlight;
 
     if (rPr != null) {
-      isBold      = rPr.findAllElements('w:b').isNotEmpty &&
-                    rPr.findAllElements('w:b')
-                        .first.getAttribute('w:val') != 'false';
-      isItalic    = rPr.findAllElements('w:i').isNotEmpty;
-      isUnderline = rPr.findAllElements('w:u').isNotEmpty &&
-                    rPr.findAllElements('w:u')
-                        .first.getAttribute('w:val') != 'none';
-      isStrike    = rPr.findAllElements('w:strike').isNotEmpty;
+      isBold =
+          rPr.findAllElements('w:b').isNotEmpty &&
+          rPr.findAllElements('w:b').first.getAttribute('w:val') != 'false';
+      isItalic = rPr.findAllElements('w:i').isNotEmpty;
+      isUnderline =
+          rPr.findAllElements('w:u').isNotEmpty &&
+          rPr.findAllElements('w:u').first.getAttribute('w:val') != 'none';
+      isStrike = rPr.findAllElements('w:strike').isNotEmpty;
 
-      final vertAlign = rPr.findAllElements('w:vertAlign')
-          .firstOrNull?.getAttribute('w:val');
+      final vertAlign = rPr
+          .findAllElements('w:vertAlign')
+          .firstOrNull
+          ?.getAttribute('w:val');
       isSuperscript = vertAlign == 'superscript';
-      isSubscript   = vertAlign == 'subscript';
+      isSubscript = vertAlign == 'subscript';
 
       final szEl = rPr.findAllElements('w:sz').firstOrNull;
       if (szEl != null) {
@@ -325,24 +343,22 @@ class DocxParser {
       }
     }
 
-    final text = run.findAllElements('w:t')
-        .map((t) => t.innerText)
-        .join();
+    final text = run.findAllElements('w:t').map((t) => t.innerText).join();
 
     if (text.isEmpty) return null;
 
     return TextRun(
-      text:          text,
-      isBold:        isBold,
-      isItalic:      isItalic,
-      isUnderline:   isUnderline,
-      isStrike:      isStrike,
-      fontSize:      fontSize,
-      color:         color,
-      highlight:     highlight,
+      text: text,
+      isBold: isBold,
+      isItalic: isItalic,
+      isUnderline: isUnderline,
+      isStrike: isStrike,
+      fontSize: fontSize,
+      color: color,
+      highlight: highlight,
       isSuperscript: isSuperscript,
-      isSubscript:   isSubscript,
-      hyperlink:     hyperlink,
+      isSubscript: isSubscript,
+      hyperlink: hyperlink,
     );
   }
 
@@ -353,11 +369,16 @@ class DocxParser {
     for (final tr in tbl.findAllElements('w:tr')) {
       final cells = <TableCell>[];
       for (final tc in tr.findAllElements('w:tc')) {
-        final tcPr    = tc.findAllElements('w:tcPr').firstOrNull;
-        final colSpan = int.tryParse(
-                tcPr?.findAllElements('w:gridSpan')
-                    .firstOrNull
-                    ?.getAttribute('w:val') ?? '1') ?? 1;
+        final tcPr = tc.findAllElements('w:tcPr').firstOrNull;
+        final colSpan =
+            int.tryParse(
+              tcPr
+                      ?.findAllElements('w:gridSpan')
+                      .firstOrNull
+                      ?.getAttribute('w:val') ??
+                  '1',
+            ) ??
+            1;
 
         // Background
         final shdEl = tcPr?.findAllElements('w:shd').firstOrNull;
@@ -378,12 +399,14 @@ class DocxParser {
         }
         if (runs.isNotEmpty && runs.last.text == '\n') runs.removeLast();
 
-        cells.add(TableCell(
-          runs:     runs,
-          colSpan:  colSpan,
-          isHeader: isFirstRow,
-          bgColor:  bgColor,
-        ));
+        cells.add(
+          TableCell(
+            runs: runs,
+            colSpan: colSpan,
+            isHeader: isFirstRow,
+            bgColor: bgColor,
+          ),
+        );
       }
       if (cells.isNotEmpty) rows.add(TableRow(cells));
       isFirstRow = false;
@@ -397,8 +420,7 @@ class DocxParser {
     final coreFile = _archive.findFile('docProps/core.xml');
     if (coreFile == null) return null;
     try {
-      final doc = XmlDocument.parse(
-          utf8.decode(coreFile.content as List<int>));
+      final doc = XmlDocument.parse(utf8.decode(coreFile.content as List<int>));
       return doc.findAllElements(tag).firstOrNull?.innerText;
     } catch (_) {
       return null;
@@ -407,16 +429,16 @@ class DocxParser {
 
   String _colorNameToHex(String name) {
     const map = {
-      'yellow':   '#FFFF00',
-      'green':    '#00FF00',
-      'cyan':     '#00FFFF',
-      'magenta':  '#FF00FF',
-      'blue':     '#0000FF',
-      'red':      '#FF0000',
+      'yellow': '#FFFF00',
+      'green': '#00FF00',
+      'cyan': '#00FFFF',
+      'magenta': '#FF00FF',
+      'blue': '#0000FF',
+      'red': '#FF0000',
       'darkBlue': '#00008B',
-      'darkRed':  '#8B0000',
-      'darkGreen':'#006400',
-      'darkYellow':'#9B870C',
+      'darkRed': '#8B0000',
+      'darkGreen': '#006400',
+      'darkYellow': '#9B870C',
     };
     return map[name] ?? '#FFFF00';
   }

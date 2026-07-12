@@ -14,10 +14,10 @@ class DDGInstantAnswerSource {
       final response = await _dio.get(
         ApiConstants.ddgInstantAnswerBase,
         queryParameters: {
-          'q':             query,
-          'format':        'json',
-          'no_redirect':   '1',
-          'no_html':       '1',
+          'q': query,
+          'format': 'json',
+          'no_redirect': '1',
+          'no_html': '1',
           'skip_disambig': '1',
         },
       );
@@ -26,9 +26,10 @@ class DDGInstantAnswerSource {
 
       final data = response.data as Map<String, dynamic>;
 
-      final hasAbstract = (data['AbstractText']?.toString().isNotEmpty ?? false);
-      final hasAnswer   = (data['Answer']?.toString().isNotEmpty ?? false);
-      final hasHeading  = (data['Heading']?.toString().isNotEmpty ?? false);
+      final hasAbstract =
+          (data['AbstractText']?.toString().isNotEmpty ?? false);
+      final hasAnswer = (data['Answer']?.toString().isNotEmpty ?? false);
+      final hasHeading = (data['Heading']?.toString().isNotEmpty ?? false);
 
       if (!hasAbstract && !hasAnswer && !hasHeading) return null;
 
@@ -37,10 +38,7 @@ class DDGInstantAnswerSource {
         data['AbstractSource'] = 'DuckDuckGo';
       }
 
-      return AriaSearchResult.fromInstantAnswer(
-        raw: data,
-        category: category,
-      );
+      return AriaSearchResult.fromInstantAnswer(raw: data, category: category);
     } catch (e) {
       return null;
     }

@@ -183,23 +183,34 @@ class _ChatPanelState extends State<ChatPanel> {
                   const SizedBox(height: 12),
                   const Divider(color: Colors.white10),
                   const SizedBox(height: 8),
-                  ...vc.buildLogs.reversed.take(3).map((log) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle_outline, size: 12, color: Colors.greenAccent),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            log.message,
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                  ...vc.buildLogs.reversed
+                      .take(3)
+                      .map(
+                        (log) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.check_circle_outline,
+                                size: 12,
+                                color: Colors.greenAccent,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  log.message,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.4),
+                                    fontSize: 11,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  )),
+                      ),
                 ],
               ],
             ),

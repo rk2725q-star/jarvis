@@ -15,13 +15,17 @@ class RssSource {
       if (response.statusCode != 200) return [];
 
       final xmlString = response.data.toString();
-      
+
       if (source.type == SourceType.rss) {
         final feed = wf.RssFeed.parse(xmlString);
-        return feed.items?.map((item) => _fromRssItem(item, source)).toList() ?? [];
+        return feed.items?.map((item) => _fromRssItem(item, source)).toList() ??
+            [];
       } else if (source.type == SourceType.atom) {
         final feed = wf.AtomFeed.parse(xmlString);
-        return feed.items?.map((item) => _fromAtomItem(item, source)).toList() ?? [];
+        return feed.items
+                ?.map((item) => _fromAtomItem(item, source))
+                .toList() ??
+            [];
       }
       return [];
     } catch (e) {
@@ -36,7 +40,8 @@ class RssSource {
     final pubDate = item.pubDate;
     final now = DateTime.now();
 
-    final normalized = '${title.toLowerCase().trim()}${link.toLowerCase().trim()}';
+    final normalized =
+        '${title.toLowerCase().trim()}${link.toLowerCase().trim()}';
     final hash = sha256.convert(utf8.encode(normalized)).toString();
 
     return AriaSearchResult(
@@ -68,10 +73,13 @@ class RssSource {
     final title = item.title ?? '';
     final link = item.links?.first.href ?? '';
     final summary = item.summary ?? item.content ?? '';
-    final publishedAt = item.published != null ? DateTime.tryParse(item.published!) : item.updated;
+    final publishedAt = item.published != null
+        ? DateTime.tryParse(item.published!)
+        : item.updated;
     final now = DateTime.now();
 
-    final normalized = '${title.toLowerCase().trim()}${link.toLowerCase().trim()}';
+    final normalized =
+        '${title.toLowerCase().trim()}${link.toLowerCase().trim()}';
     final hash = sha256.convert(utf8.encode(normalized)).toString();
 
     return AriaSearchResult(

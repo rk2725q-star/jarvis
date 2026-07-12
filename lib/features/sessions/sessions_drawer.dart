@@ -70,7 +70,10 @@ class _SessionsDrawerState extends State<SessionsDrawer> {
         final filteredSessions = chatProvider.sessions.where((s) {
           if (_searchQuery.isEmpty) return true;
           return s.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              (s.lastMessage != null && s.lastMessage!.toLowerCase().contains(_searchQuery.toLowerCase()));
+              (s.lastMessage != null &&
+                  s.lastMessage!.toLowerCase().contains(
+                    _searchQuery.toLowerCase(),
+                  ));
         }).toList();
 
         final grouped = _groupSessions(filteredSessions);
@@ -102,7 +105,8 @@ class _SessionsDrawerState extends State<SessionsDrawer> {
                   Navigator.pop(context);
                 },
                 onDelete: () => chatProvider.deleteSession(session.id),
-                onRename: (newTitle) => chatProvider.renameSession(session.id, newTitle),
+                onRename: (newTitle) =>
+                    chatProvider.renameSession(session.id, newTitle),
               ),
             );
           }
@@ -123,7 +127,9 @@ class _SessionsDrawerState extends State<SessionsDrawer> {
                 // ── Sessions List ──────────────────────────────
                 Expanded(
                   child: filteredSessions.isEmpty
-                      ? (_searchQuery.isNotEmpty ? _buildNoSearchResults() : _buildEmptySessions())
+                      ? (_searchQuery.isNotEmpty
+                            ? _buildNoSearchResults()
+                            : _buildEmptySessions())
                       : ListView.builder(
                           padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                           itemCount: listItems.length,
@@ -154,8 +160,15 @@ class _SessionsDrawerState extends State<SessionsDrawer> {
         style: const TextStyle(color: Colors.white, fontSize: 13),
         decoration: InputDecoration(
           hintText: 'Search conversations...',
-          hintStyle: TextStyle(color: JarvisColors.textMuted.withValues(alpha: 0.8), fontSize: 13),
-          prefixIcon: const Icon(Icons.search_rounded, color: JarvisColors.textSecondary, size: 16),
+          hintStyle: TextStyle(
+            color: JarvisColors.textMuted.withValues(alpha: 0.8),
+            fontSize: 13,
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: JarvisColors.textSecondary,
+            size: 16,
+          ),
           suffixIcon: _searchQuery.isNotEmpty
               ? GestureDetector(
                   onTap: () {
@@ -164,7 +177,11 @@ class _SessionsDrawerState extends State<SessionsDrawer> {
                       _searchQuery = '';
                     });
                   },
-                  child: const Icon(Icons.close_rounded, color: JarvisColors.textSecondary, size: 16),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: JarvisColors.textSecondary,
+                    size: 16,
+                  ),
                 )
               : null,
           filled: true,
@@ -172,15 +189,24 @@ class _SessionsDrawerState extends State<SessionsDrawer> {
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: JarvisColors.border, width: 0.5),
+            borderSide: const BorderSide(
+              color: JarvisColors.border,
+              width: 0.5,
+            ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: JarvisColors.border.withValues(alpha: 0.5), width: 0.5),
+            borderSide: BorderSide(
+              color: JarvisColors.border.withValues(alpha: 0.5),
+              width: 0.5,
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: JarvisColors.accentPrimary.withValues(alpha: 0.5), width: 1),
+            borderSide: BorderSide(
+              color: JarvisColors.accentPrimary.withValues(alpha: 0.5),
+              width: 1,
+            ),
           ),
         ),
       ),
@@ -194,11 +220,19 @@ class _SessionsDrawerState extends State<SessionsDrawer> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off_rounded, size: 36, color: JarvisColors.textMuted.withValues(alpha: 0.5)),
+            Icon(
+              Icons.search_off_rounded,
+              size: 36,
+              color: JarvisColors.textMuted.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: 12),
             const Text(
               'No matches found',
-              style: TextStyle(color: JarvisColors.textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: JarvisColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
@@ -214,7 +248,13 @@ class _SessionsDrawerState extends State<SessionsDrawer> {
                   _searchQuery = '';
                 });
               },
-              child: const Text('Clear Search', style: TextStyle(color: JarvisColors.accentPrimary, fontSize: 12)),
+              child: const Text(
+                'Clear Search',
+                style: TextStyle(
+                  color: JarvisColors.accentPrimary,
+                  fontSize: 12,
+                ),
+              ),
             ),
           ],
         ),
@@ -227,8 +267,11 @@ class _SessionsDrawerState extends State<SessionsDrawer> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.chat_bubble_outline_rounded,
-              size: 40, color: JarvisColors.textMuted.withValues(alpha: 0.4)),
+          Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 40,
+            color: JarvisColors.textMuted.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 12),
           const Text(
             'No conversations yet',
@@ -280,7 +323,11 @@ class _DrawerHeader extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -288,7 +335,8 @@ class _DrawerHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ShaderMask(
-                  shaderCallback: (b) => JarvisColors.primaryGradient.createShader(b),
+                  shaderCallback: (b) =>
+                      JarvisColors.primaryGradient.createShader(b),
                   child: const Text(
                     'JARVIS',
                     style: TextStyle(
@@ -317,9 +365,15 @@ class _DrawerHeader extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: JarvisColors.accentPrimary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: JarvisColors.accentPrimary.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: JarvisColors.accentPrimary.withValues(alpha: 0.3),
+                  ),
                 ),
-                child: const Icon(Icons.add_rounded, color: JarvisColors.accentPrimary, size: 16),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: JarvisColors.accentPrimary,
+                  size: 16,
+                ),
               ),
               onPressed: () {
                 cp.createNewSession();
@@ -365,7 +419,9 @@ class _FeaturesSection extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: JarvisColors.accentPrimary.withValues(alpha: 0.15),
+                        color: JarvisColors.accentPrimary.withValues(
+                          alpha: 0.15,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -398,7 +454,11 @@ class _FeaturesSection extends StatelessWidget {
                     ),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white54,
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
@@ -415,34 +475,52 @@ class _FeaturesSection extends StatelessWidget {
                     _FeatureCard(
                       icon: Icons.folder_special_rounded,
                       label: 'File Hub',
-                      description: 'Extract & analyze documents, images, and audio',
+                      description:
+                          'Extract & analyze documents, images, and audio',
                       color: JarvisColors.accentSecondary,
                       onTap: () {
                         Navigator.pop(ctx);
                         Navigator.pop(context);
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const JarvisFileHub()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const JarvisFileHub(),
+                          ),
+                        );
                       },
                     ),
                     _FeatureCard(
                       icon: Icons.bolt_rounded,
                       label: 'Agentica OS',
-                      description: 'Autonomous multi-step Android operation plans',
+                      description:
+                          'Autonomous multi-step Android operation plans',
                       color: Colors.amber,
                       onTap: () {
                         Navigator.pop(ctx);
                         Navigator.pop(context);
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const AgenticaScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AgenticaScreen(),
+                          ),
+                        );
                       },
                     ),
                     _FeatureCard(
                       icon: Icons.map_rounded,
                       label: 'AI Roadmap Hub',
-                      description: '10-Year Phased strategic research plan & dashboard',
+                      description:
+                          '10-Year Phased strategic research plan & dashboard',
                       color: JarvisColors.accentGlow,
                       onTap: () {
                         Navigator.pop(ctx);
                         Navigator.pop(context);
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const RoadmapScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RoadmapScreen(),
+                          ),
+                        );
                       },
                     ),
                     _FeatureCard(
@@ -453,7 +531,12 @@ class _FeaturesSection extends StatelessWidget {
                       onTap: () {
                         Navigator.pop(ctx);
                         Navigator.pop(context);
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SkillsScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SkillsScreen(),
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -564,7 +647,7 @@ class _FeatureCardState extends State<_FeatureCard> {
                       color: widget.color.withValues(alpha: 0.15),
                       blurRadius: 16,
                       spreadRadius: 2,
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -667,7 +750,7 @@ class _FeatureTileState extends State<_FeatureTile> {
                       color: widget.color.withValues(alpha: 0.1),
                       blurRadius: 10,
                       spreadRadius: 1,
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -677,7 +760,10 @@ class _FeatureTileState extends State<_FeatureTile> {
               onTap: widget.onTap,
               borderRadius: BorderRadius.circular(12),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -714,7 +800,9 @@ class _FeatureTileState extends State<_FeatureTile> {
                     ),
                     Icon(
                       Icons.chevron_right_rounded,
-                      color: widget.color.withValues(alpha: _isHovered ? 0.8 : 0.5),
+                      color: widget.color.withValues(
+                        alpha: _isHovered ? 0.8 : 0.5,
+                      ),
                       size: 18,
                     ),
                   ],
@@ -762,8 +850,21 @@ class _SessionTileState extends State<_SessionTile> {
     } else {
       final diff = now.difference(dt).inDays;
       if (diff == 1) return 'Yesterday';
-      
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       return '${months[dt.month - 1]} ${dt.day}';
     }
   }
@@ -806,13 +907,22 @@ class _SessionTileState extends State<_SessionTile> {
                   fillColor: Colors.white.withValues(alpha: 0.03),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: JarvisColors.border, width: 0.5),
+                    borderSide: const BorderSide(
+                      color: JarvisColors.border,
+                      width: 0.5,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: JarvisColors.accentPrimary, width: 1),
+                    borderSide: const BorderSide(
+                      color: JarvisColors.accentPrimary,
+                      width: 1,
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                 ),
                 autofocus: true,
               ),
@@ -824,7 +934,10 @@ class _SessionTileState extends State<_SessionTile> {
                     onPressed: () => Navigator.pop(ctx),
                     child: const Text(
                       'Cancel',
-                      style: TextStyle(color: JarvisColors.textMuted, fontSize: 13),
+                      style: TextStyle(
+                        color: JarvisColors.textMuted,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -843,9 +956,18 @@ class _SessionTileState extends State<_SessionTile> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                     ),
-                    child: const Text('Rename', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Rename',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -863,10 +985,7 @@ class _SessionTileState extends State<_SessionTile> {
         backgroundColor: const Color(0xFF0F0F1A),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(
-            color: JarvisColors.error,
-            width: 0.5,
-          ),
+          side: const BorderSide(color: JarvisColors.error, width: 0.5),
         ),
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -900,7 +1019,10 @@ class _SessionTileState extends State<_SessionTile> {
                     onPressed: () => Navigator.pop(ctx),
                     child: const Text(
                       'Cancel',
-                      style: TextStyle(color: JarvisColors.textMuted, fontSize: 13),
+                      style: TextStyle(
+                        color: JarvisColors.textMuted,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -916,9 +1038,18 @@ class _SessionTileState extends State<_SessionTile> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                     ),
-                    child: const Text('Delete', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Delete',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -942,7 +1073,11 @@ class _SessionTileState extends State<_SessionTile> {
           color: JarvisColors.error.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.delete_rounded, color: JarvisColors.error, size: 18),
+        child: const Icon(
+          Icons.delete_rounded,
+          color: JarvisColors.error,
+          size: 18,
+        ),
       ),
       confirmDismiss: (_) async {
         bool confirm = false;
@@ -963,12 +1098,20 @@ class _SessionTileState extends State<_SessionTile> {
                 children: [
                   const Text(
                     'Delete Chat',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   const Text(
                     'Are you sure you want to delete this chat session? This action cannot be undone.',
-                    style: TextStyle(color: JarvisColors.textSecondary, fontSize: 13, height: 1.4),
+                    style: TextStyle(
+                      color: JarvisColors.textSecondary,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -979,7 +1122,13 @@ class _SessionTileState extends State<_SessionTile> {
                           confirm = false;
                           Navigator.pop(ctx);
                         },
-                        child: const Text('Cancel', style: TextStyle(color: JarvisColors.textMuted, fontSize: 13)),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: JarvisColors.textMuted,
+                            fontSize: 13,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
@@ -991,10 +1140,21 @@ class _SessionTileState extends State<_SessionTile> {
                           backgroundColor: JarvisColors.error,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                         ),
-                        child: const Text('Delete', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Delete',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1025,31 +1185,33 @@ class _SessionTileState extends State<_SessionTile> {
                       end: Alignment.bottomRight,
                     )
                   : (_isHovered
-                      ? LinearGradient(
-                          colors: [
-                            Colors.white.withValues(alpha: 0.04),
-                            Colors.white.withValues(alpha: 0.01),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null),
+                        ? LinearGradient(
+                            colors: [
+                              Colors.white.withValues(alpha: 0.04),
+                              Colors.white.withValues(alpha: 0.01),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null),
               color: widget.isActive ? null : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: widget.isActive
                     ? JarvisColors.accentPrimary.withValues(alpha: 0.3)
                     : (_isHovered
-                        ? Colors.white.withValues(alpha: 0.1)
-                        : Colors.white.withValues(alpha: 0.03)),
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.white.withValues(alpha: 0.03)),
               ),
               boxShadow: widget.isActive
                   ? [
                       BoxShadow(
-                        color: JarvisColors.accentPrimary.withValues(alpha: 0.1),
+                        color: JarvisColors.accentPrimary.withValues(
+                          alpha: 0.1,
+                        ),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
-                      )
+                      ),
                     ]
                   : [],
             ),
@@ -1068,7 +1230,9 @@ class _SessionTileState extends State<_SessionTile> {
                         borderRadius: BorderRadius.circular(2),
                         boxShadow: [
                           BoxShadow(
-                            color: JarvisColors.accentPrimary.withValues(alpha: 0.5),
+                            color: JarvisColors.accentPrimary.withValues(
+                              alpha: 0.5,
+                            ),
                             blurRadius: 4,
                           ),
                         ],
@@ -1076,13 +1240,18 @@ class _SessionTileState extends State<_SessionTile> {
                     ),
                   ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.chat_bubble_outline_rounded,
                         size: 14,
-                        color: widget.isActive ? JarvisColors.accentPrimary : JarvisColors.textSecondary,
+                        color: widget.isActive
+                            ? JarvisColors.accentPrimary
+                            : JarvisColors.textSecondary,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -1092,9 +1261,13 @@ class _SessionTileState extends State<_SessionTile> {
                             Text(
                               widget.session.title,
                               style: TextStyle(
-                                color: widget.isActive ? JarvisColors.textPrimary : JarvisColors.textSecondary,
+                                color: widget.isActive
+                                    ? JarvisColors.textPrimary
+                                    : JarvisColors.textSecondary,
                                 fontSize: 13,
-                                fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w400,
+                                fontWeight: widget.isActive
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1104,10 +1277,14 @@ class _SessionTileState extends State<_SessionTile> {
                               _formatSessionTime(widget.session.updatedAt),
                               style: TextStyle(
                                 color: widget.isActive
-                                    ? JarvisColors.accentPrimary.withValues(alpha: 0.8)
+                                    ? JarvisColors.accentPrimary.withValues(
+                                        alpha: 0.8,
+                                      )
                                     : JarvisColors.textMuted,
                                 fontSize: 9,
-                                fontWeight: widget.isActive ? FontWeight.w500 : FontWeight.normal,
+                                fontWeight: widget.isActive
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
                               ),
                             ),
                           ],
@@ -1119,7 +1296,9 @@ class _SessionTileState extends State<_SessionTile> {
                           icon: Icon(
                             Icons.more_horiz_rounded,
                             size: 18,
-                            color: widget.isActive ? JarvisColors.accentPrimary : JarvisColors.textSecondary,
+                            color: widget.isActive
+                                ? JarvisColors.accentPrimary
+                                : JarvisColors.textSecondary,
                           ),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 100),
@@ -1144,9 +1323,19 @@ class _SessionTileState extends State<_SessionTile> {
                               height: 36,
                               child: Row(
                                 children: const [
-                                  Icon(Icons.edit_rounded, size: 14, color: JarvisColors.textSecondary),
+                                  Icon(
+                                    Icons.edit_rounded,
+                                    size: 14,
+                                    color: JarvisColors.textSecondary,
+                                  ),
                                   SizedBox(width: 8),
-                                  Text('Rename', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                  Text(
+                                    'Rename',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1155,9 +1344,19 @@ class _SessionTileState extends State<_SessionTile> {
                               height: 36,
                               child: Row(
                                 children: const [
-                                  Icon(Icons.delete_outline_rounded, size: 14, color: JarvisColors.error),
+                                  Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 14,
+                                    color: JarvisColors.error,
+                                  ),
                                   SizedBox(width: 8),
-                                  Text('Delete', style: TextStyle(color: JarvisColors.error, fontSize: 13)),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      color: JarvisColors.error,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),

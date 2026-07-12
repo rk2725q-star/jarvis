@@ -54,25 +54,28 @@ Future<void> main() async {
   ytAudioHandler = await AudioService.init(
     builder: () => YTAudioHandler(),
     config: const AudioServiceConfig(
-      androidNotificationChannelId:          'com.jarvis.yt.channel.audio',
-      androidNotificationChannelName:        'YouTube Background Play',
-      androidNotificationChannelDescription: 'Keeps YouTube audio playing in background',
-      androidStopForegroundOnPause:          false,  // keep foreground service alive on pause
-      notificationColor:                     Color(0xFFFF0000),
+      androidNotificationChannelId: 'com.jarvis.yt.channel.audio',
+      androidNotificationChannelName: 'YouTube Background Play',
+      androidNotificationChannelDescription:
+          'Keeps YouTube audio playing in background',
+      androidStopForegroundOnPause:
+          false, // keep foreground service alive on pause
+      notificationColor: Color(0xFFFF0000),
     ),
   );
-  
+
   // Pre-initialize X5 engine (non-blocking)
   FlutterFileView.init();
 
-
   // System UI
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: JarvisColors.bg,
-    systemNavigationBarIconBrightness: Brightness.light,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: JarvisColors.bg,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -113,7 +116,7 @@ Future<void> main() async {
     googleDocs: googleDocs,
     skillService: skillService,
   );
-  await router.init(); 
+  await router.init();
 
   // Build integrations provider FIRST (needed by chatProvider)
   final integrationsProvider = IntegrationsProvider();
@@ -131,7 +134,6 @@ Future<void> main() async {
   final vibecodeController = VibeCodeController(router: router);
   final assignmentProvider = AssignmentProvider(router: router);
 
-
   runApp(
     rp.ProviderScope(
       child: MultiProvider(
@@ -139,11 +141,19 @@ Future<void> main() async {
           ChangeNotifierProvider<AIRouter>.value(value: router),
           ChangeNotifierProvider<ChatProvider>.value(value: chatProvider),
           ChangeNotifierProvider<OllamaProvider>.value(value: ollamaProvider),
-          ChangeNotifierProvider<VibeCodeController>.value(value: vibecodeController),
-          ChangeNotifierProvider<AssignmentProvider>.value(value: assignmentProvider),
-          ChangeNotifierProvider<IntegrationsProvider>.value(value: integrationsProvider),
+          ChangeNotifierProvider<VibeCodeController>.value(
+            value: vibecodeController,
+          ),
+          ChangeNotifierProvider<AssignmentProvider>.value(
+            value: assignmentProvider,
+          ),
+          ChangeNotifierProvider<IntegrationsProvider>.value(
+            value: integrationsProvider,
+          ),
           ChangeNotifierProvider<SkillService>.value(value: skillService),
-          ChangeNotifierProvider<YTDownloadProvider>(create: (_) => YTDownloadProvider()),
+          ChangeNotifierProvider<YTDownloadProvider>(
+            create: (_) => YTDownloadProvider(),
+          ),
           Provider<SecureStorageService>.value(value: secureStorage),
           Provider<MemoryService>.value(value: memory),
           Provider<SessionService>.value(value: sessionService),

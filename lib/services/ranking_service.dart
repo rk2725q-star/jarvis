@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import '../data/models/search_result_model.dart';
 
 class RankingService {
-
   List<AriaSearchResult> rank(List<AriaSearchResult> results) {
     final scored = results.map((r) {
       final score = _compositeScore(r);
@@ -24,17 +23,20 @@ class RankingService {
       freshness = math.exp(-0.1 * hoursOld).clamp(0.01, 1.0);
     }
 
-    final typeBonus = result.resultType == ResultType.instantAnswer ? 0.10 : 0.0;
+    final typeBonus = result.resultType == ResultType.instantAnswer
+        ? 0.10
+        : 0.0;
     final verifiedBonus = result.isVerified ? 0.05 : 0.0;
     final biasPenalty = result.biasFlags.length * 0.05;
 
-    final score = (result.trustScore    * 0.35) +
-                  (0.60                 * 0.30) + // corroboration stub
-                  (freshness            * 0.20) +
-                  (result.confidence    * 0.15) +
-                  typeBonus +
-                  verifiedBonus -
-                  biasPenalty;
+    final score =
+        (result.trustScore * 0.35) +
+        (0.60 * 0.30) + // corroboration stub
+        (freshness * 0.20) +
+        (result.confidence * 0.15) +
+        typeBonus +
+        verifiedBonus -
+        biasPenalty;
 
     return score.clamp(0.0, 1.0);
   }

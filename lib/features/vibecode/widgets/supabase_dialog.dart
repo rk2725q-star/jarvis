@@ -43,7 +43,11 @@ class _SupabaseDialogState extends State<SupabaseDialog> {
                 SizedBox(width: 12),
                 Text(
                   'Supabase Integration',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -60,7 +64,9 @@ class _SupabaseDialogState extends State<SupabaseDialog> {
               decoration: BoxDecoration(
                 color: const Color(0xFF0A0A0F),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF3ECF8E).withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: const Color(0xFF3ECF8E).withValues(alpha: 0.3),
+                ),
               ),
               child: const Text(
                 '💡 Find these in: Supabase Dashboard → Project Settings → API',
@@ -69,7 +75,10 @@ class _SupabaseDialogState extends State<SupabaseDialog> {
             ),
             const SizedBox(height: 16),
 
-            _buildTextField(_urlController, 'Project URL (https://xxxx.supabase.co)'),
+            _buildTextField(
+              _urlController,
+              'Project URL (https://xxxx.supabase.co)',
+            ),
             const SizedBox(height: 12),
             _buildTextField(_keyController, 'Anon/Public Key', obscure: true),
             const SizedBox(height: 16),
@@ -90,7 +99,9 @@ class _SupabaseDialogState extends State<SupabaseDialog> {
                 child: Text(
                   _testResult!,
                   style: TextStyle(
-                    color: _testSuccess ? const Color(0xFF3ECF8E) : Colors.redAccent,
+                    color: _testSuccess
+                        ? const Color(0xFF3ECF8E)
+                        : Colors.redAccent,
                     fontSize: 12,
                   ),
                 ),
@@ -105,26 +116,30 @@ class _SupabaseDialogState extends State<SupabaseDialog> {
                       side: const BorderSide(color: Color(0xFF3ECF8E)),
                       foregroundColor: const Color(0xFF3ECF8E),
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                    onPressed: _isTesting ? null : () async {
-                      final url = _urlController.text.trim();
-                      final key = _keyController.text.trim();
-                      if (url.isEmpty || key.isEmpty) return;
+                    onPressed: _isTesting
+                        ? null
+                        : () async {
+                            final url = _urlController.text.trim();
+                            final key = _keyController.text.trim();
+                            if (url.isEmpty || key.isEmpty) return;
 
-                      // First connect, then test
-                      vc.connectSupabase(url: url, anonKey: key);
-                      setState(() => _isTesting = true);
+                            // First connect, then test
+                            vc.connectSupabase(url: url, anonKey: key);
+                            setState(() => _isTesting = true);
 
-                      final result = await vc.testSupabaseConnection();
-                      setState(() {
-                        _isTesting = false;
-                        _testSuccess = result['success'] == true;
-                        _testResult = _testSuccess
-                            ? '✅ Connection successful! Supabase is ready.'
-                            : '❌ Connection failed: ${result['error']}';
-                      });
-                    },
+                            final result = await vc.testSupabaseConnection();
+                            setState(() {
+                              _isTesting = false;
+                              _testSuccess = result['success'] == true;
+                              _testResult = _testSuccess
+                                  ? '✅ Connection successful! Supabase is ready.'
+                                  : '❌ Connection failed: ${result['error']}';
+                            });
+                          },
                     child: _isTesting
                         ? const SizedBox(
                             height: 16,
@@ -145,7 +160,9 @@ class _SupabaseDialogState extends State<SupabaseDialog> {
                       backgroundColor: const Color(0xFF3ECF8E),
                       foregroundColor: Colors.black,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     onPressed: () {
                       final url = _urlController.text.trim();
@@ -180,7 +197,11 @@ class _SupabaseDialogState extends State<SupabaseDialog> {
     );
   }
 
-  Widget _buildTextField(TextEditingController ctrl, String label, {bool obscure = false}) {
+  Widget _buildTextField(
+    TextEditingController ctrl,
+    String label, {
+    bool obscure = false,
+  }) {
     return TextField(
       controller: ctrl,
       obscureText: obscure,

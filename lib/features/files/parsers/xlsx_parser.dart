@@ -17,8 +17,7 @@ class XlsxParser {
     final file = _archive.findFile('xl/sharedStrings.xml');
     if (file == null) return;
     try {
-      final doc = XmlDocument.parse(
-          utf8.decode(file.content as List<int>));
+      final doc = XmlDocument.parse(utf8.decode(file.content as List<int>));
       _sharedStrings = doc
           .findAllElements('si')
           .map((si) => si.findAllElements('t').map((t) => t.innerText).join())
@@ -30,10 +29,9 @@ class XlsxParser {
     final file = _archive.findFile('xl/styles.xml');
     if (file == null) return;
     try {
-      final doc = XmlDocument.parse(
-          utf8.decode(file.content as List<int>));
+      final doc = XmlDocument.parse(utf8.decode(file.content as List<int>));
       for (final fmt in doc.findAllElements('numFmt')) {
-        final id      = fmt.getAttribute('numFmtId')   ?? '';
+        final id = fmt.getAttribute('numFmtId') ?? '';
         final fmtCode = fmt.getAttribute('formatCode') ?? '';
         _numberFormats[id] = fmtCode;
       }
@@ -43,23 +41,25 @@ class XlsxParser {
   ParsedDocument parse(String fileName) {
     // Discover sheets
     final workbookFile = _archive.findFile('xl/workbook.xml');
-    final sheetNames   = <String>[];
+    final sheetNames = <String>[];
     if (workbookFile != null) {
       try {
         final doc = XmlDocument.parse(
-            utf8.decode(workbookFile.content as List<int>));
-        sheetNames.addAll(doc
-            .findAllElements('sheet')
-            .map((s) => s.getAttribute('name') ?? 'Sheet'));
+          utf8.decode(workbookFile.content as List<int>),
+        );
+        sheetNames.addAll(
+          doc
+              .findAllElements('sheet')
+              .map((s) => s.getAttribute('name') ?? 'Sheet'),
+        );
       } catch (_) {}
     }
 
-    final sheets  = <SheetData>[];
-    int sheetIdx  = 1;
+    final sheets = <SheetData>[];
+    int sheetIdx = 1;
 
     for (final name in sheetNames.isEmpty ? ['Sheet1'] : sheetNames) {
-      final sheetFile =
-          _archive.findFile('xl/worksheets/sheet$sheetIdx.xml');
+      final sheetFile = _archive.findFile('xl/worksheets/sheet$sheetIdx.xml');
       if (sheetFile != null) {
         final sheet = _parseSheet(name, sheetFile);
         sheets.add(sheet);
@@ -69,18 +69,22 @@ class XlsxParser {
 
     // Also try to find sheets by scanning archive
     if (sheets.isEmpty) {
-      final sheetFiles = _archive.files
-          .where((f) => f.name.startsWith('xl/worksheets/sheet') &&
-              f.name.endsWith('.xml'))
-          .toList()
-        ..sort((a, b) => a.name.compareTo(b.name));
+      final sheetFiles =
+          _archive.files
+              .where(
+                (f) =>
+                    f.name.startsWith('xl/worksheets/sheet') &&
+                    f.name.endsWith('.xml'),
+              )
+              .toList()
+            ..sort((a, b) => a.name.compareTo(b.name));
       for (int i = 0; i < sheetFiles.length; i++) {
         sheets.add(_parseSheet('Sheet ${i + 1}', sheetFiles[i]));
       }
     }
 
     return ParsedDocument(
-      title:  fileName,
+      title: fileName,
       format: 'xlsx',
       blocks: [],
       sheets: sheets,
@@ -90,14 +94,13 @@ class XlsxParser {
   SheetData _parseSheet(String name, ArchiveFile file) {
     late XmlDocument doc;
     try {
-      doc = XmlDocument.parse(
-          utf8.decode(file.content as List<int>));
+      doc = XmlDocument.parse(utf8.decode(file.content as List<int>));
     } catch (_) {
       return SheetData(name: name, rows: [], maxCols: 0);
     }
 
     // Build a sparse map [row][col] = value
-    final data      = <int, Map<int, String>>{};
+    final data = <int, Map<int, String>>{};
     int maxRow = 0;
     int maxCol = 0;
 
@@ -109,13 +112,14 @@ class XlsxParser {
 
       for (final c in row.findAllElements('c')) {
         final cellRef = c.getAttribute('r') ?? '';
-        final colIdx  = _colIndex(cellRef);
+        final colIdx = _colIndex(cellRef);
         if (colIdx > maxCol) maxCol = colIdx;
 
-        final t   = c.getAttribute('t') ?? ''; // type
-        final v   = c.findAllElements('v').firstOrNull?.innerText ?? '';
+        final t = c.getAttribute('t') ?? ''; // type
+        final v = c.findAllElements('v').firstOrNull?.innerText ?? '';
         final formula = c.findAllElements('f').firstOrNull?.innerText;
-        final inline  = c.findAllElements('is')
+        final inline = c
+            .findAllElements('is')
             .expand((e) => e.findAllElements('t'))
             .map((e) => e.innerText)
             .join();
@@ -126,7 +130,7 @@ class XlsxParser {
         } else if (t == 's') {
           // Shared string
           final idx = int.tryParse(v) ?? -1;
-          display   = idx >= 0 && idx < _sharedStrings.length
+          display = idx >= 0 && idx < _sharedStrings.length
               ? _sharedStrings[idx]
               : v;
         } else if (t == 'b') {
@@ -147,7 +151,7 @@ class XlsxParser {
     final rows = <List<String>>[];
     for (int r = 1; r <= maxRow; r++) {
       final rowData = List<String>.filled(maxCol, '');
-      final rowMap  = data[r] ?? {};
+      final rowMap = data[r] ?? {};
       for (final entry in rowMap.entries) {
         if (entry.key <= maxCol) rowData[entry.key - 1] = entry.value;
       }

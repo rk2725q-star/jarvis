@@ -15,7 +15,11 @@ class TtsService {
     await _tts.setPitch(1.05); // Slightly clearer/crisper tone
   }
 
-  void setHandlers({VoidCallback? onStart, VoidCallback? onComplete, Function(String)? onError}) {
+  void setHandlers({
+    VoidCallback? onStart,
+    VoidCallback? onComplete,
+    Function(String)? onError,
+  }) {
     _tts.setStartHandler(() {
       _isPlaying = true;
       if (onStart != null) onStart();
@@ -34,21 +38,29 @@ class TtsService {
 
   Future<void> speak(String text) async {
     if (text.isEmpty) return;
-    
+
     // Sanitize markdown and special tags: remove #, *, _, `, XML tags etc. but keep Emojis
     String cleanText = text
-      .replaceAll(RegExp(r'<[^>]*>'), '') // Strip out custom tags like <SCHEDULE_REMINDER>
-      .replaceAll(RegExp(r'#+\s'), '') // Headings
-      .replaceAll(RegExp(r'[*_]{1,3}'), '') // Bold/Italic
-      .replaceAll(RegExp(r'`{1,3}[^`]*`{1,3}'), '') // Code blocks
-      .replaceAll(RegExp(r'\[([^\]]+)\]\([^)]+\)'), r'$1') // Links
-      .replaceAll(RegExp(r'^[-*+]\s', multiLine: true), '') // List markers
-      .replaceAll(RegExp(r'\n+'), ' ') // Newlines to spaces
-      .replaceAll(RegExp(r'[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]'), '') // Strip all emojis
-      .trim();
+        .replaceAll(
+          RegExp(r'<[^>]*>'),
+          '',
+        ) // Strip out custom tags like <SCHEDULE_REMINDER>
+        .replaceAll(RegExp(r'#+\s'), '') // Headings
+        .replaceAll(RegExp(r'[*_]{1,3}'), '') // Bold/Italic
+        .replaceAll(RegExp(r'`{1,3}[^`]*`{1,3}'), '') // Code blocks
+        .replaceAll(RegExp(r'\[([^\]]+)\]\([^)]+\)'), r'$1') // Links
+        .replaceAll(RegExp(r'^[-*+]\s', multiLine: true), '') // List markers
+        .replaceAll(RegExp(r'\n+'), ' ') // Newlines to spaces
+        .replaceAll(
+          RegExp(
+            r'[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]',
+          ),
+          '',
+        ) // Strip all emojis
+        .trim();
 
     if (cleanText.isEmpty) return;
-    
+
     // Check for Tamil characters: Unicode range U+0B80 to U+0BFF
     if (RegExp(r'[\u0B80-\u0BFF]').hasMatch(cleanText)) {
       await _tts.setLanguage("ta-IN");

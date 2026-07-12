@@ -89,7 +89,9 @@ class VibeCodeController extends ChangeNotifier {
   GeneratedFile? get selectedFile {
     if (selectedFilePath == null || currentProject == null) return null;
     try {
-      return currentProject!.files.firstWhere((f) => f.path == selectedFilePath);
+      return currentProject!.files.firstWhere(
+        (f) => f.path == selectedFilePath,
+      );
     } catch (_) {
       return null;
     }
@@ -116,7 +118,8 @@ class VibeCodeController extends ChangeNotifier {
     if (isGenerating) return;
 
     // Identify intent: BUILD | MODIFICATION | DISCUSSION | GREETING
-    final intentPrompt = '''Analyze the user message.
+    final intentPrompt =
+        '''Analyze the user message.
 Current state: ${hasProject ? "Current project built." : "No project active."}
 
 Message: "$message"
@@ -130,9 +133,15 @@ Classify as:
 Output ONLY the category word.''';
 
     try {
-      final intent = (await _callAI(system: intentPrompt, user: message)).trim().toUpperCase();
-      
-      if (intent.contains('BUILD') || (!hasProject && !intent.contains('GREETING') && !intent.contains('DISCUSSION'))) {
+      final intent = (await _callAI(
+        system: intentPrompt,
+        user: message,
+      )).trim().toUpperCase();
+
+      if (intent.contains('BUILD') ||
+          (!hasProject &&
+              !intent.contains('GREETING') &&
+              !intent.contains('DISCUSSION'))) {
         await generateProject(message);
       } else if (intent.contains('MODIFICATION') && hasProject) {
         await modifyProject(message);
@@ -154,18 +163,22 @@ Output ONLY the category word.''';
     if (isGenerating) return;
 
     _addChat('user', message);
-    isGenerating = true; 
+    isGenerating = true;
     notifyListeners();
 
     try {
       final context = _getProjectContext();
-      
+
       // Build a multi-turn history string for the prompt
-      final history = chatHistory.length > 1 
-          ? chatHistory.take(chatHistory.length - 1).map((m) => '${m.role.toUpperCase()}: ${m.content}').join('\n')
+      final history = chatHistory.length > 1
+          ? chatHistory
+                .take(chatHistory.length - 1)
+                .map((m) => '${m.role.toUpperCase()}: ${m.content}')
+                .join('\n')
           : 'No previous history.';
 
-      final systemPrompt = '''You are the JARVIS VibeCode Architect. 
+      final systemPrompt =
+          '''You are the JARVIS VibeCode Architect. 
 You are a brilliant software engineer who built this current project.
 Your goal is to assist the user with their codebase, explain patterns, or propose fixes.
 
@@ -183,7 +196,7 @@ RULES:
 
       // Use the SHARED AIRouter with the EXACT same fallback logic as main Jarvis
       final response = await router.generateDirectResponse(
-        prompt: message, 
+        prompt: message,
         systemOverride: systemPrompt,
         providerOverride: preferredProvider,
       );
@@ -199,7 +212,9 @@ RULES:
 
   String _getProjectContext() {
     if (currentProject == null) return 'No project active yet.';
-    final files = currentProject!.files.map((f) => '--- ${f.path} ---\n${f.content}').join('\n\n');
+    final files = currentProject!.files
+        .map((f) => '--- ${f.path} ---\n${f.content}')
+        .join('\n\n');
     return 'Project Title: ${currentProject!.name}\nType: ${currentProject!.type.name}\n\nFILES:\n$files';
   }
 
@@ -213,14 +228,21 @@ RULES:
 
     try {
       // ── PHASE 1: DEEP INTENT ANALYSIS ──────────────────
-      _log(BuildPhase.ideation, '🧠 Analyzing intent and technology requirements...', 0.08);
+      _log(
+        BuildPhase.ideation,
+        '🧠 Analyzing intent and technology requirements...',
+        0.08,
+      );
 
       final history = chatHistory.length > 1
-          ? chatHistory.map((m) => '${m.role.toUpperCase()}: ${m.content}').join('\n')
+          ? chatHistory
+                .map((m) => '${m.role.toUpperCase()}: ${m.content}')
+                .join('\n')
           : 'No previous history.';
 
       final intentSummary = await _callAI(
-        system: '''You are a senior full-stack architect. Analyze the user's request.
+        system:
+            '''You are a senior full-stack architect. Analyze the user's request.
 A "Complete App" MUST include:
 1. Dynamic logic (No static HTML templates).
 2. Data state management (arrays, local storage, or API).
@@ -252,23 +274,36 @@ Output JSON only:
       }
 
       // Simulate initial terminal configuration
-      final initCmds = (intent['terminal_commands'] as List?)?.cast<String>() ?? [];
+      final initCmds =
+          (intent['terminal_commands'] as List?)?.cast<String>() ?? [];
       for (int i = 0; i < initCmds.length; i++) {
         final cmd = initCmds[i];
         final progress = 0.10 + ((i / initCmds.length) * 0.05);
         _log(BuildPhase.generation, '\$ $cmd', progress);
         await Future.delayed(const Duration(milliseconds: 600));
         if (cmd.contains('npm') || cmd.contains('yarn')) {
-          _log(BuildPhase.generation, '  > fetching packages & resolving tree...', progress + 0.02);
+          _log(
+            BuildPhase.generation,
+            '  > fetching packages & resolving tree...',
+            progress + 0.02,
+          );
           await Future.delayed(const Duration(milliseconds: 800));
-          _log(BuildPhase.generation, '  > success! packages installed', progress + 0.04);
+          _log(
+            BuildPhase.generation,
+            '  > success! packages installed',
+            progress + 0.04,
+          );
         } else {
           _log(BuildPhase.generation, '  > executed ok', progress + 0.02);
         }
       }
 
       // ── PHASE 2: ARCHITECTURE PLAN ─────────────────────
-      _log(BuildPhase.planning, '📐 Designing file architecture and component structure...', 0.18);
+      _log(
+        BuildPhase.planning,
+        '📐 Designing file architecture and component structure...',
+        0.18,
+      );
 
       final plan = await _callAI(
         system: _plannerPrompt(),
@@ -277,9 +312,14 @@ Output JSON only:
       projectPlan = plan;
 
       // ── PHASE 3: FILE-BY-FILE GENERATION ───────────────
-      _log(BuildPhase.scaffolding, '🏗️ Scaffolding project structure...', 0.28);
+      _log(
+        BuildPhase.scaffolding,
+        '🏗️ Scaffolding project structure...',
+        0.28,
+      );
 
-      final suggestedFiles = (intent['suggested_files'] as List?)?.cast<String>() ??
+      final suggestedFiles =
+          (intent['suggested_files'] as List?)?.cast<String>() ??
           ['index.html', 'style.css', 'app.js'];
 
       final List<GeneratedFile> generatedFiles = [];
@@ -303,12 +343,14 @@ Output JSON only:
         );
 
         if (fileContent.trim().isNotEmpty) {
-          generatedFiles.add(GeneratedFile(
-            name: filePath.split('/').last,
-            path: filePath,
-            content: fileContent,
-            language: _detectLanguage(filePath),
-          ));
+          generatedFiles.add(
+            GeneratedFile(
+              name: filePath.split('/').last,
+              path: filePath,
+              content: fileContent,
+              language: _detectLanguage(filePath),
+            ),
+          );
         }
       }
 
@@ -321,7 +363,11 @@ Output JSON only:
       final integratedFiles = _injectActiveIntegrations(healedFiles);
 
       // ── PHASE 6: FINALIZE ───────────────────────────────
-      _log(BuildPhase.polish, '✨ Applying final polish and verification...', 0.95);
+      _log(
+        BuildPhase.polish,
+        '✨ Applying final polish and verification...',
+        0.95,
+      );
 
       currentProject = ProjectModel(
         id: _uuid.v4(),
@@ -336,23 +382,29 @@ Output JSON only:
           : null;
       _showWorkspace = true;
 
-      _log(BuildPhase.complete, '✅ Genesis complete! ${integratedFiles.length} files generated.', 1.0);
+      _log(
+        BuildPhase.complete,
+        '✅ Genesis complete! ${integratedFiles.length} files generated.',
+        1.0,
+      );
 
       _addChat(
         'assistant',
         '✅ **Project Built Successfully!**\n\n'
-        '**${currentProject!.name}** is ready with ${integratedFiles.length} files.\n\n'
-        '${isSupabaseConnected ? "🟢 Supabase client injected\n" : ""}'
-        '${isGithubConnected ? "🐙 Ready to push to GitHub\n" : ""}'
-        '${isVercelConnected ? "▲ Ready to deploy to Vercel\n" : ""}'
-        '\nSwitch to **WORKSPACE** tab to preview and edit!',
+            '**${currentProject!.name}** is ready with ${integratedFiles.length} files.\n\n'
+            '${isSupabaseConnected ? "🟢 Supabase client injected\n" : ""}'
+            '${isGithubConnected ? "🐙 Ready to push to GitHub\n" : ""}'
+            '${isVercelConnected ? "▲ Ready to deploy to Vercel\n" : ""}'
+            '\nSwitch to **WORKSPACE** tab to preview and edit!',
       );
     } catch (e, stack) {
       debugPrint('VibeCode Error: $e\n$stack');
       errorMessage = e.toString();
       _log(BuildPhase.failed, '❌ Build failed: $e', 1.0);
-      _addChat('assistant',
-          '❌ **Build Failed**\n\nError: $e\n\nTry rephrasing your request or switching providers in Settings.');
+      _addChat(
+        'assistant',
+        '❌ **Build Failed**\n\nError: $e\n\nTry rephrasing your request or switching providers in Settings.',
+      );
     } finally {
       isGenerating = false;
       notifyListeners();
@@ -376,12 +428,15 @@ Output JSON only:
 
       // Formulate past chat context
       final history = chatHistory.length > 1
-          ? chatHistory.map((m) => '${m.role.toUpperCase()}: ${m.content}').join('\n')
+          ? chatHistory
+                .map((m) => '${m.role.toUpperCase()}: ${m.content}')
+                .join('\n')
           : 'No previous history.';
 
       // Identify WHICH files need to change
       final impactAnalysis = await _callAI(
-        system: '''Analyze existing files, conversation history, and user request. Return JSON ONLY:
+        system:
+            '''Analyze existing files, conversation history, and user request. Return JSON ONLY:
 {
   "files_to_modify": ["index.html"],
   "files_to_add": [],
@@ -404,26 +459,42 @@ Output JSON only:
         };
       }
 
-      final filesToModify = (impact['files_to_modify'] as List?)?.cast<String>() ?? [];
-      final filesToAdd = (impact['files_to_add'] as List?)?.cast<String>() ?? [];
-      final filesToDelete = (impact['files_to_delete'] as List?)?.cast<String>() ?? [];
-      final terminalCmds = (impact['terminal_commands'] as List?)?.cast<String>() ?? [];
+      final filesToModify =
+          (impact['files_to_modify'] as List?)?.cast<String>() ?? [];
+      final filesToAdd =
+          (impact['files_to_add'] as List?)?.cast<String>() ?? [];
+      final filesToDelete =
+          (impact['files_to_delete'] as List?)?.cast<String>() ?? [];
+      final terminalCmds =
+          (impact['terminal_commands'] as List?)?.cast<String>() ?? [];
 
       // Simulate terminal commands
       for (int i = 0; i < terminalCmds.length; i++) {
         final cmd = terminalCmds[i];
         final progress = 0.15 + ((i / terminalCmds.length) * 0.05);
         _log(BuildPhase.generation, '\$ $cmd', progress);
-        
+
         // Simulate real-time dependency download logs
         if (cmd.contains('install') || cmd.contains('add')) {
           await Future.delayed(const Duration(milliseconds: 600));
-          _log(BuildPhase.generation, '  > fetching packages...', progress + 0.01);
+          _log(
+            BuildPhase.generation,
+            '  > fetching packages...',
+            progress + 0.01,
+          );
           await Future.delayed(const Duration(milliseconds: 800));
-          _log(BuildPhase.generation, '  > added ${(cmd.length * 3)} packages, audited 100+ packages in 1s', progress + 0.03);
+          _log(
+            BuildPhase.generation,
+            '  > added ${(cmd.length * 3)} packages, audited 100+ packages in 1s',
+            progress + 0.03,
+          );
         } else {
           await Future.delayed(const Duration(milliseconds: 500));
-          _log(BuildPhase.generation, '  > executed successfully', progress + 0.02);
+          _log(
+            BuildPhase.generation,
+            '  > executed successfully',
+            progress + 0.02,
+          );
         }
       }
 
@@ -435,20 +506,28 @@ Output JSON only:
       // Modify existing files
       for (int i = 0; i < filesToModify.length; i++) {
         final path = filesToModify[i];
-        final progress = 0.25 + ((i / (filesToModify.length + filesToAdd.length)) * 0.55);
+        final progress =
+            0.25 + ((i / (filesToModify.length + filesToAdd.length)) * 0.55);
         _log(BuildPhase.generation, '🛠️ Modifying $path...', progress);
 
         final existingFile = currentProject!.files.firstWhere(
           (f) => f.path == path,
-          orElse: () => GeneratedFile(name: path.split('/').last, path: path, content: '', language: _detectLanguage(path)),
+          orElse: () => GeneratedFile(
+            name: path.split('/').last,
+            path: path,
+            content: '',
+            language: _detectLanguage(path),
+          ),
         );
 
         final newContent = await _callAI(
-          system: '''You are a code editor. Modify the given file according to the user request.
+          system:
+              '''You are a code editor. Modify the given file according to the user request.
 Return ONLY the complete new file content. No explanations, no markdown fences.
 File: $path
 Language: ${existingFile.language}''',
-          user: 'Current content:\n${existingFile.content}\n\nModification request: $userRequest',
+          user:
+              'Current content:\n${existingFile.content}\n\nModification request: $userRequest',
         );
 
         final idx = currentProject!.files.indexWhere((f) => f.path == path);
@@ -460,7 +539,11 @@ Language: ${existingFile.language}''',
       // Add new files
       for (int i = 0; i < filesToAdd.length; i++) {
         final path = filesToAdd[i];
-        _log(BuildPhase.generation, '➕ Creating $path...', 0.7 + (i / filesToAdd.length * 0.15));
+        _log(
+          BuildPhase.generation,
+          '➕ Creating $path...',
+          0.7 + (i / filesToAdd.length * 0.15),
+        );
 
         final newContent = await _generateSingleFile(
           filePath: path,
@@ -470,17 +553,21 @@ Language: ${existingFile.language}''',
           existingFiles: currentProject!.files,
         );
 
-        currentProject!.files.add(GeneratedFile(
-          name: path.split('/').last,
-          path: path,
-          content: newContent,
-          language: _detectLanguage(path),
-        ));
+        currentProject!.files.add(
+          GeneratedFile(
+            name: path.split('/').last,
+            path: path,
+            content: newContent,
+            language: _detectLanguage(path),
+          ),
+        );
       }
 
       _log(BuildPhase.complete, '✨ Modifications applied successfully!', 1.0);
-      _addChat('assistant',
-          '✨ **Updated!** ${impact['modification_summary'] ?? 'Changes applied successfully.'}');
+      _addChat(
+        'assistant',
+        '✨ **Updated!** ${impact['modification_summary'] ?? 'Changes applied successfully.'}',
+      );
     } catch (e) {
       errorMessage = e.toString();
       _log(BuildPhase.failed, '❌ Modification failed: $e', 1.0);
@@ -512,15 +599,23 @@ Language: ${existingFile.language}''',
     for (int attempt = 0; attempt < maxRetries; attempt++) {
       try {
         final content = await _callAI(
-          system: _fileGenerationPrompt(filePath, language, plan, existingContext),
-          user: 'App description: $userPrompt\nGenerate ONLY the complete $filePath file content.',
+          system: _fileGenerationPrompt(
+            filePath,
+            language,
+            plan,
+            existingContext,
+          ),
+          user:
+              'App description: $userPrompt\nGenerate ONLY the complete $filePath file content.',
           providerOverride: preferredProvider,
         );
 
         final cleaned = _stripCodeFences(content);
         if (cleaned.trim().length > 50) return cleaned;
 
-        throw Exception('Generated content too short (${cleaned.length} chars)');
+        throw Exception(
+          'Generated content too short (${cleaned.length} chars)',
+        );
       } catch (e) {
         if (attempt == maxRetries - 1) rethrow;
         await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
@@ -542,7 +637,11 @@ Language: ${existingFile.language}''',
 
       if (issues.isEmpty) continue;
 
-      _log(BuildPhase.healing, '🩹 Fixing ${file.path}: ${issues.join(", ")}', 0.78 + (i / files.length * 0.08));
+      _log(
+        BuildPhase.healing,
+        '🩹 Fixing ${file.path}: ${issues.join(", ")}',
+        0.78 + (i / files.length * 0.08),
+      );
 
       try {
         final fixed = await _callAI(
@@ -583,7 +682,8 @@ Issues found: ${issues.join(", ")}''',
         issues.add('unclosed HTML tags');
       }
       // Check for placeholder text
-      if (content.contains('Lorem ipsum') || content.contains('placeholder text')) {
+      if (content.contains('Lorem ipsum') ||
+          content.contains('placeholder text')) {
         issues.add('contains placeholder text');
       }
     }
@@ -609,7 +709,10 @@ Issues found: ${issues.join(", ")}''',
   List<GeneratedFile> _injectActiveIntegrations(List<GeneratedFile> files) {
     final result = List<GeneratedFile>.from(files);
     final htmlIdx = result.indexWhere(
-        (f) => f.language == 'html' && (f.path.contains('index') || result.length == 1));
+      (f) =>
+          f.language == 'html' &&
+          (f.path.contains('index') || result.length == 1),
+    );
 
     if (htmlIdx == -1) return result;
 
@@ -618,7 +721,8 @@ Issues found: ${issues.join(", ")}''',
 
     // Supabase injection
     if (isSupabaseConnected) {
-      injections += '''
+      injections +=
+          '''
   <!-- Supabase Client (Auto-injected by Jarvis) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -749,25 +853,34 @@ PREMIUM DESIGN REQUIREMENTS:
     if (currentProject != null) {
       currentProject!.files = _injectActiveIntegrations(currentProject!.files);
     }
-    _addChat('assistant',
-        '🟢 **Supabase Connected!**\n`$url`\n\nAll future builds will auto-inject the Supabase client. Existing projects updated.');
+    _addChat(
+      'assistant',
+      '🟢 **Supabase Connected!**\n`$url`\n\nAll future builds will auto-inject the Supabase client. Existing projects updated.',
+    );
     notifyListeners();
   }
 
   void connectGithub(String token) {
     _githubToken = token;
-    _addChat('assistant', '🐙 **GitHub Connected!** Ready to push your projects.');
+    _addChat(
+      'assistant',
+      '🐙 **GitHub Connected!** Ready to push your projects.',
+    );
     notifyListeners();
   }
 
   void connectVercel(String token) {
     _vercelToken = token;
-    _addChat('assistant', '▲ **Vercel Connected!** One-tap deployment enabled.');
+    _addChat(
+      'assistant',
+      '▲ **Vercel Connected!** One-tap deployment enabled.',
+    );
     notifyListeners();
   }
 
   Future<Map<String, dynamic>> testSupabaseConnection() async {
-    if (!isSupabaseConnected) return {'success': false, 'error': 'Not connected'};
+    if (!isSupabaseConnected)
+      return {'success': false, 'error': 'Not connected'};
     try {
       final res = await http.get(
         Uri.parse('$_supabaseUrl/rest/v1/'),
@@ -819,7 +932,9 @@ PREMIUM DESIGN REQUIREMENTS:
       // Push each file
       for (final file in currentProject!.files) {
         await http.put(
-          Uri.parse('https://api.github.com/repos/$repoFullName/contents/${file.path}'),
+          Uri.parse(
+            'https://api.github.com/repos/$repoFullName/contents/${file.path}',
+          ),
           headers: {
             'Authorization': 'Bearer $_githubToken',
             'Content-Type': 'application/json',
@@ -835,8 +950,10 @@ PREMIUM DESIGN REQUIREMENTS:
       isDeploying = false;
       notifyListeners();
 
-      _addChat('assistant',
-          '🐙 **Pushed to GitHub!**\nhttps://github.com/$repoFullName');
+      _addChat(
+        'assistant',
+        '🐙 **Pushed to GitHub!**\nhttps://github.com/$repoFullName',
+      );
 
       return {'success': true, 'url': 'https://github.com/$repoFullName'};
     } catch (e) {
@@ -846,7 +963,9 @@ PREMIUM DESIGN REQUIREMENTS:
     }
   }
 
-  Future<Map<String, dynamic>> deployToVercel({required String projectName}) async {
+  Future<Map<String, dynamic>> deployToVercel({
+    required String projectName,
+  }) async {
     if (!isVercelConnected || currentProject == null) {
       return {'success': false, 'error': 'Vercel not connected or no project'};
     }
@@ -855,11 +974,13 @@ PREMIUM DESIGN REQUIREMENTS:
 
     try {
       final files = currentProject!.files
-          .map((f) => {
-                'file': f.path,
-                'data': base64Encode(utf8.encode(f.content)),
-                'encoding': 'base64',
-              })
+          .map(
+            (f) => {
+              'file': f.path,
+              'data': base64Encode(utf8.encode(f.content)),
+              'encoding': 'base64',
+            },
+          )
           .toList();
 
       final res = await http.post(
@@ -869,7 +990,9 @@ PREMIUM DESIGN REQUIREMENTS:
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'name': projectName.replaceAll(RegExp(r'[^a-z0-9-]'), '-').toLowerCase(),
+          'name': projectName
+              .replaceAll(RegExp(r'[^a-z0-9-]'), '-')
+              .toLowerCase(),
           'files': files,
           'projectSettings': {'framework': null},
         }),
@@ -958,7 +1081,9 @@ PREMIUM DESIGN REQUIREMENTS:
     currentPhase = phase;
     buildProgress = progress;
     thinkingMessage = message;
-    buildLogs.add(BuildEvent(phase: phase, message: message, progress: progress));
+    buildLogs.add(
+      BuildEvent(phase: phase, message: message, progress: progress),
+    );
     notifyListeners();
   }
 
@@ -1031,7 +1156,10 @@ PREMIUM DESIGN REQUIREMENTS:
       }
     }
 
-    return words.take(4).map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase()).join(' ');
+    return words
+        .take(4)
+        .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
+        .join(' ');
   }
 
   // Support legacy widgets

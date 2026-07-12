@@ -7,13 +7,13 @@ class DDGNewsSearchSource {
   final DuckDuckGoSearch _search = DuckDuckGoSearch();
 
   static const Map<String, double> _outletTrust = {
-    'BBC':       0.90,
-    'Reuters':   0.92,
-    'AP':        0.91,
-    'CNN':       0.72,
-    'Fox News':  0.60,
-    'Guardian':  0.82,
-    'NYT':       0.80,
+    'BBC': 0.90,
+    'Reuters': 0.92,
+    'AP': 0.91,
+    'CNN': 0.72,
+    'Fox News': 0.60,
+    'Guardian': 0.82,
+    'NYT': 0.80,
     'Bloomberg': 0.85,
   };
 

@@ -1,8 +1,9 @@
 import 'package:flutter/services.dart';
 
 class PlatformChannelService {
-  static const MethodChannel _channel = 
-      MethodChannel('com.aurora.player/platform');
+  static const MethodChannel _channel = MethodChannel(
+    'com.aurora.player/platform',
+  );
 
   /// Sets screen brightness (0.0 - 1.0)
   /// Note: This is a WINDOW-level brightness overlay, not system-wide
@@ -22,14 +23,20 @@ class PlatformChannelService {
   /// Checks if the current display supports HDR playback
   static Future<HdrCapabilities> checkHdrSupport() async {
     try {
-      final result = await _channel.invokeMapMethod<String, dynamic>('checkHdrSupport');
+      final result = await _channel.invokeMapMethod<String, dynamic>(
+        'checkHdrSupport',
+      );
       return HdrCapabilities(
         isHdrSupported: result?['isHdrSupported'] ?? false,
         supportedProfiles: List<String>.from(result?['profiles'] ?? []),
         maxLuminance: result?['maxLuminance']?.toDouble() ?? 0.0,
       );
     } catch (e) {
-      return HdrCapabilities(isHdrSupported: false, supportedProfiles: [], maxLuminance: 0);
+      return HdrCapabilities(
+        isHdrSupported: false,
+        supportedProfiles: [],
+        maxLuminance: 0,
+      );
     }
   }
 

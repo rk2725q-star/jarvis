@@ -6,9 +6,7 @@ class DedupService {
   final Set<String> _exactHashes = {};
   DateTime _lastReset = DateTime.now();
 
-  List<AriaSearchResult> deduplicate(
-    List<AriaSearchResult> results,
-  ) {
+  List<AriaSearchResult> deduplicate(List<AriaSearchResult> results) {
     _maybeResetBloom();
 
     final deduped = <AriaSearchResult>[];

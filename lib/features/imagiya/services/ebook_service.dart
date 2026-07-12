@@ -26,26 +26,25 @@ class EBookPage {
     String? imagePrompt,
     String? imageUrl,
     bool? isGenerating,
-  }) =>
-      EBookPage(
-        pageNumber: pageNumber,
-        chapterTitle: chapterTitle,
-        content: content ?? this.content,
-        imagePrompt: imagePrompt ?? this.imagePrompt,
-        imageUrl: imageUrl ?? this.imageUrl,
-        isGenerating: isGenerating ?? this.isGenerating,
-      );
+  }) => EBookPage(
+    pageNumber: pageNumber,
+    chapterTitle: chapterTitle,
+    content: content ?? this.content,
+    imagePrompt: imagePrompt ?? this.imagePrompt,
+    imageUrl: imageUrl ?? this.imageUrl,
+    isGenerating: isGenerating ?? this.isGenerating,
+  );
 }
 
 class EBookConfig {
   final String title;
-  final String genre;          // comics, fantasy, sci-fi, educational, etc.
+  final String genre; // comics, fantasy, sci-fi, educational, etc.
   final String targetAudience; // children, teen, adult
-  final String tone;           // adventurous, humorous, dramatic, etc.
-  final String artStyle;       // comic-book, realistic, anime, watercolor
-  final int pageCount;         // 25–45
-  final String language;       // English, Tamil, etc.
-  final String synopsis;       // User-supplied story idea
+  final String tone; // adventurous, humorous, dramatic, etc.
+  final String artStyle; // comic-book, realistic, anime, watercolor
+  final int pageCount; // 25–45
+  final String language; // English, Tamil, etc.
+  final String synopsis; // User-supplied story idea
 
   const EBookConfig({
     required this.title,
@@ -60,7 +59,7 @@ class EBookConfig {
 }
 
 class EBookProgress {
-  final String stage;       // outline | writing | illustrating | done
+  final String stage; // outline | writing | illustrating | done
   final int currentPage;
   final int totalPages;
   final String message;
@@ -140,12 +139,21 @@ class EBookService {
           pageNumber: i + 1,
           chapterTitle: 'Chapter ${(i ~/ 5) + 1}',
           content: '[Content generation failed for this page. Please retry.]',
-          imagePrompt: '${config.artStyle} style illustration for page ${i + 1}',
+          imagePrompt:
+              '${config.artStyle} style illustration for page ${i + 1}',
         );
       }
 
       pages.add(page);
-      yield (progress: EBookProgress(stage: 'writing', currentPage: i + 1, totalPages: totalPages, message: '✍️ Page ${i + 1} written'), page: page);
+      yield (
+        progress: EBookProgress(
+          stage: 'writing',
+          currentPage: i + 1,
+          totalPages: totalPages,
+          message: '✍️ Page ${i + 1} written',
+        ),
+        page: page,
+      );
     }
 
     // ── Stage 3: Generate images (1 per page) ─────────────────────────────
@@ -161,7 +169,11 @@ class EBookService {
       );
 
       final page = pages[i];
-      final imageUrl = _buildImageUrl(page.imagePrompt, config.artStyle, seed: i);
+      final imageUrl = _buildImageUrl(
+        page.imagePrompt,
+        config.artStyle,
+        seed: i,
+      );
 
       final illustrated = page.copyWith(imageUrl: imageUrl);
       pages[i] = illustrated;
@@ -193,7 +205,8 @@ class EBookService {
   // ─── Private helpers ─────────────────────────────────────────────────────
 
   Future<String> _generateOutline(EBookConfig config, int totalPages) async {
-    final prompt = '''
+    final prompt =
+        '''
 Create a detailed $totalPages-page ${config.genre} eBook outline.
 
 Title: "${config.title}"
@@ -233,7 +246,8 @@ Format: [Page N] Chapter Title — Brief description.
         ? 'Previous content summary: ${previousPages.last.content.substring(0, previousPages.last.content.length.clamp(0, 200))}...'
         : '';
 
-    final prompt = '''
+    final prompt =
+        '''
 Write page ${pageIndex + 1} of a $totalPages-page ${config.genre} eBook.
 
 TITLE: ${config.title}
@@ -259,12 +273,19 @@ End with: IMAGE_PROMPT: [a vivid 1-sentence ${config.artStyle} style image descr
     }
 
     final full = buf.toString().trim();
-    final imgMatch = RegExp(r'IMAGE_PROMPT:\s*(.+)', caseSensitive: false).firstMatch(full);
-    final imagePrompt = imgMatch?.group(1)?.trim() ??
+    final imgMatch = RegExp(
+      r'IMAGE_PROMPT:\s*(.+)',
+      caseSensitive: false,
+    ).firstMatch(full);
+    final imagePrompt =
+        imgMatch?.group(1)?.trim() ??
         '${config.artStyle} illustration for "${config.title}" page ${pageIndex + 1}';
-    
+
     // Strip the image prompt, and any leftover markdown headers/bold syntax
-    String content = full.replaceAll(RegExp(r'IMAGE_PROMPT:.*', caseSensitive: false), '');
+    String content = full.replaceAll(
+      RegExp(r'IMAGE_PROMPT:.*', caseSensitive: false),
+      '',
+    );
     content = content.replaceAll(RegExp(r'^#+\s*', multiLine: true), '');
     content = content.replaceAll('**', '');
     content = content.trim();

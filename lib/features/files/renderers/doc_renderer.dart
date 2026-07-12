@@ -4,27 +4,27 @@ import '../models/doc_models.dart';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 class DocTheme {
-  static const pageColor       = Color(0xFFFFFFFF);
-  static const pageShadow      = Color(0xFFD0D0D0);
-  static const bgColor         = Color(0xFFEEEEEE);
-  static const textPrimary     = Color(0xFF1A1A2E);
-  static const textSecondary   = Color(0xFF4A4A68);
-  static const accent          = Color(0xFF2563EB);
-  static const accentLight     = Color(0xFFEFF6FF);
-  static const slideGrad1      = Color(0xFF1E3A5F);
-  static const slideGrad2      = Color(0xFF0F172A);
-  static const tableBorder     = Color(0xFFCBD5E1);
-  static const tableHeaderBg   = Color(0xFF1E3A5F);
-  static const tableAltRow     = Color(0xFFF8FAFC);
-  static const bulletColor     = Color(0xFF2563EB);
-  static const quoteBarColor   = Color(0xFF2563EB);
-  static const codeBackground  = Color(0xFF1E293B);
-  static const codeText        = Color(0xFFE2E8F0);
-  static const dividerColor    = Color(0xFFE2E8F0);
-  static const sheetHeaderBg   = Color(0xFF1E3A5F);
+  static const pageColor = Color(0xFFFFFFFF);
+  static const pageShadow = Color(0xFFD0D0D0);
+  static const bgColor = Color(0xFFEEEEEE);
+  static const textPrimary = Color(0xFF1A1A2E);
+  static const textSecondary = Color(0xFF4A4A68);
+  static const accent = Color(0xFF2563EB);
+  static const accentLight = Color(0xFFEFF6FF);
+  static const slideGrad1 = Color(0xFF1E3A5F);
+  static const slideGrad2 = Color(0xFF0F172A);
+  static const tableBorder = Color(0xFFCBD5E1);
+  static const tableHeaderBg = Color(0xFF1E3A5F);
+  static const tableAltRow = Color(0xFFF8FAFC);
+  static const bulletColor = Color(0xFF2563EB);
+  static const quoteBarColor = Color(0xFF2563EB);
+  static const codeBackground = Color(0xFF1E293B);
+  static const codeText = Color(0xFFE2E8F0);
+  static const dividerColor = Color(0xFFE2E8F0);
+  static const sheetHeaderBg = Color(0xFF1E3A5F);
   static const sheetHeaderText = Color(0xFFFFFFFF);
-  static const sheetBorder     = Color(0xFFCBD5E1);
-  static const sheetAltRow     = Color(0xFFF1F5F9);
+  static const sheetBorder = Color(0xFFCBD5E1);
+  static const sheetAltRow = Color(0xFFF1F5F9);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -121,8 +121,10 @@ class _DocInfoBanner extends StatelessWidget {
       children: [
         Icon(icon, color: Colors.white60, size: 12),
         const SizedBox(width: 4),
-        Text(label,
-            style: const TextStyle(color: Colors.white60, fontSize: 11)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white60, fontSize: 11),
+        ),
       ],
     );
   }
@@ -157,32 +159,54 @@ class _DocPage extends StatelessWidget {
   }
 
   Widget _buildBlock(DocBlock block) {
-    if (isEditMode && block.type != BlockType.image && block.type != BlockType.table) {
+    if (isEditMode &&
+        block.type != BlockType.image &&
+        block.type != BlockType.table) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: TextField(
           controller: TextEditingController(text: block.plainText),
           maxLines: null,
-          style: const TextStyle(fontSize: 13.5, color: DocTheme.textPrimary, height: 1.5),
-          decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+          style: const TextStyle(
+            fontSize: 13.5,
+            color: DocTheme.textPrimary,
+            height: 1.5,
+          ),
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            isDense: true,
+          ),
           onChanged: (v) => block.plainText = v,
         ),
       );
     }
     switch (block.type) {
-      case BlockType.heading1:   return _Heading1Widget(block: block);
-      case BlockType.heading2:   return _Heading2Widget(block: block);
-      case BlockType.heading3:   return _Heading3Widget(block: block);
-      case BlockType.paragraph:  return _ParagraphWidget(block: block);
-      case BlockType.bulletPoint:return _BulletWidget(block: block);
-      case BlockType.numberedPoint:return _NumberedWidget(block: block);
-      case BlockType.table:      return _TableWidget(block: block);
-      case BlockType.image:      return _ImageWidget(block: block);
-      case BlockType.pageBreak:  return _PageBreakWidget(block: block);
-      case BlockType.divider:    return _DividerWidget();
-      case BlockType.quote:      return _QuoteWidget(block: block);
-      case BlockType.codeBlock:  return _CodeWidget(block: block);
-      case BlockType.emptyLine:  return const SizedBox(height: 10);
+      case BlockType.heading1:
+        return _Heading1Widget(block: block);
+      case BlockType.heading2:
+        return _Heading2Widget(block: block);
+      case BlockType.heading3:
+        return _Heading3Widget(block: block);
+      case BlockType.paragraph:
+        return _ParagraphWidget(block: block);
+      case BlockType.bulletPoint:
+        return _BulletWidget(block: block);
+      case BlockType.numberedPoint:
+        return _NumberedWidget(block: block);
+      case BlockType.table:
+        return _TableWidget(block: block);
+      case BlockType.image:
+        return _ImageWidget(block: block);
+      case BlockType.pageBreak:
+        return _PageBreakWidget(block: block);
+      case BlockType.divider:
+        return _DividerWidget();
+      case BlockType.quote:
+        return _QuoteWidget(block: block);
+      case BlockType.codeBlock:
+        return _CodeWidget(block: block);
+      case BlockType.emptyLine:
+        return const SizedBox(height: 10);
     }
   }
 }
@@ -352,7 +376,11 @@ class _NumberedWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(left: block.indentLevel * 16.0 + 8.0, top: 3, bottom: 3),
+      padding: EdgeInsets.only(
+        left: block.indentLevel * 16.0 + 8.0,
+        top: 3,
+        bottom: 3,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -487,11 +515,20 @@ class _ImageWidget extends StatelessWidget {
   }
 
   Widget _buildImage(Uint8List bytes, String ext) {
-    if (['jpg','jpeg','png','gif','webp','bmp'].contains(ext.toLowerCase())) {
+    if ([
+      'jpg',
+      'jpeg',
+      'png',
+      'gif',
+      'webp',
+      'bmp',
+    ].contains(ext.toLowerCase())) {
       return Image.memory(
         bytes,
         fit: BoxFit.contain,
-        errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) => _brokenImage(),
+        errorBuilder:
+            (BuildContext context, Object error, StackTrace? stackTrace) =>
+                _brokenImage(),
       );
     }
     return _brokenImage();
@@ -507,8 +544,10 @@ class _ImageWidget extends StatelessWidget {
           children: [
             Icon(Icons.broken_image_outlined, color: Colors.grey, size: 36),
             SizedBox(height: 6),
-            Text('Image could not be displayed',
-                style: TextStyle(color: Colors.grey, fontSize: 11)),
+            Text(
+              'Image could not be displayed',
+              style: TextStyle(color: Colors.grey, fontSize: 11),
+            ),
           ],
         ),
       ),
@@ -539,26 +578,28 @@ class _TableWidget extends StatelessWidget {
           child: Column(
             children: rows.asMap().entries.map((entry) {
               final rowIdx = entry.key;
-              final row    = entry.value;
+              final row = entry.value;
               final isHeader = rowIdx == 0;
-              final isAlt    = !isHeader && rowIdx % 2 == 0;
+              final isAlt = !isHeader && rowIdx % 2 == 0;
 
               return Container(
                 color: isHeader
                     ? DocTheme.tableHeaderBg
                     : isAlt
-                        ? DocTheme.tableAltRow
-                        : Colors.white,
+                    ? DocTheme.tableAltRow
+                    : Colors.white,
                 child: IntrinsicHeight(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: row.cells.asMap().entries.map((ce) {
                       final colIdx = ce.key;
-                      final cell   = ce.value;
+                      final cell = ce.value;
                       final isLast = colIdx == row.cells.length - 1;
                       return Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           border: Border(
                             right: isLast
@@ -566,13 +607,15 @@ class _TableWidget extends StatelessWidget {
                                 : BorderSide(
                                     color: isHeader
                                         ? Colors.white24
-                                        : DocTheme.tableBorder),
+                                        : DocTheme.tableBorder,
+                                  ),
                             bottom: rowIdx == rows.length - 1
                                 ? BorderSide.none
                                 : BorderSide(
                                     color: isHeader
                                         ? Colors.white24
-                                        : DocTheme.tableBorder),
+                                        : DocTheme.tableBorder,
+                                  ),
                           ),
                         ),
                         child: Text(
@@ -611,28 +654,25 @@ class _PageBreakWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Row(
         children: [
-          Expanded(
-              child: Divider(color: DocTheme.dividerColor, thickness: 1)),
+          Expanded(child: Divider(color: DocTheme.dividerColor, thickness: 1)),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 12),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
               color: DocTheme.accentLight,
               borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: DocTheme.accent.withValues(alpha: 0.3)),
+              border: Border.all(color: DocTheme.accent.withValues(alpha: 0.3)),
             ),
             child: Text(
               'Page ${block.pageNumber ?? ''}',
               style: const TextStyle(
-                  fontSize: 10,
-                  color: DocTheme.accent,
-                  fontWeight: FontWeight.w500),
+                fontSize: 10,
+                color: DocTheme.accent,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-          Expanded(
-              child: Divider(color: DocTheme.dividerColor, thickness: 1)),
+          Expanded(child: Divider(color: DocTheme.dividerColor, thickness: 1)),
         ],
       ),
     );
@@ -688,8 +728,10 @@ class _RichTextWidget extends StatelessWidget {
 
       TextDecoration deco = TextDecoration.none;
       if (run.isUnderline && run.isStrike) {
-        deco = TextDecoration.combine(
-            [TextDecoration.underline, TextDecoration.lineThrough]);
+        deco = TextDecoration.combine([
+          TextDecoration.underline,
+          TextDecoration.lineThrough,
+        ]);
       } else if (run.isUnderline) {
         deco = TextDecoration.underline;
       } else if (run.isStrike) {
@@ -700,10 +742,10 @@ class _RichTextWidget extends StatelessWidget {
         text: run.text,
         style: defaultStyle.copyWith(
           fontWeight: run.isBold ? FontWeight.bold : null,
-          fontStyle:  run.isItalic ? FontStyle.italic : null,
+          fontStyle: run.isItalic ? FontStyle.italic : null,
           decoration: deco,
-          fontSize:   run.fontSize ?? defaultStyle.fontSize,
-          color:      textColor ?? defaultStyle.color,
+          fontSize: run.fontSize ?? defaultStyle.fontSize,
+          color: textColor ?? defaultStyle.color,
           backgroundColor: bg,
         ),
       );
@@ -711,16 +753,20 @@ class _RichTextWidget extends StatelessWidget {
 
     TextAlign align;
     switch (alignment) {
-      case 'center':  align = TextAlign.center;  break;
-      case 'right':   align = TextAlign.right;   break;
-      case 'justify': align = TextAlign.justify; break;
-      default:        align = TextAlign.left;
+      case 'center':
+        align = TextAlign.center;
+        break;
+      case 'right':
+        align = TextAlign.right;
+        break;
+      case 'justify':
+        align = TextAlign.justify;
+        break;
+      default:
+        align = TextAlign.left;
     }
 
-    return SelectableText.rich(
-      TextSpan(children: spans),
-      textAlign: align,
-    );
+    return SelectableText.rich(TextSpan(children: spans), textAlign: align);
   }
 }
 
@@ -765,7 +811,10 @@ class _PptxRendererState extends State<PptxRenderer> {
                 child: Text(
                   widget.doc.title,
                   style: const TextStyle(
-                      color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -871,7 +920,8 @@ class _PptxRendererState extends State<PptxRenderer> {
         controller: _pageCtrl,
         onPageChanged: (i) => setState(() => _current = i),
         itemCount: slides.length,
-        itemBuilder: (_, i) => _SlideView(slide: slides[i], isEditMode: widget.isEditMode),
+        itemBuilder: (_, i) =>
+            _SlideView(slide: slides[i], isEditMode: widget.isEditMode),
       ),
     );
   }
@@ -897,8 +947,9 @@ class _PptxRendererState extends State<PptxRenderer> {
             onPressed: _current > 0
                 ? () {
                     _pageCtrl.previousPage(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOut);
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                    );
                   }
                 : null,
           ),
@@ -914,8 +965,9 @@ class _PptxRendererState extends State<PptxRenderer> {
             onPressed: _current < slides.length - 1
                 ? () {
                     _pageCtrl.nextPage(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOut);
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                    );
                   }
                 : null,
           ),
@@ -976,9 +1028,10 @@ class _PptxRendererState extends State<PptxRenderer> {
                     child: Text(
                       'Slide ${i + 1}',
                       style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500),
+                        color: Colors.white70,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -1026,19 +1079,30 @@ class _SlideView extends StatelessWidget {
   }
 
   Widget _buildSlideContent() {
-    final images   = slide.blocks.where((b) => b.type == BlockType.image).toList();
-    final nonImages = slide.blocks.where((b) => b.type != BlockType.image).toList();
-    final heading  = nonImages.where((b) =>
-        b.type == BlockType.heading1 || b.type == BlockType.heading2).toList();
-    final body     = nonImages.where((b) =>
-        b.type != BlockType.heading1 && b.type != BlockType.heading2).toList();
+    final images = slide.blocks
+        .where((b) => b.type == BlockType.image)
+        .toList();
+    final nonImages = slide.blocks
+        .where((b) => b.type != BlockType.image)
+        .toList();
+    final heading = nonImages
+        .where(
+          (b) => b.type == BlockType.heading1 || b.type == BlockType.heading2,
+        )
+        .toList();
+    final body = nonImages
+        .where(
+          (b) => b.type != BlockType.heading1 && b.type != BlockType.heading2,
+        )
+        .toList();
 
     if (images.isNotEmpty && nonImages.isEmpty) {
       // Image-only slide
       return Image.memory(
         images.first.imageBytes!,
         fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => const Icon(Icons.broken_image, color: Colors.white),
+        errorBuilder: (_, _, _) =>
+            const Icon(Icons.broken_image, color: Colors.white),
       );
     }
 
@@ -1049,10 +1113,7 @@ class _SlideView extends StatelessWidget {
           top: 0,
           left: 0,
           right: 0,
-          child: Container(
-            height: 4,
-            color: DocTheme.accent,
-          ),
+          child: Container(height: 4, color: DocTheme.accent),
         ),
         Positioned(
           bottom: 0,
@@ -1073,12 +1134,22 @@ class _SlideView extends StatelessWidget {
           child: images.isNotEmpty
               ? Row(
                   children: [
-                    Expanded(child: _SlideTextColumn(heading: heading, body: body, isEditMode: isEditMode)),
+                    Expanded(
+                      child: _SlideTextColumn(
+                        heading: heading,
+                        body: body,
+                        isEditMode: isEditMode,
+                      ),
+                    ),
                     const SizedBox(width: 20),
                     Expanded(child: _SlideImages(images: images)),
                   ],
                 )
-              : _SlideTextColumn(heading: heading, body: body, isEditMode: isEditMode),
+              : _SlideTextColumn(
+                  heading: heading,
+                  body: body,
+                  isEditMode: isEditMode,
+                ),
         ),
 
         // Slide number
@@ -1088,8 +1159,9 @@ class _SlideView extends StatelessWidget {
           child: Text(
             '${slide.index}',
             style: TextStyle(
-                color: Colors.black.withValues(alpha: 0.4),
-                fontSize: 11),
+              color: Colors.black.withValues(alpha: 0.4),
+              fontSize: 11,
+            ),
           ),
         ),
       ],
@@ -1101,19 +1173,28 @@ class _SlideTextColumn extends StatelessWidget {
   final List<DocBlock> heading;
   final List<DocBlock> body;
   final bool isEditMode;
-  const _SlideTextColumn({required this.heading, required this.body, this.isEditMode = false});
+  const _SlideTextColumn({
+    required this.heading,
+    required this.body,
+    this.isEditMode = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...heading.map((b) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: isEditMode 
+        ...heading.map(
+          (b) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: isEditMode
                 ? TextField(
                     controller: TextEditingController(text: b.plainText),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: DocTheme.textPrimary),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: DocTheme.textPrimary,
+                    ),
                     decoration: const InputDecoration(border: InputBorder.none),
                     onChanged: (v) => b.plainText = v,
                   )
@@ -1126,7 +1207,8 @@ class _SlideTextColumn extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
-            )),
+          ),
+        ),
         if (heading.isNotEmpty)
           Container(
             height: 2,
@@ -1138,15 +1220,26 @@ class _SlideTextColumn extends StatelessWidget {
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: body.map((b) => isEditMode 
-                ? TextField(
-                    controller: TextEditingController(text: b.plainText),
-                    maxLines: null,
-                    style: const TextStyle(fontSize: 13, color: DocTheme.textPrimary),
-                    decoration: const InputDecoration(border: InputBorder.none),
-                    onChanged: (v) => b.plainText = v,
+              children: body
+                  .map(
+                    (b) => isEditMode
+                        ? TextField(
+                            controller: TextEditingController(
+                              text: b.plainText,
+                            ),
+                            maxLines: null,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: DocTheme.textPrimary,
+                            ),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                            ),
+                            onChanged: (v) => b.plainText = v,
+                          )
+                        : _buildBodyBlock(b),
                   )
-                : _buildBodyBlock(b)).toList(),
+                  .toList(),
             ),
           ),
         ),
@@ -1166,13 +1259,18 @@ class _SlideTextColumn extends StatelessWidget {
               width: 5,
               height: 5,
               decoration: const BoxDecoration(
-                  color: DocTheme.accent, shape: BoxShape.circle),
+                color: DocTheme.accent,
+                shape: BoxShape.circle,
+              ),
             ),
             Expanded(
               child: _RichTextWidget(
                 runs: b.runs,
                 defaultStyle: const TextStyle(
-                    fontSize: 16, color: DocTheme.textPrimary, height: 1.5),
+                  fontSize: 16,
+                  color: DocTheme.textPrimary,
+                  height: 1.5,
+                ),
               ),
             ),
           ],
@@ -1187,7 +1285,10 @@ class _SlideTextColumn extends StatelessWidget {
       child: _RichTextWidget(
         runs: b.runs,
         defaultStyle: const TextStyle(
-            fontSize: 12, color: Colors.white70, height: 1.6),
+          fontSize: 12,
+          color: Colors.white70,
+          height: 1.6,
+        ),
       ),
     );
   }
@@ -1210,8 +1311,12 @@ class _SlideImages extends StatelessWidget {
               child: Image.memory(
                 img.imageBytes!,
                 fit: BoxFit.contain,
-                errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) =>
-                    const Icon(Icons.broken_image, color: Colors.white38),
+                errorBuilder:
+                    (
+                      BuildContext context,
+                      Object error,
+                      StackTrace? stackTrace,
+                    ) => const Icon(Icons.broken_image, color: Colors.white38),
               ),
             ),
           ),
@@ -1254,19 +1359,23 @@ class _SlideMiniature extends StatelessWidget {
             ),
           const SizedBox(height: 2),
           ...slide.blocks
-              .where((b) =>
-                  b.type == BlockType.paragraph ||
-                  b.type == BlockType.bulletPoint)
+              .where(
+                (b) =>
+                    b.type == BlockType.paragraph ||
+                    b.type == BlockType.bulletPoint,
+              )
               .take(3)
-              .map((b) => Padding(
-                    padding: const EdgeInsets.only(bottom: 1),
-                    child: Text(
-                      b.plainText ?? '',
-                      style: const TextStyle(color: Colors.white38, fontSize: 5),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  )),
+              .map(
+                (b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 1),
+                  child: Text(
+                    b.plainText ?? '',
+                    style: const TextStyle(color: Colors.white38, fontSize: 5),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
         ],
       ),
     );
@@ -1325,21 +1434,29 @@ class _XlsxRendererState extends State<XlsxRenderer>
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 child: Row(
                   children: [
-                    const Icon(Icons.table_chart, color: Colors.white, size: 16),
+                    const Icon(
+                      Icons.table_chart,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         widget.doc.title,
                         style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13),
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Text(
                       '${sheets.length} sheet${sheets.length > 1 ? 's' : ''}',
-                      style: const TextStyle(color: Colors.white54, fontSize: 11),
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -1359,11 +1476,14 @@ class _XlsxRendererState extends State<XlsxRenderer>
                     decoration: const InputDecoration(
                       hintText: 'Search in sheet...',
                       hintStyle: TextStyle(color: Colors.white38),
-                      prefixIcon: Icon(Icons.search, color: Colors.white38, size: 18),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: Colors.white38,
+                        size: 18,
+                      ),
                       border: InputBorder.none,
                       isDense: true,
-                      contentPadding:
-                          EdgeInsets.symmetric(vertical: 8),
+                      contentPadding: EdgeInsets.symmetric(vertical: 8),
                     ),
                     onChanged: (v) => setState(() => _search = v.toLowerCase()),
                   ),
@@ -1379,7 +1499,9 @@ class _XlsxRendererState extends State<XlsxRenderer>
                   labelColor: Colors.white,
                   unselectedLabelColor: Colors.white54,
                   labelStyle: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                   tabs: sheets.map((s) => Tab(text: s.name)).toList(),
                 ),
             ],
@@ -1436,17 +1558,17 @@ class _XlsxRendererState extends State<XlsxRenderer>
             ...rows.asMap().entries.map((entry) {
               final rowIdx = entry.key;
               final isHeader = rowIdx == 0;
-              final isAlt    = !isHeader && rowIdx % 2 == 0;
+              final isAlt = !isHeader && rowIdx % 2 == 0;
               return _buildRow(
                 entry.value,
                 rowIdx + 1,
                 maxCols,
                 isHeader: isHeader,
-                isAlt:    isAlt,
+                isAlt: isAlt,
                 onCellChanged: (colIdx, newValue) {
                   setState(() {
                     if (colIdx < entry.value.length) {
-                       entry.value[colIdx] = newValue;
+                      entry.value[colIdx] = newValue;
                     }
                   });
                 },
@@ -1467,31 +1589,37 @@ class _XlsxRendererState extends State<XlsxRenderer>
           height: 28,
           color: const Color(0xFFE8ECF0),
           alignment: Alignment.center,
-          child: const Text('#',
-              style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold)),
+          child: const Text(
+            '#',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
-        ...letters.map((l) => Container(
-              width: 200,
-              height: 28,
-              color: const Color(0xFFE8ECF0),
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                border: Border(
-                  right: BorderSide(color: DocTheme.sheetBorder),
-                  bottom: BorderSide(color: DocTheme.sheetBorder),
-                ),
+        ...letters.map(
+          (l) => Container(
+            width: 200,
+            height: 28,
+            color: const Color(0xFFE8ECF0),
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              border: Border(
+                right: BorderSide(color: DocTheme.sheetBorder),
+                bottom: BorderSide(color: DocTheme.sheetBorder),
               ),
-              child: Text(
-                l,
-                style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.bold),
+            ),
+            child: Text(
+              l,
+              style: const TextStyle(
+                fontSize: 10,
+                color: Colors.grey,
+                fontWeight: FontWeight.bold,
               ),
-            )),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1507,71 +1635,75 @@ class _XlsxRendererState extends State<XlsxRenderer>
     final bg = isHeader
         ? DocTheme.sheetHeaderBg
         : isAlt
-            ? DocTheme.sheetAltRow
-            : Colors.white;
+        ? DocTheme.sheetAltRow
+        : Colors.white;
 
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-        // Row number
-        Container(
-          width: 44,
-          color: const Color(0xFFE8ECF0),
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            border: Border(right: BorderSide(color: DocTheme.sheetBorder)),
-          ),
-          child: Text(
-            '$rowNum',
-            style: const TextStyle(fontSize: 10, color: Colors.grey),
-          ),
-        ),
-        // Data cells
-        ...List.generate(maxCols, (i) {
-          final value = i < cells.length ? cells[i] : '';
-          final isHighlight = _search.isNotEmpty &&
-              value.toLowerCase().contains(_search);
-
-          return Container(
-            width: 200,
-            color: isHighlight
-                ? Colors.yellow.shade100
-                : bg,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              border: Border(
-                right: BorderSide(color: DocTheme.sheetBorder, width: 0.5),
-                bottom: BorderSide(color: DocTheme.sheetBorder, width: 0.5),
-              ),
+          // Row number
+          Container(
+            width: 44,
+            color: const Color(0xFFE8ECF0),
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              border: Border(right: BorderSide(color: DocTheme.sheetBorder)),
             ),
-            child: widget.isEditMode && !isHeader
-                ? TextFormField(
-                    initialValue: value,
-                    style: const TextStyle(fontSize: 12, color: DocTheme.textPrimary),
-                    maxLines: null,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
+            child: Text(
+              '$rowNum',
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+            ),
+          ),
+          // Data cells
+          ...List.generate(maxCols, (i) {
+            final value = i < cells.length ? cells[i] : '';
+            final isHighlight =
+                _search.isNotEmpty && value.toLowerCase().contains(_search);
+
+            return Container(
+              width: 200,
+              color: isHighlight ? Colors.yellow.shade100 : bg,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border(
+                  right: BorderSide(color: DocTheme.sheetBorder, width: 0.5),
+                  bottom: BorderSide(color: DocTheme.sheetBorder, width: 0.5),
+                ),
+              ),
+              child: widget.isEditMode && !isHeader
+                  ? TextFormField(
+                      initialValue: value,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: DocTheme.textPrimary,
+                      ),
+                      maxLines: null,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onChanged: (v) => onCellChanged?.call(i, v),
+                    )
+                  : Text(
+                      value,
+                      softWrap: true,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isHeader
+                            ? FontWeight.bold
+                            : FontWeight.w400,
+                        color: isHeader
+                            ? DocTheme.sheetHeaderText
+                            : DocTheme.textPrimary,
+                      ),
                     ),
-                    onChanged: (v) => onCellChanged?.call(i, v),
-                  )
-                : Text(
-                    value,
-                    softWrap: true,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isHeader ? FontWeight.bold : FontWeight.w400,
-                      color: isHeader
-                          ? DocTheme.sheetHeaderText
-                          : DocTheme.textPrimary,
-                    ),
-                  ),
-          );
-        }),
-      ],
-    ));
+            );
+          }),
+        ],
+      ),
+    );
   }
 
   String _colLetter(int index) {

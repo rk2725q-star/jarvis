@@ -6,7 +6,6 @@
 /// Injected into AgenticaEngine at task start for fewer turns on repeat tasks.
 library;
 
-
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
@@ -57,33 +56,35 @@ class AgenticaMemory {
         ''');
 
         await db.execute(
-            'CREATE INDEX idx_tasks_status ON tasks (status, created_at DESC)');
+          'CREATE INDEX idx_tasks_status ON tasks (status, created_at DESC)',
+        );
         await db.execute(
-            'CREATE INDEX idx_patterns_kw ON learned_patterns (trigger_keyword)');
+          'CREATE INDEX idx_patterns_kw ON learned_patterns (trigger_keyword)',
+        );
         await db.execute(
-            'CREATE INDEX idx_scheduled_time ON scheduled_tasks (status, scheduled_time)');
+          'CREATE INDEX idx_scheduled_time ON scheduled_tasks (status, scheduled_time)',
+        );
       },
     );
     return _db!;
   }
 
   // ─── SAVE completed task ──────────────────────────────────────────────────
-  static Future<void> saveTask(AgenticaTask task, {String? providerUsed}) async {
+  static Future<void> saveTask(
+    AgenticaTask task, {
+    String? providerUsed,
+  }) async {
     final db = await _database;
-    await db.insert(
-      'tasks',
-      {
-        'id': task.id,
-        'prompt': task.prompt,
-        'result': task.result ?? '',
-        'status': task.status.name,
-        'turns_used': task.turnsUsed,
-        'provider_used': providerUsed ?? '',
-        'created_at': task.createdAt.millisecondsSinceEpoch,
-        'ended_at': task.endedAt?.millisecondsSinceEpoch,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('tasks', {
+      'id': task.id,
+      'prompt': task.prompt,
+      'result': task.result ?? '',
+      'status': task.status.name,
+      'turns_used': task.turnsUsed,
+      'provider_used': providerUsed ?? '',
+      'created_at': task.createdAt.millisecondsSinceEpoch,
+      'ended_at': task.endedAt?.millisecondsSinceEpoch,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
     print('[AgenticaMemory] Saved task: ${task.id} status=${task.status.name}');
   }
 
@@ -95,7 +96,15 @@ class AgenticaMemory {
     final db = await _database;
     // Extract keywords: words > 3 chars, not common stopwords
     final stopwords = {
-      'the', 'and', 'for', 'that', 'this', 'with', 'from', 'have', 'into'
+      'the',
+      'and',
+      'for',
+      'that',
+      'this',
+      'with',
+      'from',
+      'have',
+      'into',
     };
     final keywords = prompt
         .toLowerCase()
@@ -119,7 +128,10 @@ class AgenticaMemory {
   }
 
   // ─── Build memory context string for injection into LLM ──────────────────
-  static Future<String> buildMemoryContext(String prompt, {String? currentApp}) async {
+  static Future<String> buildMemoryContext(
+    String prompt, {
+    String? currentApp,
+  }) async {
     try {
       final pattern = await findPattern(prompt, appContext: currentApp);
       if (pattern == null) return '';
@@ -148,7 +160,9 @@ class AgenticaMemory {
     if (keyword.isEmpty) return;
 
     // Serialize as JSON list of ToolCall maps for v3 compatibility
-    final toolList = toolSequence.map((t) => {'name': t, 'params': {}}).toList();
+    final toolList = toolSequence
+        .map((t) => {'name': t, 'params': {}})
+        .toList();
     final toolJson = jsonEncode(toolList);
     final now = DateTime.now().millisecondsSinceEpoch;
 
@@ -183,7 +197,9 @@ class AgenticaMemory {
   }
 
   // ─── GET all learned patterns for cache warming ──────────────────────────
-  static Future<List<Map<String, dynamic>>> getLearnedPatterns({int limit = 100}) async {
+  static Future<List<Map<String, dynamic>>> getLearnedPatterns({
+    int limit = 100,
+  }) async {
     try {
       final db = await _database;
       final rows = await db.query(
@@ -194,19 +210,18 @@ class AgenticaMemory {
       return rows.map((r) {
         final keyword = r['trigger_keyword'] as String;
         final rawSequence = r['successful_tool_sequence'] as String;
-        
+
         // Backwards compatibility fallback if it was saved in old format (joined by ' → ')
         String jsonSequence = rawSequence;
         if (!rawSequence.startsWith('[')) {
-          final parts = rawSequence.split(' → ').map((t) => {'name': t, 'params': {}}).toList();
+          final parts = rawSequence
+              .split(' → ')
+              .map((t) => {'name': t, 'params': {}})
+              .toList();
           jsonSequence = jsonEncode(parts);
         }
-        
-        return {
-          'embedding': keyword,
-          'sequence': jsonSequence,
-          'latency': 500,
-        };
+
+        return {'embedding': keyword, 'sequence': jsonSequence, 'latency': 500};
       }).toList();
     } catch (_) {
       return [];
@@ -214,7 +229,10 @@ class AgenticaMemory {
   }
 
   // ─── GET learned pattern for a keyword ───────────────────────────────────
-  static Future<String?> findPattern(String prompt, {String? appContext}) async {
+  static Future<String?> findPattern(
+    String prompt, {
+    String? appContext,
+  }) async {
     try {
       final db = await _database;
       final keywords = prompt
@@ -229,7 +247,8 @@ class AgenticaMemory {
       for (final kw in keywords) {
         final rows = await db.query(
           'learned_patterns',
-          where: 'trigger_keyword = ?${appContext != null ? ' AND app_context = ?' : ''}',
+          where:
+              'trigger_keyword = ?${appContext != null ? ' AND app_context = ?' : ''}',
           whereArgs: appContext != null ? [kw, appContext] : [kw],
           orderBy: 'success_count DESC',
           limit: 1,
@@ -260,13 +279,22 @@ class AgenticaMemory {
   static Future<Map<String, int>> getStats() async {
     final db = await _database;
     final total =
-        Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM tasks')) ?? 0;
-    final succeeded = Sqflite.firstIntValue(await db.rawQuery(
-            "SELECT COUNT(*) FROM tasks WHERE status = 'succeeded'")) ??
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM tasks'),
+        ) ??
+        0;
+    final succeeded =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM tasks WHERE status = 'succeeded'",
+          ),
+        ) ??
         0;
     final patterns =
-        Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM learned_patterns')) ??
-            0;
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM learned_patterns'),
+        ) ??
+        0;
     return {'total': total, 'succeeded': succeeded, 'patterns': patterns};
   }
 
@@ -274,21 +302,21 @@ class AgenticaMemory {
   static Future<void> scheduleTask(String prompt, int scheduledTimeMs) async {
     final db = await _database;
     final id = '${DateTime.now().millisecondsSinceEpoch}';
-    await db.insert(
-      'scheduled_tasks',
-      {
-        'id': id,
-        'prompt': prompt,
-        'scheduled_time': scheduledTimeMs,
-        'status': 'pending',
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
+    await db.insert('scheduled_tasks', {
+      'id': id,
+      'prompt': prompt,
+      'scheduled_time': scheduledTimeMs,
+      'status': 'pending',
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    print(
+      '[AgenticaMemory] Scheduled task: $id prompt="$prompt" time=$scheduledTimeMs',
     );
-    print('[AgenticaMemory] Scheduled task: $id prompt="$prompt" time=$scheduledTimeMs');
   }
 
   // ─── GET pending scheduled tasks ──────────────────────────────────────────
-  static Future<List<Map<String, dynamic>>> getPendingScheduledTasks(int nowMs) async {
+  static Future<List<Map<String, dynamic>>> getPendingScheduledTasks(
+    int nowMs,
+  ) async {
     final db = await _database;
     return db.query(
       'scheduled_tasks',

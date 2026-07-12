@@ -19,7 +19,7 @@ import 'video_gen_screen.dart';
 
 class ImagiyaScreen extends StatefulWidget {
   final int initialTabIndex;
-  
+
   const ImagiyaScreen({super.key, this.initialTabIndex = 0});
 
   @override
@@ -44,7 +44,11 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
     super.initState();
     _imagiyaService = ImagiyaService(router: context.read<AIRouter>());
     _codesignService = CodesignService(router: context.read<AIRouter>());
-    _tabs = TabController(length: 4, vsync: this, initialIndex: widget.initialTabIndex);
+    _tabs = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
   }
 
   @override
@@ -58,26 +62,35 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
     _genSub?.cancel();
     setState(() => _isGenerating = true);
 
-    _genSub = _imagiyaService.generate(prompt).listen(
-      (image) => setState(() {
-        _currentImage = image;
-        if (image.status != ImageStatus.generating) _isGenerating = false;
-      }),
-      onError: (_) => setState(() => _isGenerating = false),
-    );
+    _genSub = _imagiyaService
+        .generate(prompt)
+        .listen(
+          (image) => setState(() {
+            _currentImage = image;
+            if (image.status != ImageStatus.generating) _isGenerating = false;
+          }),
+          onError: (_) => setState(() => _isGenerating = false),
+        );
   }
 
   Future<void> _downloadImage() async {
     if (_currentImage == null) return;
-    final bytes = await ApiClient.instance.fetchImageBytes(_currentImage!.imageUrl);
+    final bytes = await ApiClient.instance.fetchImageBytes(
+      _currentImage!.imageUrl,
+    );
     final result = await _downloadService.saveToGallery(
-      bytes, 'imagiya_${DateTime.now().millisecondsSinceEpoch}',
+      bytes,
+      'imagiya_${DateTime.now().millisecondsSinceEpoch}',
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(result.success ? '✅ Saved to gallery!' : '❌ ${result.error}'),
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.success ? '✅ Saved to gallery!' : '❌ ${result.error}',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _generateCodesign(CodesignRequest request) async {
@@ -88,7 +101,10 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
     } on ApiException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('CoDesign error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('CoDesign error: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -100,7 +116,10 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
     if (_currentArtifact == null) return;
     setState(() => _isDesigning = true);
     try {
-      final updated = await _codesignService.edit(_currentArtifact!, instruction);
+      final updated = await _codesignService.edit(
+        _currentArtifact!,
+        instruction,
+      );
       setState(() => _currentArtifact = updated);
     } finally {
       setState(() => _isDesigning = false);
@@ -113,11 +132,19 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
       backgroundColor: const Color(0xFF0F0F16), // Dark mode base
       appBar: AppBar(
         backgroundColor: const Color(0xFF141420),
-        title: const Row(children: [
-          Icon(Icons.auto_awesome, color: Colors.deepPurpleAccent),
-          SizedBox(width: 8),
-          Text('JARVIS Creative', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
-        ]),
+        title: const Row(
+          children: [
+            Icon(Icons.auto_awesome, color: Colors.deepPurpleAccent),
+            SizedBox(width: 8),
+            Text(
+              'JARVIS Creative',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
         bottom: TabBar(
           controller: _tabs,
@@ -154,27 +181,41 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
                     onEdit: () async {
                       try {
                         setState(() => _isGenerating = true);
-                        final bytes = await ApiClient.instance.fetchImageBytes(_currentImage!.imageUrl);
-                        final codec = await ui.instantiateImageCodec(Uint8List.fromList(bytes));
+                        final bytes = await ApiClient.instance.fetchImageBytes(
+                          _currentImage!.imageUrl,
+                        );
+                        final codec = await ui.instantiateImageCodec(
+                          Uint8List.fromList(bytes),
+                        );
                         final frame = await codec.getNextFrame();
                         final uiImage = frame.image;
-                        
+
                         setState(() => _isGenerating = false);
-                        
+
                         if (!context.mounted) return;
-                        
+
                         final editedBytes = await Navigator.push<Uint8List>(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => ImageEditorScreen(image: uiImage),
+                            builder: (context) =>
+                                ImageEditorScreen(image: uiImage),
                           ),
                         );
-                        
+
                         if (editedBytes != null && context.mounted) {
-                          await _downloadService.saveToGallery(editedBytes, 'edited_${DateTime.now().millisecondsSinceEpoch}');
+                          await _downloadService.saveToGallery(
+                            editedBytes,
+                            'edited_${DateTime.now().millisecondsSinceEpoch}',
+                          );
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Edited image saved to gallery!', style: TextStyle(color: Colors.white)), backgroundColor: Colors.deepPurpleAccent),
+                            const SnackBar(
+                              content: Text(
+                                'Edited image saved to gallery!',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              backgroundColor: Colors.deepPurpleAccent,
+                            ),
                           );
                         }
                       } catch (e) {
@@ -186,8 +227,13 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
                       }
                     },
                     onShare: () async {
-                      final bytes = await ApiClient.instance.fetchImageBytes(_currentImage!.imageUrl);
-                      _downloadService.shareImage(bytes, _currentImage!.sourcePrompt.text);
+                      final bytes = await ApiClient.instance.fetchImageBytes(
+                        _currentImage!.imageUrl,
+                      );
+                      _downloadService.shareImage(
+                        bytes,
+                        _currentImage!.sourcePrompt.text,
+                      );
                     },
                     onCodesign: () {
                       _tabs.animateTo(1); // Switch to CoDesign tab
@@ -217,7 +263,11 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
                 );
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(result.success ? '✅ Image saved!' : '❌ ${result.error}')),
+                    SnackBar(
+                      content: Text(
+                        result.success ? '✅ Image saved!' : '❌ ${result.error}',
+                      ),
+                    ),
                   );
                 }
               },
@@ -228,7 +278,11 @@ class _ImagiyaScreenState extends State<ImagiyaScreen>
                 );
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(result.success ? '✅ HTML saved!' : '❌ ${result.error}')),
+                    SnackBar(
+                      content: Text(
+                        result.success ? '✅ HTML saved!' : '❌ ${result.error}',
+                      ),
+                    ),
                   );
                 }
               },

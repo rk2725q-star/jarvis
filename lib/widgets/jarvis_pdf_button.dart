@@ -25,8 +25,9 @@ class JarvisFontLoader {
   static pw.Font? _codeFont;
   static pw.Font? _fallbackTamil;
   static pw.Font? _fallbackSymbols;
-  static pw.Font? _fallbackMath;       // NotoSansMath — covers 1000s of math glyphs
-  static pw.Font? _fallbackSymbols2;   // NotoSansSymbols2 — box drawing, arrows, misc
+  static pw.Font? _fallbackMath; // NotoSansMath — covers 1000s of math glyphs
+  static pw.Font?
+  _fallbackSymbols2; // NotoSansSymbols2 — box drawing, arrows, misc
 
   static Future<void> loadFonts() async {
     _headingRegular =
@@ -55,11 +56,11 @@ class JarvisFontLoader {
 
   // All fallbacks: Tamil, Symbols, Math, Symbols2 — covers 10,000+ codepoints
   static List<pw.Font> get _fallbacks => [
-        ?_fallbackTamil,
-        ?_fallbackSymbols,
-        ?_fallbackMath,
-        ?_fallbackSymbols2,
-      ];
+    ?_fallbackTamil,
+    ?_fallbackSymbols,
+    ?_fallbackMath,
+    ?_fallbackSymbols2,
+  ];
 
   static pw.Font get headingRegular => _headingRegular!;
   static pw.Font get headingBold => _headingBold!;

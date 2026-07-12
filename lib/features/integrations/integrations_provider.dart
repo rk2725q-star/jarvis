@@ -411,7 +411,6 @@ When user asks to play a specific video file:
 - Offer to open the JARVIS Player
 - The UI handles the media kit integration directly
 ''',
-
 };
 
 class IntegrationsProvider extends ChangeNotifier {
@@ -432,7 +431,9 @@ class IntegrationsProvider extends ChangeNotifier {
     final sb = StringBuffer();
     sb.writeln('\n\n═══════ JARVIS CONNECTED INTEGRATIONS ═══════');
     sb.writeln('The user has connected the following integrations.');
-    sb.writeln('JARVIS instantly gains ALL their capabilities and MUST use them:\n');
+    sb.writeln(
+      'JARVIS instantly gains ALL their capabilities and MUST use them:\n',
+    );
     for (final id in _connected) {
       final prompt = kIntegrationCapabilityPrompts[id];
       if (prompt != null) sb.writeln(prompt);

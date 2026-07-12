@@ -45,7 +45,9 @@ class ImageViewport extends StatelessWidget {
                   errorWidget: (context, url, error) => Container(
                     height: 300,
                     color: Colors.red[50],
-                    child: const Center(child: Icon(Icons.broken_image, color: Colors.red)),
+                    child: const Center(
+                      child: Icon(Icons.broken_image, color: Colors.red),
+                    ),
                   ),
                 ),
               if (image.status == ImageStatus.generating)
@@ -58,7 +60,10 @@ class ImageViewport extends StatelessWidget {
                         children: [
                           CircularProgressIndicator(color: Colors.white),
                           SizedBox(height: 12),
-                          Text('Imagiya is creating...', style: TextStyle(color: Colors.white)),
+                          Text(
+                            'Imagiya is creating...',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ],
                       ),
                     ),
@@ -89,7 +94,13 @@ class EditToolbar extends StatelessWidget {
   final VoidCallback? onShare;
   final VoidCallback? onCodesign;
 
-  const EditToolbar({super.key, this.onDownload, this.onEdit, this.onShare, this.onCodesign});
+  const EditToolbar({
+    super.key,
+    this.onDownload,
+    this.onEdit,
+    this.onShare,
+    this.onCodesign,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -97,9 +108,19 @@ class EditToolbar extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         _ToolButton(icon: Icons.edit, label: 'Edit', onTap: onEdit),
-        _ToolButton(icon: Icons.download, label: 'Save HD', onTap: onDownload, accent: true),
+        _ToolButton(
+          icon: Icons.download,
+          label: 'Save HD',
+          onTap: onDownload,
+          accent: true,
+        ),
         _ToolButton(icon: Icons.share, label: 'Share', onTap: onShare),
-        _ToolButton(icon: Icons.design_services, label: 'CoDesign', onTap: onCodesign, accent: true),
+        _ToolButton(
+          icon: Icons.design_services,
+          label: 'CoDesign',
+          onTap: onCodesign,
+          accent: true,
+        ),
       ],
     );
   }
@@ -132,13 +153,20 @@ class _ToolButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 20, color: accent ? Colors.white : Colors.grey[700]),
-            const SizedBox(height: 4),
-            Text(label, style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+            Icon(
+              icon,
+              size: 20,
               color: accent ? Colors.white : Colors.grey[700],
-            )),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: accent ? Colors.white : Colors.grey[700],
+              ),
+            ),
           ],
         ),
       ),

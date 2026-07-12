@@ -82,7 +82,8 @@ class YTAudioHandler extends BaseAudioHandler with SeekHandler {
         AudioSource.uri(
           Uri.parse(url),
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
+            'User-Agent':
+                'Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
             'Origin': 'https://www.youtube.com',
           },
         ),
@@ -110,7 +111,9 @@ class YTAudioHandler extends BaseAudioHandler with SeekHandler {
 
   // ── Apply boost manually (called from settings) ──────────────────────────
   Future<void> applyBoost(double boostLevel) async {
-    final gainMb = boostLevel > 1.0 ? ((boostLevel - 1.0) / 2.0 * 1500).toInt() : 0;
+    final gainMb = boostLevel > 1.0
+        ? ((boostLevel - 1.0) / 2.0 * 1500).toInt()
+        : 0;
     try {
       // Always pass the real session ID if we have it
       final args = <String, dynamic>{'gainMb': gainMb};
@@ -145,32 +148,34 @@ class YTAudioHandler extends BaseAudioHandler with SeekHandler {
       MediaControl.stop,
     ];
 
-    playbackState.add(PlaybackState(
-      controls: controls,
-      systemActions: const {
-        MediaAction.seek,
-        MediaAction.seekForward,
-        MediaAction.seekBackward,
-        MediaAction.play,
-        MediaAction.pause,
-        MediaAction.playPause,
-        MediaAction.stop,
-        MediaAction.skipToNext,
-        MediaAction.skipToPrevious,
-      },
-      androidCompactActionIndices: const [0, 1, 2],
-      processingState: {
-        ProcessingState.idle:      AudioProcessingState.idle,
-        ProcessingState.loading:   AudioProcessingState.loading,
-        ProcessingState.buffering: AudioProcessingState.buffering,
-        ProcessingState.ready:     AudioProcessingState.ready,
-        ProcessingState.completed: AudioProcessingState.completed,
-      }[_player.processingState]!,
-      playing:          isPlaying,
-      updatePosition:   _player.position,
-      bufferedPosition: _player.bufferedPosition,
-      speed:            _player.speed,
-      queueIndex:       e.currentIndex,
-    ));
+    playbackState.add(
+      PlaybackState(
+        controls: controls,
+        systemActions: const {
+          MediaAction.seek,
+          MediaAction.seekForward,
+          MediaAction.seekBackward,
+          MediaAction.play,
+          MediaAction.pause,
+          MediaAction.playPause,
+          MediaAction.stop,
+          MediaAction.skipToNext,
+          MediaAction.skipToPrevious,
+        },
+        androidCompactActionIndices: const [0, 1, 2],
+        processingState: {
+          ProcessingState.idle: AudioProcessingState.idle,
+          ProcessingState.loading: AudioProcessingState.loading,
+          ProcessingState.buffering: AudioProcessingState.buffering,
+          ProcessingState.ready: AudioProcessingState.ready,
+          ProcessingState.completed: AudioProcessingState.completed,
+        }[_player.processingState]!,
+        playing: isPlaying,
+        updatePosition: _player.position,
+        bufferedPosition: _player.bufferedPosition,
+        speed: _player.speed,
+        queueIndex: e.currentIndex,
+      ),
+    );
   }
 }

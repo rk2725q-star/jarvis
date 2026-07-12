@@ -27,35 +27,44 @@ class NotificationService {
     if (_isInitialized) return;
 
     tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Kolkata')); // Force Tamil Nadu Time (IST)
+    tz.setLocalLocation(
+      tz.getLocation('Asia/Kolkata'),
+    ); // Force Tamil Nadu Time (IST)
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
 
     await _flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
-      onDidReceiveNotificationResponse: NotificationService.handleNotificationReply,
+      onDidReceiveNotificationResponse:
+          NotificationService.handleNotificationReply,
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
 
-    final NotificationAppLaunchDetails? launchDetails = 
-        await _flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+    final NotificationAppLaunchDetails? launchDetails =
+        await _flutterLocalNotificationsPlugin
+            .getNotificationAppLaunchDetails();
     if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
       if (launchDetails.notificationResponse != null) {
-        NotificationService.handleNotificationReply(launchDetails.notificationResponse!);
+        NotificationService.handleNotificationReply(
+          launchDetails.notificationResponse!,
+        );
       }
     }
 
     await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
-        
+
     await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestExactAlarmsPermission();
 
     _isInitialized = true;
@@ -64,8 +73,12 @@ class NotificationService {
     await _scheduleReports();
   }
 
-  static Future<void> handleNotificationReply(NotificationResponse response) async {
-    debugPrint('[NotifReply] actionId=${response.actionId}, input=${response.input}');
+  static Future<void> handleNotificationReply(
+    NotificationResponse response,
+  ) async {
+    debugPrint(
+      '[NotifReply] actionId=${response.actionId}, input=${response.input}',
+    );
     final prefs = await SharedPreferences.getInstance();
 
     if (response.actionId == 'reply_action') {
@@ -73,7 +86,9 @@ class NotificationService {
       if (userReply.isEmpty) return;
 
       final history = prefs.getStringList('jarvis_memory_history') ?? [];
-      history.add('USER REPLIED TO NOTIFICATION ("${response.payload ?? "Reminder"}"): "$userReply"');
+      history.add(
+        'USER REPLIED TO NOTIFICATION ("${response.payload ?? "Reminder"}"): "$userReply"',
+      );
       await prefs.setStringList('jarvis_memory_history', history);
 
       final notifId = response.id ?? 999;
@@ -96,7 +111,7 @@ class NotificationService {
       );
 
       final aiReply = await NotificationReplyService.generateReply(
-        userReply, 
+        userReply,
         response.payload ?? 'JARVIS Reminder',
       );
 
@@ -107,10 +122,15 @@ class NotificationService {
         notificationDetails: replyChannel,
       );
     } else {
-      await prefs.setString('pending_notification_reply', response.payload ?? 'Reminder');
-      
+      await prefs.setString(
+        'pending_notification_reply',
+        response.payload ?? 'Reminder',
+      );
+
       final history = prefs.getStringList('jarvis_memory_history') ?? [];
-      history.add('USER OPENED APP FROM NOTIFICATION: "${response.payload ?? "Reminder"}"');
+      history.add(
+        'USER OPENED APP FROM NOTIFICATION: "${response.payload ?? "Reminder"}"',
+      );
       await prefs.setStringList('jarvis_memory_history', history);
     }
   }
@@ -120,30 +140,46 @@ class NotificationService {
 
     // Mapping of routine types to their metadata: (idPrefix, title, body, defaultHour, defaultMin)
     final routineMeta = {
-      'morning':   (110, 'Good Morning! 🌅', 'Coffee or tea drink or not?', 6, 0),
+      'morning': (110, 'Good Morning! 🌅', 'Coffee or tea drink or not?', 6, 0),
       'breakfast': (120, 'Time for Breakfast 🍳', 'Kalai Saptiya?', 9, 30),
-      'lunch':     (130, 'Afternoon Check 🍛', 'Madhiyam Saptiya?', 13, 30),
-      'evening':   (140, 'Evening Break! ☕', 'Time for your evening tea or coffee?', 18, 0),
-      'dinner':    (150, 'Dinner Time 🍽️', 'Night Saptiya?', 20, 0),
-      'sleep':     (160, 'Time to Sleep 😴', "It's getting late, consider going to sleep soon.", 22, 0),
+      'lunch': (130, 'Afternoon Check 🍛', 'Madhiyam Saptiya?', 13, 30),
+      'evening': (
+        140,
+        'Evening Break! ☕',
+        'Time for your evening tea or coffee?',
+        18,
+        0,
+      ),
+      'dinner': (150, 'Dinner Time 🍽️', 'Night Saptiya?', 20, 0),
+      'sleep': (
+        160,
+        'Time to Sleep 😴',
+        "It's getting late, consider going to sleep soon.",
+        22,
+        0,
+      ),
     };
 
     for (var entry in routineMeta.entries) {
       final type = entry.key;
       final meta = entry.value;
-      
+
       for (int i = 1; i <= 7; i++) {
         // Hardcoded generic defaults
         int defH = meta.$4;
         int defM = meta.$5;
 
-        final hour = prefs.getInt('routine_${type}_h_$i') ?? 
-                    prefs.getInt('routine_${type}_hour') ?? defH;
-        final min  = prefs.getInt('routine_${type}_m_$i') ?? 
-                    prefs.getInt('routine_${type}_min') ?? defM;
+        final hour =
+            prefs.getInt('routine_${type}_h_$i') ??
+            prefs.getInt('routine_${type}_hour') ??
+            defH;
+        final min =
+            prefs.getInt('routine_${type}_m_$i') ??
+            prefs.getInt('routine_${type}_min') ??
+            defM;
 
         await _scheduleWeekly(
-          id: meta.$1 + i, 
+          id: meta.$1 + i,
           title: meta.$2,
           body: meta.$3,
           day: i,
@@ -154,7 +190,6 @@ class NotificationService {
     }
   }
 
-
   Future<void> _scheduleWeekly({
     required int id,
     required String title,
@@ -164,7 +199,14 @@ class NotificationService {
     required int minute,
   }) async {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    var scheduledDate = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
 
     while (scheduledDate.weekday != day || scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
@@ -178,7 +220,7 @@ class NotificationService {
       scheduledDate: scheduledDate,
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
-          'jarvis_routine_channel', 
+          'jarvis_routine_channel',
           'JARVIS Routines',
           channelDescription: 'Weekly recurring routines',
           importance: Importance.max,
@@ -191,7 +233,12 @@ class NotificationService {
   }
 
   /// Update a routine time and reschedule all routines
-  Future<void> updateRoutine(String type, {int? weekday, required int hour, required int minute}) async {
+  Future<void> updateRoutine(
+    String type, {
+    int? weekday,
+    required int hour,
+    required int minute,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     if (weekday != null) {
       // If weekday 0 is passed, it means "all weekdays" (1-6)
@@ -209,11 +256,18 @@ class NotificationService {
       await prefs.setInt('routine_${type}_min', minute);
     }
     await _scheduleDailyRoutines();
-    debugPrint('[JARVIS] Routine updated: $type (day: $weekday) to $hour:$minute');
+    debugPrint(
+      '[JARVIS] Routine updated: $type (day: $weekday) to $hour:$minute',
+    );
   }
 
   /// Schedule a specific custom reminder
-  Future<void> scheduleReminder(int id, String title, String body, DateTime scheduledDate) async {
+  Future<void> scheduleReminder(
+    int id,
+    String title,
+    String body,
+    DateTime scheduledDate,
+  ) async {
     final scheduleTz = tz.TZDateTime.from(scheduledDate, tz.local);
     if (scheduleTz.isBefore(tz.TZDateTime.now(tz.local))) return;
 
@@ -225,7 +279,7 @@ class NotificationService {
       scheduledDate: scheduleTz,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          'jarvis_reminder_channel', 
+          'jarvis_reminder_channel',
           'JARVIS Reminders',
           channelDescription: 'User requested notifications and reminders',
           importance: Importance.max,
@@ -249,7 +303,12 @@ class NotificationService {
 
   Future<void> cancelNotification(int id) async {
     // If it's a base ID, cancel all 7 weekdays
-    if (id == 110 || id == 120 || id == 130 || id == 140 || id == 150 || id == 160) {
+    if (id == 110 ||
+        id == 120 ||
+        id == 130 ||
+        id == 140 ||
+        id == 150 ||
+        id == 160) {
       for (int i = 1; i <= 7; i++) {
         await _flutterLocalNotificationsPlugin.cancel(id: id + i);
       }
@@ -262,12 +321,12 @@ class NotificationService {
   /// Cancels a routine for TODAY only and ensures it is scheduled for NEXT week.
   Future<void> skipRoutineForToday(String type) async {
     final meta = {
-      'morning':   110,
+      'morning': 110,
       'breakfast': 120,
-      'lunch':     130,
-      'evening':   140,
-      'dinner':    150,
-      'sleep':     160,
+      'lunch': 130,
+      'evening': 140,
+      'dinner': 150,
+      'sleep': 160,
     };
     final baseId = meta[type];
     if (baseId == null) return;
@@ -278,19 +337,34 @@ class NotificationService {
 
     // 1. Cancel today's occurrence
     await _flutterLocalNotificationsPlugin.cancel(id: routineId);
-    
+
     // 2. Re-schedule starting from tomorrow so it picks the NEXT week's occurrence
     final prefs = await SharedPreferences.getInstance();
-    int defH = type == 'breakfast' ? 9 : (type == 'lunch' ? 13 : (type == 'dinner' ? 20 : (type == 'sleep' ? 22 : 6)));
+    int defH = type == 'breakfast'
+        ? 9
+        : (type == 'lunch'
+              ? 13
+              : (type == 'dinner' ? 20 : (type == 'sleep' ? 22 : 6)));
     int defM = type == 'breakfast' ? 30 : (type == 'lunch' ? 30 : 0);
 
-    final hour = prefs.getInt('routine_${type}_h_$todayWeekday') ?? 
-                prefs.getInt('routine_${type}_hour') ?? defH;
-    final min  = prefs.getInt('routine_${type}_m_$todayWeekday') ?? 
-                prefs.getInt('routine_${type}_min') ?? defM;
+    final hour =
+        prefs.getInt('routine_${type}_h_$todayWeekday') ??
+        prefs.getInt('routine_${type}_hour') ??
+        defH;
+    final min =
+        prefs.getInt('routine_${type}_m_$todayWeekday') ??
+        prefs.getInt('routine_${type}_min') ??
+        defM;
 
     final tomorrow = tz.TZDateTime.now(tz.local).add(const Duration(days: 1));
-    var scheduledDate = tz.TZDateTime(tz.local, tomorrow.year, tomorrow.month, tomorrow.day, hour, min);
+    var scheduledDate = tz.TZDateTime(
+      tz.local,
+      tomorrow.year,
+      tomorrow.month,
+      tomorrow.day,
+      hour,
+      min,
+    );
 
     while (scheduledDate.weekday != todayWeekday) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
@@ -304,7 +378,7 @@ class NotificationService {
       scheduledDate: scheduledDate,
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
-          'jarvis_routine_channel', 
+          'jarvis_routine_channel',
           'JARVIS Routines',
           channelDescription: 'Weekly recurring routines',
           importance: Importance.max,
@@ -314,8 +388,10 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
     );
-    
-    debugPrint('[JARVIS] skipped $type for today. Next scheduled: $scheduledDate');
+
+    debugPrint(
+      '[JARVIS] skipped $type for today. Next scheduled: $scheduledDate',
+    );
   }
 
   String _getRoutineTitle(String type) {
@@ -334,7 +410,8 @@ class NotificationService {
     if (type == 'lunch') return 'Madhiyam Saptiya?';
     if (type == 'evening') return 'Time for your evening tea or coffee?';
     if (type == 'dinner') return 'Night Saptiya?';
-    if (type == 'sleep') return "It's getting late, consider going to sleep soon.";
+    if (type == 'sleep')
+      return "It's getting late, consider going to sleep soon.";
     return 'Check-in time!';
   }
 
@@ -380,15 +457,34 @@ class NotificationService {
     DateTimeComponents match = DateTimeComponents.time,
   }) async {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduledDate = tz.TZDateTime(tz.local, now.year, month ?? now.month, day ?? now.day, hour, 0);
+    var scheduledDate = tz.TZDateTime(
+      tz.local,
+      now.year,
+      month ?? now.month,
+      day ?? now.day,
+      hour,
+      0,
+    );
 
     if (scheduledDate.isBefore(now)) {
       if (match == DateTimeComponents.dayOfWeekAndTime) {
         scheduledDate = scheduledDate.add(const Duration(days: 7));
       } else if (match == DateTimeComponents.dayOfMonthAndTime) {
-        scheduledDate = tz.TZDateTime(tz.local, now.year, now.month + 1, day!, hour);
+        scheduledDate = tz.TZDateTime(
+          tz.local,
+          now.year,
+          now.month + 1,
+          day!,
+          hour,
+        );
       } else if (match == DateTimeComponents.dateAndTime) {
-        scheduledDate = tz.TZDateTime(tz.local, now.year + 1, month!, day!, hour);
+        scheduledDate = tz.TZDateTime(
+          tz.local,
+          now.year + 1,
+          month!,
+          day!,
+          hour,
+        );
       } else {
         scheduledDate = scheduledDate.add(const Duration(days: 1));
       }
@@ -404,7 +500,8 @@ class NotificationService {
         android: AndroidNotificationDetails(
           'jarvis_report_channel',
           'JARVIS Reports',
-          channelDescription: 'Weekly, Monthly, and Yearly performance summaries',
+          channelDescription:
+              'Weekly, Monthly, and Yearly performance summaries',
           importance: Importance.high,
           priority: Priority.high,
         ),
@@ -416,9 +513,15 @@ class NotificationService {
 
   int? getRoutineIdFromPurpose(String purpose) {
     final lower = purpose.toLowerCase();
-    
-    if (lower.contains('coffee') || lower.contains('tea') || lower.contains('wake up') || lower.contains('morning')) {
-      if (lower.contains('evening') || lower.contains('18:00') || lower.contains('6:00 pm')) return 140;
+
+    if (lower.contains('coffee') ||
+        lower.contains('tea') ||
+        lower.contains('wake up') ||
+        lower.contains('morning')) {
+      if (lower.contains('evening') ||
+          lower.contains('18:00') ||
+          lower.contains('6:00 pm'))
+        return 140;
       return 110;
     }
     if (lower.contains('breakfast') || lower.contains('kalai')) return 120;
@@ -432,7 +535,7 @@ class NotificationService {
     if (lower.contains('18:00') || lower.contains('6:00 pm')) return 140;
     if (lower.contains('20:00') || lower.contains('8:00 pm')) return 150;
     if (lower.contains('22:00') || lower.contains('10:00 pm')) return 160;
-    
+
     return null;
   }
 }

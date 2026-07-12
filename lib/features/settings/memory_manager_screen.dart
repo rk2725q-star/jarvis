@@ -19,12 +19,14 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
   Widget build(BuildContext context) {
     final memoryService = context.watch<MemoryService>();
     var memories = memoryService.getAllMemories();
-    
+
     // Sort chronologically (newest first for UI)
     memories.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     if (_selectedCategory != 'ALL') {
-      memories = memories.where((m) => m.category.toUpperCase() == _selectedCategory).toList();
+      memories = memories
+          .where((m) => m.category.toUpperCase() == _selectedCategory)
+          .toList();
     }
 
     return Scaffold(
@@ -43,7 +45,10 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
         actions: [
           if (memories.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete_sweep_rounded, color: JarvisColors.error),
+              icon: const Icon(
+                Icons.delete_sweep_rounded,
+                color: JarvisColors.error,
+              ),
               onPressed: () => _confirmClearAll(context, memoryService),
               tooltip: 'Clear All',
             ),
@@ -56,13 +61,13 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
             child: memories.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: memories.length,
-              itemBuilder: (context, index) {
-                final memory = memories[index];
-                return _buildMemoryCard(context, memory, memoryService);
-              },
-            ),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: memories.length,
+                    itemBuilder: (context, index) {
+                      final memory = memories[index];
+                      return _buildMemoryCard(context, memory, memoryService);
+                    },
+                  ),
           ),
         ],
       ),
@@ -82,14 +87,27 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
           final cat = categories[index];
           final isSelected = _selectedCategory == cat;
           return FilterChip(
-            label: Text(cat, style: TextStyle(fontSize: 11, color: isSelected ? Colors.black : Colors.white70)),
+            label: Text(
+              cat,
+              style: TextStyle(
+                fontSize: 11,
+                color: isSelected ? Colors.black : Colors.white70,
+              ),
+            ),
             selected: isSelected,
             onSelected: (val) => setState(() => _selectedCategory = cat),
             backgroundColor: JarvisColors.surfaceElevated,
             selectedColor: JarvisColors.accentPrimary,
             checkmarkColor: Colors.black,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            side: BorderSide(color: isSelected ? JarvisColors.accentPrimary : JarvisColors.border, width: 0.5),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            side: BorderSide(
+              color: isSelected
+                  ? JarvisColors.accentPrimary
+                  : JarvisColors.border,
+              width: 0.5,
+            ),
           );
         },
       ),
@@ -101,7 +119,11 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.psychology_alt_rounded, size: 64, color: JarvisColors.textMuted.withValues(alpha: 0.3)),
+          Icon(
+            Icons.psychology_alt_rounded,
+            size: 64,
+            color: JarvisColors.textMuted.withValues(alpha: 0.3),
+          ),
           const SizedBox(height: 16),
           Text(
             'NO STORED MEMORIES',
@@ -117,7 +139,11 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
     );
   }
 
-  Widget _buildMemoryCard(BuildContext context, MemoryItem item, MemoryService service) {
+  Widget _buildMemoryCard(
+    BuildContext context,
+    MemoryItem item,
+    MemoryService service,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -139,9 +165,14 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: JarvisColors.accentPrimary.withValues(alpha: 0.1),
+                          color: JarvisColors.accentPrimary.withValues(
+                            alpha: 0.1,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -156,7 +187,10 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
                       const Spacer(),
                       Text(
                         _formatDate(item.createdAt),
-                        style: const TextStyle(color: JarvisColors.textMuted, fontSize: 10),
+                        style: const TextStyle(
+                          color: JarvisColors.textMuted,
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
@@ -172,16 +206,27 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded, size: 14, color: Colors.orangeAccent),
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 14,
+                        color: Colors.orangeAccent,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Importance: ${(item.importance * 100).toInt()}%',
-                        style: const TextStyle(color: JarvisColors.textSecondary, fontSize: 11),
+                        style: const TextStyle(
+                          color: JarvisColors.textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
                       const Spacer(),
                       IconButton(
                         visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.delete_outline_rounded, size: 18, color: JarvisColors.error),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: JarvisColors.error,
+                        ),
                         onPressed: () => _confirmDelete(context, item, service),
                       ),
                     ],
@@ -199,13 +244,23 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  void _confirmDelete(BuildContext context, MemoryItem item, MemoryService service) {
+  void _confirmDelete(
+    BuildContext context,
+    MemoryItem item,
+    MemoryService service,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: JarvisColors.surfaceElevated,
-        title: const Text('Delete Memory?', style: TextStyle(color: Colors.white)),
-        content: const Text('This piece of context will be permanently removed from JARVIS.', style: TextStyle(color: JarvisColors.textSecondary)),
+        title: const Text(
+          'Delete Memory?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'This piece of context will be permanently removed from JARVIS.',
+          style: TextStyle(color: JarvisColors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -219,7 +274,10 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
                 setState(() {});
               }
             },
-            child: const Text('DELETE', style: TextStyle(color: JarvisColors.error)),
+            child: const Text(
+              'DELETE',
+              style: TextStyle(color: JarvisColors.error),
+            ),
           ),
         ],
       ),
@@ -231,8 +289,14 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: JarvisColors.surfaceElevated,
-        title: const Text('Clear All Memories?', style: TextStyle(color: Colors.white)),
-        content: const Text('JARVIS will lose all stored contextual learned behavior.', style: TextStyle(color: JarvisColors.textSecondary)),
+        title: const Text(
+          'Clear All Memories?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'JARVIS will lose all stored contextual learned behavior.',
+          style: TextStyle(color: JarvisColors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -246,7 +310,10 @@ class _MemoryManagerScreenState extends State<MemoryManagerScreen> {
                 setState(() {});
               }
             },
-            child: const Text('CLEAR ALL', style: TextStyle(color: JarvisColors.error)),
+            child: const Text(
+              'CLEAR ALL',
+              style: TextStyle(color: JarvisColors.error),
+            ),
           ),
         ],
       ),
