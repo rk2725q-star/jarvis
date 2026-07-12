@@ -387,10 +387,19 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _showAddMcpDialog(ChatProvider provider) {
-    final mcpUrlController = TextEditingController(text: 'https://mcp.pixelcut.ai/mcp');
+    final mcpUrlController = TextEditingController();
     final mcpTokenController = TextEditingController();
     bool isLoading = false;
     String? error;
+    bool showCustom = false;
+    String? selectedPreset;
+    
+    final presets = {
+      'Pixelcut': 'https://mcp.pixelcut.ai/mcp',
+      'Vercel': 'https://mcp.vercel.com/',
+      'Canva': 'https://mcp.canva.com/mcp',
+      'Copilot': 'https://api.githubcopilot.com/mcp/x/all'
+    };
 
     showDialog(
       context: context,
@@ -411,88 +420,94 @@ class _ChatInputBarState extends State<ChatInputBar>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Enter the URL of the remote Model Context Protocol server.',
+                'Select a provider to connect securely.',
                 style: TextStyle(color: Color(0xFFB0B0C8), fontSize: 14),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: [
-                  ActionChip(
-                    label: const Text('Pixelcut', style: TextStyle(fontSize: 12, color: Colors.white)),
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                children: presets.keys.map((name) {
+                  final isSelected = selectedPreset == name && !showCustom;
+                  return ActionChip(
+                    label: Text(name, style: TextStyle(fontSize: 12, color: isSelected ? Colors.black : Colors.white)),
+                    backgroundColor: isSelected ? JarvisColors.accentPrimary : Colors.white.withOpacity(0.1),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     side: BorderSide.none,
-                    onPressed: () => mcpUrlController.text = 'https://mcp.pixelcut.ai/mcp',
-                  ),
+                    onPressed: () {
+                      setDialogState(() {
+                        selectedPreset = name;
+                        showCustom = false;
+                        error = null;
+                      });
+                    },
+                  );
+                }).toList()..add(
                   ActionChip(
-                    label: const Text('Vercel', style: TextStyle(fontSize: 12, color: Colors.white)),
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    label: Text('Custom', style: TextStyle(fontSize: 12, color: showCustom ? Colors.black : Colors.white)),
+                    backgroundColor: showCustom ? JarvisColors.accentPrimary : Colors.white.withOpacity(0.1),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     side: BorderSide.none,
-                    onPressed: () => mcpUrlController.text = 'https://mcp.vercel.com/',
-                  ),
-                  ActionChip(
-                    label: const Text('Canva', style: TextStyle(fontSize: 12, color: Colors.white)),
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    side: BorderSide.none,
-                    onPressed: () => mcpUrlController.text = 'https://mcp.canva.com/mcp',
-                  ),
-                  ActionChip(
-                    label: const Text('Copilot', style: TextStyle(fontSize: 12, color: Colors.white)),
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    side: BorderSide.none,
-                    onPressed: () => mcpUrlController.text = 'https://api.githubcopilot.com/mcp/x/all',
-                  ),
-                ],
+                    onPressed: () {
+                      setDialogState(() {
+                        showCustom = true;
+                        selectedPreset = null;
+                        error = null;
+                      });
+                    },
+                  )
+                ),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: mcpUrlController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'MCP Server URL',
-                  labelStyle: const TextStyle(color: JarvisColors.textMuted),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: JarvisColors.accentPrimary),
+              if (showCustom) ...[
+                TextField(
+                  controller: mcpUrlController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'MCP Server URL',
+                    labelStyle: const TextStyle(color: JarvisColors.textMuted),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: JarvisColors.accentPrimary)),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: mcpTokenController,
-                style: const TextStyle(color: Colors.white),
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Auth Token / API Key (Optional)',
-                  labelStyle: const TextStyle(color: JarvisColors.textMuted),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: JarvisColors.accentPrimary),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: mcpTokenController,
+                  style: const TextStyle(color: Colors.white),
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Auth Token / API Key (Optional)',
+                    labelStyle: const TextStyle(color: JarvisColors.textMuted),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: JarvisColors.accentPrimary)),
                   ),
                 ),
-              ),
+              ],
               if (error != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  error!,
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          error!,
+                          style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ]
             ],
@@ -510,7 +525,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: isLoading
+              onPressed: (isLoading || (!showCustom && selectedPreset == null))
                   ? null
                   : () async {
                       setDialogState(() {
@@ -520,12 +535,14 @@ class _ChatInputBarState extends State<ChatInputBar>
                       final scaffoldMessenger = ScaffoldMessenger.of(context);
                       final navigator = Navigator.of(ctx);
                       try {
-                        final token = mcpTokenController.text.trim().isEmpty ? null : mcpTokenController.text.trim();
-                        await provider.connectMcpServer(mcpUrlController.text.trim(), token: token);
+                        final url = showCustom ? mcpUrlController.text.trim() : presets[selectedPreset]!;
+                        final token = showCustom && mcpTokenController.text.trim().isNotEmpty ? mcpTokenController.text.trim() : null;
+                        
+                        await provider.connectMcpServer(url, token: token);
                         navigator.pop();
                         scaffoldMessenger.showSnackBar(
-                          SnackBar(
-                            content: const Text('MCP Server connected successfully!'),
+                          const SnackBar(
+                            content: Text('MCP Server connected successfully!'),
                             backgroundColor: JarvisColors.accentPrimary,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -533,7 +550,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                       } catch (e) {
                         setDialogState(() {
                           isLoading = false;
-                          error = e.toString();
+                          final msg = e.toString();
+                          if (msg.contains('McpAuthError') || msg.contains('401') || msg.contains('Unauthorized')) {
+                            error = 'Couldn\'t connect — try signing in again';
+                          } else {
+                            error = 'Failed to connect. Please check the server URL or your connection.';
+                          }
                         });
                       }
                     },
@@ -541,12 +563,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                     )
-                  : const Text('Connect', style: TextStyle(fontWeight: FontWeight.bold)),
+                  : Text(showCustom ? 'Connect' : (selectedPreset == 'Pixelcut' ? 'Connect' : 'Sign in to $selectedPreset'), style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),

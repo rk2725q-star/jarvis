@@ -18,6 +18,7 @@ dependencies:
   dio: ^5.9.2
   dio_cache_interceptor: ^3.5.0
   retry: ^3.1.2
+  flutter_web_auth_2: ^4.1.0
 
   # RSS / XML Parsing (core engine for ARIA)
   webfeed: ^0.7.0          # RSS 1.0/2.0 + Atom parser

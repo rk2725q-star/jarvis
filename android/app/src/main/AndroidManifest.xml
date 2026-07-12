@@ -154,6 +154,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="content" android:mimeType="*/*" />
             </intent-filter>
+            
+            <!-- MCP OAuth Callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="jarvis" android:host="mcp-callback" />
+            </intent-filter>
         </activity>
 
         <meta-data
