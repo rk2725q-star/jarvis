@@ -597,11 +597,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                 ),
               ],
             ),
-            ),
           ),
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMainView(ChatProvider provider, VoidCallback onToolsClick) {
     return Column(
