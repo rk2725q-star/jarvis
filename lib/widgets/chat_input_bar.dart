@@ -415,10 +415,11 @@ class _ChatInputBarState extends State<ChatInputBar>
               border: Border.all(color: Colors.white.withOpacity(0.08)),
               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 40, offset: const Offset(0, 20))],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Row(
                   children: [
                     Container(
@@ -596,8 +597,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                 ),
               ],
             ),
+            ),
           ),
-        ),
       ),
     );
   }
