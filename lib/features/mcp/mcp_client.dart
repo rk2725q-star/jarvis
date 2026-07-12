@@ -220,16 +220,39 @@ class McpServer {
     final mcpUrl = server.url;
     
     // Step 1: probe server, read metadata hint
-    final metaUrl = mcpUrl.endsWith('/') ? "\${mcpUrl}.well-known/oauth-authorization-server" : "\$mcpUrl/.well-known/oauth-authorization-server";
+    final metaUrl = mcpUrl.endsWith('/') ? "${mcpUrl}.well-known/oauth-authorization-server" : "$mcpUrl/.well-known/oauth-authorization-server";
     final metaResp = await http.get(Uri.parse(metaUrl));
     if (metaResp.statusCode >= 400) {
       throw Exception('Server requires authentication but lacks OAuth endpoints.');
     }
     final meta = jsonDecode(metaResp.body);
     
+    String? clientId = meta['client_id'];
+    
+    if (clientId == null) {
+      if (meta['registration_endpoint'] != null) {
+        final regResp = await http.post(
+          Uri.parse(meta['registration_endpoint']), 
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'client_name': 'JARVIS',
+            'redirect_uris': ['jarvis://mcp-callback'],
+            'grant_types': ['authorization_code'],
+            'response_types': ['code'],
+            'token_endpoint_auth_method': 'none',
+          })
+        );
+        if (regResp.statusCode >= 400) {
+          throw Exception('Dynamic client registration failed: ${regResp.body}');
+        }
+        clientId = jsonDecode(regResp.body)['client_id'];
+      } else {
+        throw Exception('This server needs manual app registration — no dynamic registration support.');
+      }
+    }
+    
     final verifier = _generateCodeVerifier();
     final challenge = _codeChallengeS256(verifier);
-    final clientId = meta['client_id'] ?? 'jarvis-mobile';
     
     final authUrl = Uri.parse(meta['authorization_endpoint']).replace(queryParameters: {
       'response_type': 'code',
