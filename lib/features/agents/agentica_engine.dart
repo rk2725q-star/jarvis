@@ -870,16 +870,14 @@ R:1 snapshot first 2 no verify 3 batch parallel 4 min steps
   // ─── Inference with Binary Support ──────────────────────────────────
   Future<String?> _inferBinary(String prompt) async {
     try {
-      final buf = StringBuffer();
-      await for (final chunk in router.generateStream(
+      final result = await router.generate(
         prompt,
         imageBase64: _lastScreenshotBase64,
-      )) {
-        buf.write(chunk);
-      }
+      );
       _lastScreenshotBase64 = null;
-      return buf.toString().trim();
+      return result.trim();
     } catch (e) {
+      print('Agentica infer error: $e');
       return null;
     }
   }
