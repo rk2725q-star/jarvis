@@ -86,14 +86,15 @@ class JarvisAccessibilityService : AccessibilityService() {
         return super.onUnbind(intent)
     }
 
+    val gpayLikePackages = setOf(
+        "com.google.android.apps.nbu.paisa.user",
+        "com.phonepe.app",
+        "net.one97.paytm"
+    )
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: ""
-        
-        if (pkg == "com.google.android.apps.nbu.paisa.user") {
-            Log.w(TAG, "GPay detected, disabling accessibility service to prevent security warnings.")
-            disableSelf()
-            return
-        }
+        if (pkg in gpayLikePackages) return // ignore silently, no disableSelf
 
         if (event?.eventType == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) {
             val text = event.text.joinToString(" ").trim()
