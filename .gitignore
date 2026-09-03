@@ -87,6 +87,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/build/
+.vscode/
+scratch/
 
 # Secrets
 assets/config/google_service_account.json

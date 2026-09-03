@@ -122,11 +122,13 @@ class McpServer {
       headers['Mcp-Session-Id'] = sessionId!;
     }
 
-    final resp = await http.post(
-      Uri.parse(url),
-      headers: headers,
-      body: jsonEncode(body),
-    );
+    final resp = await http
+        .post(
+          Uri.parse(url),
+          headers: headers,
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 15));
 
     if (resp.statusCode == 401 || resp.statusCode == 403) {
       throw McpAuthError('Unauthorized');
@@ -146,24 +148,43 @@ class McpServer {
 
     final bodyText = resp.body.trim();
 
-    // Parse SSE format if present
-    if (bodyText.startsWith('data:')) {
+    // Parse SSE format — handles both simple `data: {...}` and
+    // multi-line `event: message\ndata: {...}` used by many MCP servers
+    if (bodyText.contains('data:')) {
+      // Collect all data lines, take the last non-empty JSON one
+      dynamic lastResult;
       for (final line in bodyText.split('\n')) {
-        if (line.trim().startsWith('data:')) {
-          final jsonStr = line.substring(line.indexOf('data:') + 5).trim();
-          if (jsonStr.isNotEmpty) {
+        final trimmed = line.trim();
+        if (trimmed.startsWith('data:')) {
+          final jsonStr = trimmed.substring(5).trim();
+          if (jsonStr.isEmpty || jsonStr == '[DONE]') continue;
+          try {
             final parsed = jsonDecode(jsonStr);
-            if (parsed['error'] != null) throw Exception(parsed['error']);
-            return parsed['result'] ?? {};
+            if (parsed is Map && parsed['error'] != null) {
+              throw Exception(parsed['error']);
+            }
+            if (parsed is Map) {
+              lastResult = parsed['result'] ?? parsed;
+            }
+          } catch (e) {
+            if (e is Exception && e.toString().contains('MCP')) rethrow;
+            // Incomplete JSON chunk — skip
           }
         }
       }
+      if (lastResult != null) return lastResult;
     }
 
     // Fallback to raw JSON
-    final parsed = jsonDecode(bodyText);
-    if (parsed['error'] != null) throw Exception(parsed['error']);
-    return parsed['result'] ?? {};
+    try {
+      final parsed = jsonDecode(bodyText);
+      if (parsed is Map && parsed['error'] != null) throw Exception(parsed['error']);
+      if (parsed is Map) return parsed['result'] ?? parsed;
+      return {};
+    } catch (e) {
+      // Body is not JSON (e.g. plain 200 OK text from notifications) — treat as success
+      return {};
+    }
   }
 
   static String _generateCodeVerifier() {
@@ -199,21 +220,35 @@ class McpServer {
     }
   }
 
-  Future<void> _handshake() async {
-    // 1. Initialize Handshake
-    await _post({
-      "jsonrpc": "2.0",
-      "method": "initialize",
-      "id": const Uuid().v4(),
-      "params": {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {},
-        "clientInfo": {"name": "jarvis-client", "version": "1.0.0"},
-      },
-    });
+  Future<void> _handshake({String protocolVersion = '2025-03-26'}) async {
+    // 1. Initialize Handshake — try newer protocol first
+    try {
+      await _post({
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": const Uuid().v4(),
+        "params": {
+          "protocolVersion": protocolVersion,
+          "capabilities": {"tools": {}},
+          "clientInfo": {"name": "JARVIS", "version": "2.0.0"},
+        },
+      });
+    } catch (e) {
+      // If newer protocol rejected, fall back to 2024-11-05
+      if (protocolVersion != '2024-11-05') {
+        await _handshake(protocolVersion: '2024-11-05');
+        return;
+      }
+      rethrow;
+    }
 
-    // 2. Notifications/initialized (Required by MCP spec)
-    await _post({"jsonrpc": "2.0", "method": "notifications/initialized"});
+    // 2. Notifications/initialized — fire-and-forget, some servers reject it
+    // Per MCP spec §4.1: notifications have no id and no response expected
+    try {
+      await _post({"jsonrpc": "2.0", "method": "notifications/initialized"});
+    } catch (_) {
+      // Intentionally ignored — not all servers implement this
+    }
 
     // 3. Fetch Tools
     final toolsData = await _post({
@@ -222,21 +257,30 @@ class McpServer {
       "id": const Uuid().v4(),
     });
 
-    final toolsList = toolsData['tools'] as List<dynamic>? ?? [];
-    tools = toolsList.map((t) => McpTool.fromJson(t)).toList();
+    // Handle both {tools: [...]} and {result: {tools: [...]}} wrappings
+    dynamic rawList = toolsData;
+    if (rawList is Map && rawList['tools'] == null && rawList['result'] != null) {
+      rawList = rawList['result'];
+    }
+    final toolsList = (rawList is Map ? rawList['tools'] : null) as List<dynamic>? ?? [];
+    tools = toolsList.map((t) => McpTool.fromJson(t as Map<String, dynamic>)).toList();
   }
 
   static Future<McpServer> connectWithOAuth(McpServer server) async {
     final mcpUrl = server.url;
 
-    // Step 1: probe server, read metadata hint
-    final metaUrl = mcpUrl.endsWith('/')
-        ? "$mcpUrl.well-known/oauth-authorization-server"
-        : "$mcpUrl/.well-known/oauth-authorization-server";
-    final metaResp = await http.get(Uri.parse(metaUrl));
+    // Step 1: probe server OAuth metadata
+    // Normalize URL — remove trailing slash, then append /.well-known path
+    final baseUrl = mcpUrl.endsWith('/')
+        ? mcpUrl.substring(0, mcpUrl.length - 1)
+        : mcpUrl;
+    final metaUrl = '$baseUrl/.well-known/oauth-authorization-server';
+    final metaResp = await http
+        .get(Uri.parse(metaUrl))
+        .timeout(const Duration(seconds: 10));
     if (metaResp.statusCode >= 400) {
       throw Exception(
-        'Server requires authentication but lacks OAuth endpoints.',
+        'Server requires authentication but lacks OAuth metadata endpoint (tried $metaUrl).',
       );
     }
     final meta = jsonDecode(metaResp.body);

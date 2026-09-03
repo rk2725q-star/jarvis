@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -44,25 +45,53 @@ import 'features/youtube/yt_audio_handler.dart';
 import 'features/youtube/youtube_download_manager.dart';
 import 'app.dart';
 
-late YTAudioHandler ytAudioHandler;
+YTAudioHandler? _ytAudioHandler;
+YTAudioHandler get ytAudioHandler =>
+    _ytAudioHandler ??
+    (throw StateError(
+      'YouTube audio handler not initialized. Try restarting the app.',
+    ));
 
 Future<void> main() async {
+  // Catch ALL uncaught errors so a blank screen never hides the cause.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Catch Flutter framework errors (build/layout/paint exceptions) and
+  // show them on screen instead of leaving the app on a blank screen.
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('FLUTTER_ERROR: ${details.exceptionAsString()}');
+    debugPrint('STACK: ${details.stack}');
+  };
+
+  // Catch uncaught async errors outside the Flutter framework.
+  // ignore: deprecated_member_use
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('PLATFORM_ERROR: $error');
+    debugPrint('STACK: $stack');
+    return true;
+  };
 
   // Init background audio service (YouTube Premium-style: plays on home/lock,
   // stops when user clears app from recents)
-  ytAudioHandler = await AudioService.init(
-    builder: () => YTAudioHandler(),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.jarvis.yt.channel.audio',
-      androidNotificationChannelName: 'YouTube Background Play',
-      androidNotificationChannelDescription:
-          'Keeps YouTube audio playing in background',
-      androidStopForegroundOnPause:
-          false, // keep foreground service alive on pause
-      notificationColor: Color(0xFFFF0000),
-    ),
-  );
+  try {
+    _ytAudioHandler = await AudioService.init(
+      builder: () => YTAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.jarvis.yt.channel.audio',
+        androidNotificationChannelName: 'YouTube Background Play',
+        androidNotificationChannelDescription:
+            'Keeps YouTube audio playing in background',
+        androidStopForegroundOnPause:
+            false, // keep foreground service alive on pause
+        notificationColor: Color(0xFFFF0000),
+      ),
+    );
+  } catch (e, st) {
+    // Audio service must NEVER block app launch — log and continue.
+    debugPrint('AUDIO_SERVICE_INIT_FAILED: $e');
+    debugPrint('STACK: $st');
+  }
 
   // Pre-initialize X5 engine (non-blocking)
   FlutterFileView.init();
@@ -96,16 +125,18 @@ Future<void> main() async {
   final googleDocs = GoogleDocsService();
   final skillService = SkillService();
 
-  await memory.init();
-  await sessionService.init();
-  await ttsService.init();
-  await skillService.init();
+  // Each init must NEVER hang the UI launch. Use a hard 3s timeout so the
+  // splash screen never gets stuck if a service is unreachable.
+  await _withTimeout('memory', memory.init);
+  await _withTimeout('sessionService', sessionService.init);
+  await _withTimeout('ttsService', ttsService.init);
+  await _withTimeout('skillService', skillService.init);
 
   final ollamaProvider = OllamaProvider();
-  await ollamaProvider.init();
+  await _withTimeout('ollamaProvider', ollamaProvider.init);
 
   // Initialize notifications for background routines
-  await NotificationService().init();
+  await _withTimeout('notifications', () => NotificationService().init());
 
   // Build router
   final router = AIRouter(
@@ -116,11 +147,11 @@ Future<void> main() async {
     googleDocs: googleDocs,
     skillService: skillService,
   );
-  await router.init();
+  await _withTimeout('router', router.init);
 
   // Build integrations provider FIRST (needed by chatProvider)
   final integrationsProvider = IntegrationsProvider();
-  await integrationsProvider.init();
+  await _withTimeout('integrationsProvider', integrationsProvider.init);
 
   // Build chat provider
   final chatProvider = ChatProvider(
@@ -129,7 +160,7 @@ Future<void> main() async {
     ttsService: ttsService,
     integrationsProvider: integrationsProvider,
   );
-  await chatProvider.init();
+  await _withTimeout('chatProvider', chatProvider.init);
 
   final vibecodeController = VibeCodeController(router: router);
   final assignmentProvider = AssignmentProvider(router: router);
@@ -166,4 +197,15 @@ Future<void> main() async {
       ),
     ),
   );
+}
+
+/// Runs [fn] with a hard 3-second timeout. Logs and continues on failure so
+/// a single hung init can never freeze the splash screen.
+Future<void> _withTimeout(String name, Future<void> Function() fn) async {
+  try {
+    await fn().timeout(const Duration(seconds: 3));
+  } catch (e, st) {
+    debugPrint('INIT_TIMEOUT[$name]: $e');
+    debugPrint('STACK: $st');
+  }
 }

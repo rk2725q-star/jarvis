@@ -1,7 +1,9 @@
 // ignore_for_file: deprecated_member_use
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -46,6 +48,39 @@ class _DnaInfo {
   final String label;
   final Color color;
   const _DnaInfo(this.id, this.emoji, this.label, this.color);
+}
+
+// Compact value-type used by Selector to avoid rebuilding the JARVIS
+// Intelligence Panel on every streaming notifyListeners() call. The
+// underlying lists only change once per response, but without this
+// snapshot the Consumer would diff the entire provider on every tick.
+class _IntelligenceSnapshot {
+  final List<String> dnaModels;
+  final List<String> contextualSkills;
+  const _IntelligenceSnapshot(this.dnaModels, this.contextualSkills);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! _IntelligenceSnapshot) return false;
+    if (dnaModels.length != other.dnaModels.length) return false;
+    if (contextualSkills.length != other.contextualSkills.length) return false;
+    for (var i = 0; i < dnaModels.length; i++) {
+      if (dnaModels[i] != other.dnaModels[i]) return false;
+    }
+    for (var i = 0; i < contextualSkills.length; i++) {
+      if (contextualSkills[i] != other.contextualSkills[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        dnaModels.length,
+        contextualSkills.length,
+        dnaModels.isEmpty ? '' : dnaModels.first,
+        contextualSkills.isEmpty ? '' : contextualSkills.first,
+      );
 }
 
 class MessageBubble extends StatelessWidget {
@@ -1076,13 +1111,87 @@ class _UserBubble extends StatelessWidget {
   }
 }
 
-class _AIBubble extends StatelessWidget {
+class _AIBubble extends StatefulWidget {
   final Message message;
   final Color providerColor;
   const _AIBubble({required this.message, required this.providerColor});
 
   @override
+  State<_AIBubble> createState() => _AIBubbleState();
+}
+
+class _AIBubbleState extends State<_AIBubble> {
+  // ── Streaming render throttling ──
+  // MarkdownBody re-parses the ENTIRE content as an AST on every build.
+  // For 20k-token responses that means 20,000 full markdown parses — which
+  // causes 1-3s GPU stalls ("grey freeze") once content grows past ~1k chars.
+  // We render a cheap Text widget every token and throttle the heavy
+  // MarkdownBody rebuild to once every [_markdownRebuildInterval] while
+  // streaming. When streaming ends, we always do one final full render.
+  Timer? _markdownThrottle;
+  String _lastRenderedContent = '';
+  int _renderTick = 0;
+
+  static const Duration _markdownRebuildInterval =
+      Duration(milliseconds: 180);
+
+  @override
+  void didUpdateWidget(covariant _AIBubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.message.content != oldWidget.message.content) {
+      // Always render the latest content immediately when not streaming
+      // (e.g. when user pastes a long message before sending).
+      if (!widget.message.isStreaming) {
+        _markdownThrottle?.cancel();
+        _lastRenderedContent = widget.message.content;
+        _renderTick++;
+        return;
+      }
+      _scheduleMarkdownRebuild();
+    }
+    if (!widget.message.isStreaming && oldWidget.message.isStreaming) {
+      // Streaming just ended — force a final full markdown render immediately.
+      _markdownThrottle?.cancel();
+      if (_lastRenderedContent != widget.message.content) {
+        _lastRenderedContent = widget.message.content;
+        _renderTick++;
+        // Schedule rebuild after current frame so it doesn't fight streaming.
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
+      }
+    }
+  }
+
+  void _scheduleMarkdownRebuild() {
+    if (!widget.message.isStreaming) return; // non-streaming: render every time
+    if (_markdownThrottle?.isActive ?? false) return; // already scheduled
+    _markdownThrottle = Timer(_markdownRebuildInterval, () {
+      if (!mounted) return;
+      // Only rebuild if content actually changed since last render
+      if (_lastRenderedContent != widget.message.content) {
+        _lastRenderedContent = widget.message.content;
+        _renderTick++;
+        setState(() {});
+      }
+      // Re-arm: the timer is one-shot. We re-arm so the next content change
+      // (from another didUpdateWidget) will see an active timer and skip;
+      // this re-arm keeps us in "always ready" mode.
+      _scheduleMarkdownRebuild();
+    });
+  }
+
+  @override
+  void dispose() {
+    _markdownThrottle?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Local aliases keep the build method body unchanged while we hold state.
+    final message = widget.message;
+    final providerColor = widget.providerColor;
     return Align(
           alignment: Alignment.centerLeft,
           child: Container(
@@ -1131,17 +1240,28 @@ class _AIBubble extends StatelessWidget {
                     ),
                   ),
                 // ── JARVIS Intelligence Panel (live during streaming) ──
+                // Selector instead of Consumer: only rebuilds when the
+                // active-skill lists actually change (not on every
+                // notifyListeners tick during streaming). The lists only
+                // mutate once at the start of a response, so this turns
+                // 60 rebuilds/sec into 1.
                 if (message.isStreaming)
-                  Consumer<ChatProvider>(
-                    builder: (context, cp, _) {
-                      if (cp.activeDnaModels.isEmpty &&
-                          cp.activeContextualSkills.isEmpty) {
+                  Selector<ChatProvider, _IntelligenceSnapshot>(
+                    selector: (_, cp) => _IntelligenceSnapshot(
+                      cp.activeDnaModels,
+                      cp.activeContextualSkills,
+                    ),
+                    builder: (context, snap, _) {
+                      if (snap.dnaModels.isEmpty &&
+                          snap.contextualSkills.isEmpty) {
                         return const SizedBox.shrink();
                       }
-                      return _JarvisIntelligencePanel(
-                        dnaModels: cp.activeDnaModels,
-                        contextualSkills: cp.activeContextualSkills,
-                        providerColor: providerColor,
+                      return RepaintBoundary(
+                        child: _JarvisIntelligencePanel(
+                          dnaModels: snap.dnaModels,
+                          contextualSkills: snap.contextualSkills,
+                          providerColor: providerColor,
+                        ),
                       );
                     },
                   ),
@@ -1255,7 +1375,7 @@ class _AIBubble extends StatelessWidget {
                                   },
                                 ),
                               ] else ...[
-                                _buildMarkdown(context, message.content),
+                                _buildStreamingMarkdown(context, message),
                               ],
                               if (message.isStreaming) ...[
                                 const SizedBox(height: 12),
@@ -1272,43 +1392,204 @@ class _AIBubble extends StatelessWidget {
             ),
           ),
         )
-        .animate()
+        .animate(
+          // Skip animation: keep the slide-in from re-firing on every
+          // rebuild (which happens on every streaming chunk). Without
+          // this, the bubble re-slides from the left and the GPU must
+          // repaint the whole subtree on every chunk → visible grey stall.
+          onPlay: (controller) => controller.value = 1.0,
+        )
         .slideX(begin: -0.05, end: 0, duration: 200.ms, curve: Curves.easeOut)
         .fadeIn(duration: 150.ms);
   }
 
+  /// Renders the AI message body. During streaming we throttle the heavy
+  /// MarkdownBody rebuild to once every [_markdownRebuildInterval] so the
+  /// GPU doesn't stall every token. We still always render from the live
+  /// `message.content` (not a snapshot) — the throttle just reduces how
+  /// often Flutter actually rebuilds the markdown AST. RepaintBoundary
+  /// isolates the markdown from the rest of the chat list so other bubbles
+  /// don't repaint when this one ticks.
+  Widget _buildStreamingMarkdown(BuildContext context, Message message) {
+    // Pre-streaming or post-streaming: always do the full markdown render.
+    if (!message.isStreaming) {
+      return _buildMarkdown(context, message.content);
+    }
+
+    // During streaming: render markdown from the throttled snapshot.
+    // The throttled snapshot is updated every _markdownRebuildInterval;
+    // the user sees "bursts" of text every ~180ms which is imperceptible.
+    final rendered = _lastRenderedContent.isNotEmpty
+        ? _lastRenderedContent
+        : message.content;
+    return RepaintBoundary(
+      // Key on _renderTick so MarkdownBody actually rebuilds its AST on
+      // each throttle tick. Without a new key Flutter's element diff sees
+      // the widget as identical and skips the rebuild.
+      key: ValueKey('streaming-markdown-$_renderTick'),
+      child: _buildMarkdown(context, rendered),
+    );
+  }
+
   Widget _buildMarkdown(BuildContext context, String content) {
-    return MarkdownBody(
+    return RepaintBoundary(
+      child: MarkdownBody(
       data: _cleanResponse(content),
       imageBuilder: (uri, title, alt) {
         final src = uri.toString();
         if (src.startsWith('data:image/')) {
           try {
             final b64 = src.split(',').last;
-            if (b64.length % 4 != 0) {
-              // incomplete base64 mid-stream — show lightweight placeholder, don't attempt decode
-              return const SizedBox(
+            // Incomplete base64 mid-stream: show dark placeholder, never a grey block
+            if (b64.length < 100 || b64.length % 4 != 0) {
+              return Container(
                 height: 120,
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D0D14),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: JarvisColors.border.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: JarvisColors.accentPrimary.withValues(alpha: 0.5),
+                  ),
+                ),
+              );
+            }
+            final bytes = base64Decode(b64);
+            // Validate decoded bytes are a real image format (PNG/JPEG/GIF/WEBP)
+            if (bytes.length < 8 ||
+                !(bytes[0] == 0x89 && bytes[1] == 0x50) && // PNG
+                !(bytes[0] == 0xFF && bytes[1] == 0xD8) && // JPEG
+                !(bytes[0] == 0x47 && bytes[1] == 0x49) && // GIF
+                !(bytes[0] == 0x52 && bytes[1] == 0x49)) {
+              // RIFF (WEBP)
+              return Container(
+                height: 100,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D0D14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.image_outlined,
+                    color: Colors.white24,
+                    size: 32,
+                  ),
+                ),
               );
             }
             return ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.memory(base64Decode(b64), fit: BoxFit.contain),
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.contain,
+                frameBuilder: (ctx, child, frame, wasSynchronouslyLoaded) {
+                  if (wasSynchronouslyLoaded || frame != null) return child;
+                  // While decoding, show dark placeholder NOT grey
+                  return Container(
+                    height: 120,
+                    width: double.infinity,
+                    color: const Color(0xFF0D0D14),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: JarvisColors.accentPrimary.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (ctx, err, st) => Container(
+                  height: 100,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D0D14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.image_outlined,
+                      color: Colors.white24,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
             );
           } catch (_) {
-            return const SizedBox(
+            return Container(
               height: 100,
-              child: Center(
-                child: Icon(Icons.broken_image_rounded, color: Colors.white30),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D0D14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.image_outlined,
+                  color: Colors.white24,
+                  size: 32,
+                ),
               ),
             );
           }
         }
-        return Image.network(
-          src,
-          errorBuilder: (ctx, err, st) =>
-              const Icon(Icons.broken_image_rounded, color: Colors.white30),
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.network(
+            src,
+            fit: BoxFit.contain,
+            loadingBuilder: (ctx, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                height: 120,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D0D14),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                    color: JarvisColors.accentPrimary,
+                  ),
+                ),
+              );
+            },
+            frameBuilder: (ctx, child, frame, wasSynchronouslyLoaded) {
+              if (wasSynchronouslyLoaded) return child;
+              return AnimatedOpacity(
+                opacity: frame == null ? 0.0 : 1.0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+                child: child,
+              );
+            },
+            errorBuilder: (ctx, err, st) => Container(
+              height: 100,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D0D14),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.image_outlined,
+                  color: Colors.white24,
+                  size: 32,
+                ),
+              ),
+            ),
+          ),
         );
       },
       builders: {
@@ -1319,7 +1600,7 @@ class _AIBubble extends StatelessWidget {
         'customtable': CustomTableBuilder(),
         'custommermaid': CustomMermaidBuilder(),
       },
-      styleSheetTheme: MarkdownStyleSheetBaseTheme.cupertino,
+      styleSheetTheme: MarkdownStyleSheetBaseTheme.material,
       extensionSet: md.ExtensionSet(
         [
           LatexBlockSyntax(),
@@ -1330,10 +1611,18 @@ class _AIBubble extends StatelessWidget {
         [LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
       ),
       styleSheet: MarkdownStyleSheet(
+        // Explicitly style ALL markdown elements to prevent grey fallback from cupertino theme
+        // Also ensure NO grey backgrounds leak through on any element
         p: GoogleFonts.outfit(
           color: JarvisColors.textPrimary,
           fontSize: 15,
           height: 1.6,
+        ),
+        h1: GoogleFonts.outfit(
+          color: JarvisColors.accentSecondary,
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          height: 2.2,
         ),
         h2: GoogleFonts.outfit(
           color: JarvisColors.accentSecondary,
@@ -1347,9 +1636,40 @@ class _AIBubble extends StatelessWidget {
           fontWeight: FontWeight.w600,
           height: 1.8,
         ),
+        h4: GoogleFonts.outfit(
+          color: JarvisColors.textPrimary,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          height: 1.7,
+        ),
+        h5: GoogleFonts.outfit(
+          color: JarvisColors.textSecondary,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          height: 1.6,
+        ),
+        h6: GoogleFonts.outfit(
+          color: JarvisColors.textMuted,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          height: 1.5,
+        ),
         strong: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
+        ),
+        em: GoogleFonts.outfit(
+          color: JarvisColors.textPrimary,
+          fontStyle: FontStyle.italic,
+        ),
+        a: GoogleFonts.outfit(
+          color: JarvisColors.accentSecondary,
+          decoration: TextDecoration.underline,
+          decorationColor: JarvisColors.accentSecondary,
+        ),
+        del: GoogleFonts.outfit(
+          color: JarvisColors.textMuted,
+          decoration: TextDecoration.lineThrough,
         ),
         listBullet: const TextStyle(color: JarvisColors.accentPrimary),
         tableHead: GoogleFonts.outfit(
@@ -1378,7 +1698,7 @@ class _AIBubble extends StatelessWidget {
         code: GoogleFonts.firaCode(
           backgroundColor: Colors.black26,
           fontSize: 13,
-          color: JarvisColors.accentPrimary,
+          color: JarvisColors.textPrimary,
         ),
         codeblockDecoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.3),
@@ -1386,14 +1706,21 @@ class _AIBubble extends StatelessWidget {
           border: Border.all(color: JarvisColors.border),
         ),
         codeblockPadding: const EdgeInsets.all(12),
+        horizontalRuleDecoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(color: JarvisColors.border, width: 1),
+          ),
+        ),
       ),
       onTapLink: (text, href, title) {
         if (href != null) launchUrl(Uri.parse(href));
       },
-    );
+    ),
+    ); // RepaintBoundary
   }
 
   Widget _buildActionRow(BuildContext context) {
+    final message = widget.message;
     final isDiagram = message.content.contains('<!--JARVIS_DIAGRAM-->');
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,

@@ -13,11 +13,40 @@ import '../models/jarvis_skill.dart';
 import '../features/integrations/integrations_screen.dart';
 import '../features/integrations/integrations_provider.dart';
 import '../features/integrations/integrations_model.dart';
-import '../services/netless_service.dart';
-import '../core/router/ai_router.dart';
 import '../features/imagiya/screens/imagiya_screen.dart';
 
 enum ChatInputMode { chat, imagiya, codesign }
+
+// Value type for the input bar's Selector. We rebuild the input bar only
+// when one of these changes — NOT on every streaming notify. The actual
+// streaming text only flows through the MessageBubble subtree.
+class _ChatInputBarStateSlice {
+  final bool isAnalyzing;
+  final String analysisStatus;
+  final int attachedFileCount;
+
+  const _ChatInputBarStateSlice({
+    required this.isAnalyzing,
+    required this.analysisStatus,
+    required this.attachedFileCount,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! _ChatInputBarStateSlice) return false;
+    return isAnalyzing == other.isAnalyzing &&
+        analysisStatus == other.analysisStatus &&
+        attachedFileCount == other.attachedFileCount;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        isAnalyzing,
+        analysisStatus,
+        attachedFileCount,
+      );
+}
 
 class ChatInputBar extends StatefulWidget {
   final Function(String) onSubmit;
@@ -50,8 +79,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   bool _showSlashPicker = false;
   String _slashQuery = '';
 
-  // — Netless / Infinity model selector —
-  String _selectedMode = 'infinity'; // 'netless' | 'infinity'
+  // — Infinity model selector —
+  // (Netless / offline Gemma 4 2B removed)
 
   // — Input Mode —
   ChatInputMode _inputMode = ChatInputMode.chat;
@@ -156,231 +185,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
   }
 
-  // ── Model Picker Popup (Netless / Infinity) ───────────────────────────
-  void _showModelPicker(BuildContext context, ChatProvider chatProvider) {
-    final RenderBox button = context.findRenderObject()! as RenderBox;
-    final RenderBox overlay =
-        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
-    final RelativeRect position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        button.localToGlobal(Offset.zero, ancestor: overlay),
-        button.localToGlobal(
-          button.size.bottomRight(Offset.zero),
-          ancestor: overlay,
-        ),
-      ),
-      Offset.zero & overlay.size,
-    );
-
-    showMenu<String>(
-      context: context,
-      position: position.shift(const Offset(-80, -130)),
-      color: const Color(0xFF1A1A2E),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: JarvisColors.accentPrimary.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      elevation: 24,
-      items: [
-        // ── Header label ──
-        PopupMenuItem<String>(
-          enabled: false,
-          height: 36,
-          child: Text(
-            'SELECT MODE',
-            style: TextStyle(
-              color: JarvisColors.textMuted,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.4,
-            ),
-          ),
-        ),
-        // ── Netless ──
-        PopupMenuItem<String>(
-          value: 'netless',
-          height: 64,
-          child: _ModelOption(
-            icon: Icons.wifi_off_rounded,
-            iconColor: const Color(0xFF00E676),
-            title: 'Netless',
-            subtitle: 'Offline · Gemma 4 E2B-it',
-            isSelected: _selectedMode == 'netless',
-            badge: 'OFFLINE',
-            badgeColor: const Color(0xFF00E676),
-          ),
-        ),
-        // ── Infinity ──
-        PopupMenuItem<String>(
-          value: 'infinity',
-          height: 64,
-          child: _ModelOption(
-            icon: Icons.all_inclusive_rounded,
-            iconColor: JarvisColors.accentPrimary,
-            title: 'Infinity',
-            subtitle: 'All cloud providers',
-            isSelected: _selectedMode == 'infinity',
-            badge: 'ONLINE',
-            badgeColor: JarvisColors.accentPrimary,
-          ),
-        ),
-      ],
-    ).then((value) {
-      if (value == null) return;
-      if (!mounted) return;
-      setState(() => _selectedMode = value);
-
-      if (value == 'netless') {
-        // Switch router to netless provider
-        chatProvider.router.setLastSelectedProvider(AIProvider.netless);
-        final netless = NetlessService();
-
-        // Show dialog if not loaded, OR if it's already the selected mode (allows management)
-        if (!netless.isLoading &&
-            !netless.isDownloading &&
-            (!netless.isLoaded || _selectedMode == 'netless')) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _showNetlessActionDialog(this.context, netless);
-          });
-        }
-      } else {
-        // Switch back to auto-select (clear netless preference)
-        chatProvider.router.setLastSelectedProvider(null);
-      }
-    });
-  }
-
-  void _showNetlessActionDialog(BuildContext context, NetlessService netless) {
-    final hasFile = netless.hasFile;
-    final isLoaded = netless.isLoaded;
-
-    String title = 'Download Netless';
-    String actionLabel = 'Download';
-    if (hasFile && !isLoaded) {
-      title = 'Load Netless';
-      actionLabel = 'Load Model';
-    } else if (isLoaded) {
-      title = 'Unload Netless';
-      actionLabel = 'Unload';
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A2E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isLoaded
-                    ? const Color(0xFFFF9800).withValues(alpha: 0.15)
-                    : const Color(0xFF00E676).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                isLoaded ? Icons.stop_circle_rounded : Icons.wifi_off_rounded,
-                color: isLoaded
-                    ? const Color(0xFFFF9800)
-                    : const Color(0xFF00E676),
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isLoaded
-                  ? 'Gemma 4 is currently loaded in RAM. Unload it to free up memory?'
-                  : 'Netless runs Google Gemma 4 E2B-it entirely on your device — no internet needed.',
-              style: const TextStyle(color: Color(0xFFB0B0C8), fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _InfoRow(
-                    icon: Icons.storage_rounded,
-                    text: hasFile
-                        ? 'Status: Downloaded (~2.5 GB)'
-                        : 'Size: ~2.5 GB',
-                  ),
-                  const SizedBox(height: 6),
-                  _InfoRow(
-                    icon: Icons.memory_rounded,
-                    text: isLoaded
-                        ? 'Status: Active in RAM'
-                        : 'Model: Gemma 4 E2B-it',
-                  ),
-                  const SizedBox(height: 6),
-                  const _InfoRow(
-                    icon: Icons.wifi_off_rounded,
-                    text: 'Works 100% offline',
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF7070A0)),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isLoaded
-                  ? const Color(0xFFFF9800)
-                  : const Color(0xFF00E676),
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              if (isLoaded) {
-                netless.unloadModel();
-              } else if (hasFile) {
-                netless.loadModel();
-              } else {
-                netless.downloadAndLoad();
-              }
-            },
-            child: Text(
-              actionLabel,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ── Model Picker Popup removed — Netless / offline Gemma 4 2B dropped ──
 
   void _showActionMenu(ChatProvider provider) {
     bool showTools = false;
@@ -776,11 +581,21 @@ class _ChatInputBarState extends State<ChatInputBar>
                                       url,
                                       token: token,
                                     );
+                                    // Find the newly connected server to show tool count
+                                    final server = provider.connectedMcpServers
+                                        .where((s) => s.url == url)
+                                        .lastOrNull;
+                                    final toolCount = server?.tools.length ?? 0;
+                                    final label = showCustom
+                                        ? 'Server'
+                                        : selectedPreset!;
                                     navigator.pop();
                                     scaffoldMessenger.showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          '${showCustom ? "Server" : selectedPreset} connected',
+                                          toolCount > 0
+                                              ? '\u2705 $label connected · $toolCount tool${toolCount == 1 ? '' : 's'} available'
+                                              : '\u2705 $label connected',
                                         ),
                                         backgroundColor:
                                             JarvisColors.accentPrimary,
@@ -790,29 +605,50 @@ class _ChatInputBarState extends State<ChatInputBar>
                                             12,
                                           ),
                                         ),
+                                        duration: const Duration(seconds: 4),
                                       ),
                                     );
                                   } catch (e) {
                                     setDialogState(() {
                                       isLoading = false;
-                                      final msg = e.toString();
-                                      error =
-                                          (msg.contains('McpAuthError') ||
-                                              msg.contains('401') ||
-                                              msg.contains('Unauthorized'))
-                                          ? "Couldn't sign in — try again"
-                                          : 'Connection failed — check the URL';
+                                      final msg = e.toString().toLowerCase();
+                                      if (msg.contains('cancel') || msg.contains('user_cancelled')) {
+                                        error = 'Sign-in cancelled — try again';
+                                      } else if (msg.contains('timeout')) {
+                                        error = 'Connection timed out — check your internet';
+                                      } else if (msg.contains('401') || msg.contains('unauthorized') || msg.contains('mcpauthError')) {
+                                        error = 'Sign-in failed — please try again';
+                                      } else if (msg.contains('oauth') || msg.contains('registration')) {
+                                        error = 'This server requires manual setup — use Custom URL + token';
+                                      } else {
+                                        error = 'Could not connect — check the URL or try again';
+                                      }
                                     });
                                   }
                                 },
                           child: isLoading
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.black,
-                                  ),
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      (presets[selectedPreset]?['auth'] as bool?) == true
+                                          ? 'Opening browser...'
+                                          : 'Connecting...',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
                                 )
                               : Text(
                                   showCustom
@@ -820,7 +656,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                       : ((presets[selectedPreset]?['auth']
                                                     as bool?) ==
                                                 true
-                                            ? 'Sign in'
+                                            ? '\uD83C\uDF10  Open Browser to Sign In'
                                             : 'Connect'),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w700,
@@ -1894,8 +1730,23 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ChatProvider>(
-      builder: (context, chatProvider, _) {
+    // Selector instead of Consumer: the input bar uses only a few slice of
+    // the ChatProvider state (isAnalyzing, analysisStatus, attachedFilePaths).
+    // Without this, the input bar's entire tree (model picker, mode toggle,
+    // voice button, attachment row, text field) would rebuild on every
+    // streaming notifyListeners() — even throttled, that's 60/s and the
+    // text-field cursor jumps visibly.
+    return Selector<ChatProvider, _ChatInputBarStateSlice>(
+      selector: (_, cp) => _ChatInputBarStateSlice(
+        isAnalyzing: cp.isAnalyzing,
+        analysisStatus: cp.analysisStatus,
+        attachedFileCount: cp.attachedFilePaths.length,
+      ),
+      builder: (context, slice, _) {
+        // We need a real ChatProvider reference for the user-actions
+        // (attach, unattach). context.read is fine because we don't
+        // subscribe to its changes here.
+        final chatProvider = context.read<ChatProvider>();
         final intProv = context.watch<IntegrationsProvider>();
         final skillService = context.watch<SkillService>();
         return Column(
@@ -1912,7 +1763,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             if (_inputMode == ChatInputMode.codesign) _buildCodesignOptions(),
 
             // Analysis indicator
-            if (chatProvider.isAnalyzing)
+            if (slice.isAnalyzing)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
@@ -1934,7 +1785,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      chatProvider.analysisStatus,
+                      slice.analysisStatus,
                       style: const TextStyle(
                         color: JarvisColors.accentPrimary,
                         fontSize: 12,
@@ -2302,53 +2153,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                // Model picker button
-                                if (_speechAvailable)
-                                  Builder(
-                                    builder: (btnCtx) => GestureDetector(
-                                      onTap: () => _showModelPicker(
-                                        btnCtx,
-                                        chatProvider,
-                                      ),
-                                      child: AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds: 220,
-                                        ),
-                                        width: 32,
-                                        height: 32,
-                                        margin: const EdgeInsets.only(right: 5),
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: _selectedMode == 'netless'
-                                              ? const Color(
-                                                  0xFF00E676,
-                                                ).withValues(alpha: 0.13)
-                                              : JarvisColors.accentPrimary
-                                                    .withValues(alpha: 0.10),
-                                          border: Border.all(
-                                            color: _selectedMode == 'netless'
-                                                ? const Color(
-                                                    0xFF00E676,
-                                                  ).withValues(alpha: 0.45)
-                                                : JarvisColors.accentPrimary
-                                                      .withValues(alpha: 0.28),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Icon(
-                                            _selectedMode == 'netless'
-                                                ? Icons.wifi_off_rounded
-                                                : Icons.all_inclusive_rounded,
-                                            color: _selectedMode == 'netless'
-                                                ? const Color(0xFF00E676)
-                                                : JarvisColors.accentPrimary,
-                                            size: 15,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
                                 // Mic button
                                 if (_speechAvailable)
                                   AnimatedBuilder(
@@ -2587,115 +2391,4 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
-// ── Model Option Item (for Netless/Infinity picker) ───────────────────────────
-class _ModelOption extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final bool isSelected;
-  final String badge;
-  final Color badgeColor;
-
-  const _ModelOption({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.isSelected,
-    required this.badge,
-    required this.badgeColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        // Icon circle
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: iconColor.withValues(alpha: 0.12),
-            border: Border.all(
-              color: iconColor.withValues(alpha: isSelected ? 0.6 : 0.25),
-              width: 1.2,
-            ),
-          ),
-          child: Icon(icon, color: iconColor, size: 18),
-        ),
-        const SizedBox(width: 12),
-        // Labels
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFFCCCCE8),
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(color: Color(0xFF7070A0), fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-        // Badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: badgeColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: badgeColor.withValues(alpha: 0.4),
-              width: 0.8,
-            ),
-          ),
-          child: Text(
-            badge,
-            style: TextStyle(
-              color: badgeColor,
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-        // Selected checkmark
-        if (isSelected) ...[
-          const SizedBox(width: 6),
-          Icon(Icons.check_circle_rounded, color: iconColor, size: 16),
-        ],
-      ],
-    );
-  }
-}
-
-// ── Info row for download dialog ──────────────────────────────────────────────
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _InfoRow({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: const Color(0xFF7B5FFF), size: 14),
-        const SizedBox(width: 8),
-        Text(
-          text,
-          style: const TextStyle(color: Color(0xFFB0B0C8), fontSize: 13),
-        ),
-      ],
-    );
-  }
-}
+// _ModelOption removed — Netless / Infinity picker dropped

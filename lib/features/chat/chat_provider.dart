@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
@@ -10,8 +11,6 @@ import 'package:jarvis_ai/models/session.dart';
 import 'package:jarvis_ai/services/session_service.dart';
 import 'package:jarvis_ai/services/tts_service.dart';
 import 'package:jarvis_ai/services/notification_service.dart';
-import 'package:jarvis_ai/services/netless_context_manager.dart';
-import 'package:jarvis_ai/services/netless_service.dart';
 import 'package:jarvis_ai/features/diagram/diagram_service.dart';
 import 'package:jarvis_ai/features/integrations/integrations_model.dart';
 import 'package:jarvis_ai/features/integrations/integrations_provider.dart';
@@ -48,6 +47,37 @@ class ChatProvider extends ChangeNotifier {
   bool _isTTSEnabled = false;
   bool _isVoiceMode = false;
   List<String> _currentSuggestions = [];
+
+  // ── Streaming notify throttling ──
+  // notifyListeners() during streaming rebuilds the whole chat screen, which
+  // includes the message list, the JARVIS Intelligence panel, status bars, and
+  // input bar. Doing it on every token (often 10-50/s) causes 1-3s GPU stalls
+  // ("grey freezes") once a few thousand tokens have streamed. We coalesce
+  // all notify calls during a single frame into one — Flutter's scheduler
+  // already does this for setState, but ChangeNotifier is synchronous.
+  Timer? _streamNotifyTimer;
+  bool _streamNotifyPending = false;
+  // 16ms = ~60fps; comfortable for streaming UI without GPU stalls.
+  static const Duration _streamNotifyInterval = Duration(milliseconds: 16);
+
+  void _notifyStreamThrottled() {
+    if (_streamNotifyTimer != null) {
+      // A notify is already pending — don't schedule another.
+      _streamNotifyPending = true;
+      return;
+    }
+    notifyListeners();
+    _streamNotifyTimer = Timer(_streamNotifyInterval, () {
+      _streamNotifyTimer = null;
+      if (_streamNotifyPending) {
+        _streamNotifyPending = false;
+        notifyListeners();
+        _streamNotifyTimer = Timer(_streamNotifyInterval, () {
+          _streamNotifyTimer = null;
+        });
+      }
+    });
+  }
 
   // File & Analysis state
   final List<String> _attachedFilePaths = [];
@@ -153,9 +183,6 @@ class ChatProvider extends ChangeNotifier {
     _activeContextualSkills = [];
     notifyListeners();
   }
-
-  // Netless Smart Context Manager
-  final NetlessContextManager netlessContext = NetlessContextManager();
 
   // Getters
   String? get currentSessionId => _currentSessionId;
@@ -280,9 +307,40 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  /// Finalize any in-flight streaming AI messages so a new user prompt
+  /// doesn't leave partial content (or partial diagram WebView / base64 image)
+  /// stranded in the chat — which is what causes the big grey block to
+  /// appear when a user sends a message mid-stream.
+  void _finalizeInFlightStreaming() {
+    var changed = false;
+    for (var i = 0; i < _messages.length; i++) {
+      final m = _messages[i];
+      if (m.isUser || !m.isStreaming) continue;
+      // Empty cancelled stream → just remove the bubble entirely
+      if (m.content.trim().isEmpty) {
+        _messages.removeAt(i);
+        i--;
+        changed = true;
+        continue;
+      }
+      // Partial content → mark as final, prefix with cancelled marker
+      _messages[i] = m.copyWith(
+        content: '⏹️ _Response interrupted._\n\n${m.content}',
+        isStreaming: false,
+      );
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+
   Future<void> sendMessage(String text) async {
     if (_currentSessionId == null) return;
     if (text.trim().isEmpty && _attachedFilePaths.isEmpty) return;
+
+    // Cancel any in-flight stream first so a new prompt doesn't leave the
+    // previous AI bubble (and its diagram WebView / base64 image) showing
+    // a grey placeholder while it tries to keep streaming.
+    _finalizeInFlightStreaming();
 
     _currentSuggestions = [];
     notifyListeners();
@@ -671,95 +729,52 @@ class ChatProvider extends ChangeNotifier {
     }
 
     // --- Inject Short-Term Chat History ---
-    final actualProvider = resolvedProvider ?? router.activeProvider?.name;
+    // (Netless / offline provider removed — always use the Infinity / standard
+    // short-term history path.)
+    final recentHistory = _messages.where((m) => !m.isStreaming).toList();
 
-    if (actualProvider == 'netless') {
-      // Use smart context manager for Netless to strictly manage 1024 token limit
-      final ref = netlessContext.parseReference(combinedText);
-      String enrichedPrompt = combinedText;
-      if (ref != null) {
-        enrichedPrompt =
-            '${ref.role} said: "${ref.content}"\n\nUser: $combinedText';
-      }
-      combinedText = await netlessContext.prepareContext(
-        enrichedPrompt,
-        NetlessService(),
-      );
-    } else {
-      final bool isInfinity = router.lastSelectedProvider != AIProvider.netless;
-      if (isInfinity) {
-        final recentHistory = _messages.where((m) => !m.isStreaming).toList();
+    // If we have history, build a virtual 3M context window!
+    if (recentHistory.isNotEmpty) {
+      // Keep the last 12 messages fully intact (short-term context)
+      final int shortTermCount = 12;
+      final int splitIdx = recentHistory.length > shortTermCount
+          ? recentHistory.length - shortTermCount
+          : 0;
 
-        // If we have history, build a virtual 3M context window!
-        if (recentHistory.isNotEmpty) {
-          // Keep the last 12 messages fully intact (short-term context)
-          final int shortTermCount = 12;
-          final int splitIdx = recentHistory.length > shortTermCount
-              ? recentHistory.length - shortTermCount
-              : 0;
+      final olderHistory = recentHistory.sublist(0, splitIdx);
+      final recentHistoryPart = recentHistory.sublist(splitIdx);
 
-          final olderHistory = recentHistory.sublist(0, splitIdx);
-          final recentHistoryPart = recentHistory.sublist(splitIdx);
-
-          // Build a highly compressed session synopsis for older messages
-          // so that the AI retains chronological context of the entire past
-          // chat session without blowing up the actual model's prompt limit.
-          final olderSummaryBuf = StringBuffer();
-          if (olderHistory.isNotEmpty) {
-            olderSummaryBuf.writeln(
-              "[INFINITY VIRTUAL 3M CONTEXT — COMPRESSED SESSION MEMORY]",
-            );
-            for (final m in olderHistory) {
-              final role = m.isUser ? "User" : "Jarvis";
-              final clean = m.content.replaceAll(RegExp(r'\s+'), ' ').trim();
-              final snippet = clean.length > 150
-                  ? '${clean.substring(0, 80)}...${clean.substring(clean.length - 60)}'
-                  : clean;
-              olderSummaryBuf.writeln('• $role: $snippet');
-            }
-            olderSummaryBuf.writeln("[END COMPRESSED SESSION MEMORY]\n");
-          }
-
-          final recentHistoryStr = recentHistoryPart
-              .map((m) {
-                final str = m.content;
-                final displayStr = str.length > 20000
-                    ? '${str.substring(0, 20000)}\n\n...(TRUNCATED)...'
-                    : str;
-                return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
-              })
-              .join('\n\n---\n\n');
-
-          combinedText =
-              "${olderSummaryBuf.toString()}[RECENT CHAT HISTORY]\n$recentHistoryStr\n\n[CURRENT USER QUERY]\n$combinedText";
+      // Build a highly compressed session synopsis for older messages
+      // so that the AI retains chronological context of the entire past
+      // chat session without blowing up the actual model's prompt limit.
+      final olderSummaryBuf = StringBuffer();
+      if (olderHistory.isNotEmpty) {
+        olderSummaryBuf.writeln(
+          "[INFINITY VIRTUAL 3M CONTEXT — COMPRESSED SESSION MEMORY]",
+        );
+        for (final m in olderHistory) {
+          final role = m.isUser ? "User" : "Jarvis";
+          final clean = m.content.replaceAll(RegExp(r'\s+'), ' ').trim();
+          final snippet = clean.length > 150
+              ? '${clean.substring(0, 80)}...${clean.substring(clean.length - 60)}'
+              : clean;
+          olderSummaryBuf.writeln('• $role: $snippet');
         }
-      } else {
-        final recentHistory = _messages.where((m) => !m.isStreaming).toList();
-        final recentMemories = recentHistory.length > 6
-            ? recentHistory.sublist(recentHistory.length - 6)
-            : recentHistory;
-
-        if (recentMemories.isNotEmpty) {
-          final historyStr = recentMemories
-              .map((m) {
-                final str = m.content;
-                final displayStr = str.length > 30000
-                    ? '${str.substring(0, 30000)}\n\n...(TRUNCATED FOR MEMORY)...'
-                    : str;
-                return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
-              })
-              .join('\n\n---\n\n');
-
-          String finalHistory = historyStr;
-          int maxLength = 60000;
-          if (finalHistory.length > maxLength) {
-            finalHistory =
-                "...\n${finalHistory.substring(finalHistory.length - maxLength)}";
-          }
-          combinedText =
-              "[RECENT CHAT HISTORY]\n$finalHistory\n\n[CURRENT USER QUERY]\n$combinedText";
-        }
+        olderSummaryBuf.writeln("[END COMPRESSED SESSION MEMORY]\n");
       }
+
+      final recentHistoryStr = recentHistoryPart
+          .map((m) {
+            final str = m.content;
+            final displayStr = str.length > 20000
+                ? '${str.substring(0, 20000)}\n\n...(TRUNCATED)...'
+                : str;
+            return '${m.isUser ? "USER" : "JARVIS"}:\n$displayStr';
+          })
+          .join('\n\n---\n\n');
+
+      combinedText =
+          "${olderSummaryBuf.toString()}[RECENT CHAT HISTORY]\n$recentHistoryStr\n\n[CURRENT USER QUERY]\n$combinedText";
     }
 
     // ── 1. Set Status ────────────────────────
@@ -1030,24 +1045,29 @@ class ChatProvider extends ChangeNotifier {
         resolvedProvider == null;
 
     if (hasTools) {
-      final toolsCompressed = mcpTools
-          .map((t) {
-            final schemaStr = jsonEncode(
-              t.toGeminiSchema()['parameters'] ?? {},
-            );
-            return '- name: "${t.name}"\n  description: "${t.description}"\n  args: $schemaStr';
-          })
-          .join('\n\n');
+      final toolsJson = jsonEncode(
+        mcpTools.map((t) => t.toGeminiSchema()).toList(),
+      );
 
       final toolPrompt =
           '''
-\n\n[MCP TOOLS AVAILABLE]
-You have access to the following external tools:
-$toolsCompressed
 
-To use a tool, you MUST output exactly:
-<TOOL_CALL name="tool_name">{"arg":"value"}</TOOL_CALL>
-Wait for the system to provide the result before continuing. Do NOT output anything else inside the tool block.
+\n\n[MCP TOOLS AVAILABLE]
+You have access to the following external tools. Use them when relevant to answer the user's question.
+$toolsJson
+
+TOOL CALLING FORMAT:
+When you need to use a tool, respond with a JSON object in this exact format:
+{
+  "tool_calls": [
+    {
+      "name": "tool_name",
+      "arguments": {"arg": "value"}
+    }
+  ]
+}
+
+After the tool result is returned, continue your response naturally. You can make multiple tool calls in sequence.
 [END MCP TOOLS]
 ''';
       combinedText = '$toolPrompt$combinedText';
@@ -1056,13 +1076,37 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
     final buffer = StringBuffer();
     var currentAiMsg = aiMsg;
 
+    // Helper function to parse JSON tool calls from response
+    List<Map<String, dynamic>> parseToolCalls(String text) {
+      final calls = <Map<String, dynamic>>[];
+      try {
+        // Try to find JSON object with tool_calls
+        final jsonRegex = RegExp(r'\{[\s\S]*"tool_calls"[\s\S]*\}');
+        final match = jsonRegex.firstMatch(text);
+        if (match != null) {
+          final jsonStr = match.group(0)!;
+          final parsed = jsonDecode(jsonStr);
+          if (parsed['tool_calls'] is List) {
+            for (final call in parsed['tool_calls']) {
+              if (call['name'] is String) {
+                calls.add({
+                  'name': call['name'] as String,
+                  'arguments': call['arguments'] as Map<String, dynamic>? ?? {},
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to parse tool calls: $e');
+      }
+      return calls;
+    }
+
     try {
       bool isToolCalling = true;
       int toolLoopCount = 0;
       String currentPrompt = combinedText;
-      final RegExp toolCallRegex = RegExp(
-        r'<TOOL_CALL\s+name="([^"]+)">([\s\S]*?)</TOOL_CALL>',
-      );
 
       while (isToolCalling && toolLoopCount < 5) {
         isToolCalling = false; // Assume no tools unless we find a tag
@@ -1075,74 +1119,82 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
           buffer.write(chunk);
           final currentText = buffer.toString();
 
-          // Check for Tool Call tag (Robust regex match ignoring wrappers)
-          if (hasTools && toolCallRegex.hasMatch(currentText)) {
-            isToolCalling = true;
-            break; // Stop streaming immediately to handle the tool call
-          }
-
           final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
           if (idx != -1) {
-            // Strip tags purely for UI cleanliness while streaming
-            final displayContent = _stripTags(
-              currentText.replaceAll(
-                RegExp(r'<TOOL_CALL[\s\S]*?(?:</TOOL_CALL>|$)'),
-                '',
-              ),
-            );
-            final bool isInfinity =
-                router.lastSelectedProvider != AIProvider.netless;
+            // Show raw streamed content directly — no regex stripping here.
+            // Tool-call JSON (if any) is detected and handled AFTER the
+            // stream fully completes, keeping the stream loop lightweight.
             _messages[idx] = currentAiMsg.copyWith(
-              content: displayContent,
-              provider: isInfinity ? 'INFINITY' : router.activeProvider?.name,
-              model: isInfinity
-                  ? '3M Context (${router.activeModel ?? "Brain"})'
-                  : router.activeModel,
+              content: currentText,
+              provider: 'INFINITY',
+              model: '3M Context (${router.activeModel ?? "Brain"})',
               isStreaming: true,
             );
-            notifyListeners();
+            // THROTTLED: instead of notifying on every token (10-50/s for
+            // a 25k token response = 100k+ full screen rebuilds → 1-3s
+            // GPU stalls / grey freezes), we coalesce all updates into
+            // one notify per 16ms (~60fps). The next post-frame callback
+            // triggers the actual UI rebuild with the latest content.
+            _notifyStreamThrottled();
+          }
+        }
+
+        // ── Post-stream: check for tool calls in the complete response ──
+        if (hasTools) {
+          final toolCalls = parseToolCalls(buffer.toString());
+          if (toolCalls.isNotEmpty) {
+            isToolCalling = true;
           }
         }
 
         if (isToolCalling) {
           final fullResponse = buffer.toString();
-          final match = toolCallRegex.firstMatch(fullResponse);
+          final toolCalls = parseToolCalls(fullResponse);
 
-          if (match != null) {
-            final toolName = match.group(1) ?? '';
-            final argStr = match.group(2) ?? '';
+          if (toolCalls.isNotEmpty) {
+            // For simplicity, handle the first tool call
+            final toolCall = toolCalls.first;
+            final toolName = toolCall['name'] as String;
+            final args = toolCall['arguments'] as Map<String, dynamic>;
 
             // Retain any prose generated BEFORE the tool call
-            final prose = fullResponse
-                .substring(0, match.start)
-                .replaceAll(RegExp(r'```(?:xml)?\s*$'), '')
-                .trim();
+            final jsonRegex = RegExp(r'\{[\s\S]*"tool_calls"[\s\S]*\}');
+            final match = jsonRegex.firstMatch(buffer.toString());
+            final prose = match != null
+                ? buffer.toString().substring(0, match.start).trim()
+                : '';
 
-            if (prose.isNotEmpty) {
-              final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
-              if (idx != -1) {
-                _messages[idx] = currentAiMsg.copyWith(
-                  content: _stripTags(prose),
-                  isStreaming: false,
-                );
-              }
-            } else {
-              _messages.removeWhere((m) => m.id == currentAiMsg.id);
+            // Show prose + a live tool-use status in the bubble (Claude-style)
+            final toolStatusContent =
+                '${prose.isNotEmpty ? '$prose\n\n' : ''}🔧 *Using tool: **$toolName**...*';
+            final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
+            if (idx != -1) {
+              _messages[idx] = currentAiMsg.copyWith(
+                content: toolStatusContent,
+                isStreaming: true,
+              );
+              notifyListeners();
+            } else if (prose.isNotEmpty) {
+              // bubble was removed, re-add with prose
+              final proseMsg = currentAiMsg.copyWith(
+                content: toolStatusContent,
+                isStreaming: true,
+              );
+              _messages.add(proseMsg);
+              notifyListeners();
             }
 
             _setAnalysisStatus('Running $toolName...');
 
             String toolResultStr;
             try {
-              final args = jsonDecode(argStr);
               final server = connectedMcpServers.firstWhere(
                 (s) => s.tools.any((t) => t.name == toolName),
               );
               final result = await server.callTool(toolName, args);
               toolResultStr = jsonEncode(result);
             } catch (e) {
-              toolResultStr =
-                  'Error: $e. If this was a JSON parse error, please verify your argument formatting and try again.';
+              toolResultStr = 'Error calling $toolName: $e';
             }
 
             // Append context natively as a Message for history integrity
@@ -1156,7 +1208,7 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
             _messages.add(toolResultMsg);
 
             // Re-prompt LLM, incrementally growing context
-            String proseContext = prose.isNotEmpty
+            final proseContext = prose.isNotEmpty
                 ? "You thought: $prose\n"
                 : "";
             currentPrompt +=
@@ -1201,6 +1253,12 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
       _setAnalysisStatus("thinking...", active: false);
       _clearActiveSkills();
       notifyListeners();
+      // Flush any pending throttled streaming notify so the final state
+      // (e.g. isStreaming: false, last few tokens) reaches the UI
+      // regardless of the throttler state.
+      _streamNotifyTimer?.cancel();
+      _streamNotifyTimer = null;
+      _streamNotifyPending = false;
     }
 
     // Mark as done — strip tags, finalize message
@@ -1236,9 +1294,6 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
       _messages[idx] = finalMsg;
       await sessionService.addMessage(finalMsg);
 
-      if (actualProvider == 'netless') {
-        netlessContext.addAssistantResponse(cleanText);
-      }
       notifyListeners();
 
       if (_isTTSEnabled) {
@@ -1821,6 +1876,8 @@ Wait for the system to provide the result before continuing. Do NOT output anyth
         // Strip any bare <WEB_SEARCH ...> or <tool_code> remnants, preserving the contents within <tool_code>...</tool_code>
         .replaceAll(RegExp(r'<tool_code\b[^>]*>', caseSensitive: false), '')
         .replaceAll(RegExp(r'</tool_code>', caseSensitive: false), '')
+        // Strip JSON tool call blocks (new standard format)
+        .replaceAll(RegExp(r'\{[\s\S]*"tool_calls"[\s\S]*\}'), '')
         // Strip injected REAL-TIME WEB CONTEXT block (should not appear in output)
         .replaceAll(
           RegExp(

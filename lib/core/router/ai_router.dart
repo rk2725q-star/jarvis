@@ -7,7 +7,6 @@ import 'package:jarvis_ai/core/api/openrouter_client.dart';
 import 'package:jarvis_ai/core/api/local_model_client.dart';
 import 'package:jarvis_ai/services/ollama_cloud_service.dart';
 import 'package:jarvis_ai/services/google_docs_service.dart';
-import 'package:jarvis_ai/services/netless_service.dart';
 import 'package:jarvis_ai/core/memory/memory_service.dart';
 import 'package:jarvis_ai/core/security/secure_storage_service.dart';
 import 'package:jarvis_ai/core/api/anthropic_client.dart';
@@ -23,7 +22,6 @@ enum AIProvider {
   openRouter,
   zeera,
   anthropic,
-  netless, // ⭐ Offline Gemma 4 E2B-it — works without internet
 }
 
 enum IntentMode {
@@ -68,8 +66,6 @@ class ProviderStatus {
         return 'Zeera (Dual-Model)';
       case AIProvider.anthropic:
         return 'Anthropic';
-      case AIProvider.netless:
-        return 'Netless (Offline)';
     }
   }
 }
@@ -119,7 +115,6 @@ class AIRouter extends ChangeNotifier {
     AIProvider.openRouter: true,
     AIProvider.zeera: false,
     AIProvider.anthropic: true,
-    AIProvider.netless: true,
   };
 
   // Selected models per provider
@@ -326,7 +321,7 @@ class AIRouter extends ChangeNotifier {
       _providerEnabled[provider] ?? false;
   String? getSelectedModel(AIProvider provider) => _selectedModels[provider];
 
-  /// Switch the preferred provider (used by Netless/Infinity toggle).
+  /// Switch the preferred provider (used by the Infinity toggle).
   /// Pass null to clear the preference and return to auto-fallback chain.
   void setLastSelectedProvider(AIProvider? provider) {
     _lastSelectedProvider = provider;
@@ -1104,33 +1099,7 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       }
     }
 
-    // ── Netless (offline) fast-path ──────────────────────────────────────────
-    // If user selected Netless, route ONLY to on-device Gemma — no fallback.
-    if (_lastSelectedProvider == AIProvider.netless) {
-      final netless = NetlessService();
-      if (!netless.isAvailable) {
-        _isGenerating = false;
-        yield '🔴 **Netless model not loaded.**\n\n'
-            'Go to **Settings → Netless** to download the Gemma 4 E2B-it model (~1.5 GB).\n'
-            'Once downloaded, JARVIS runs 100% offline without any internet!';
-        return;
-      }
-      _isGenerating = true;
-      _setStatus('Netless — running offline Gemma 4 E2B-it…');
-      _activeProvider = AIProvider.netless;
-      _activeModel = 'Gemma 4 E2B-it';
-      notifyListeners();
-      await for (final token in netless.generateStream(
-        prompt,
-        systemPrompt: systemPrompt,
-      )) {
-        yield token;
-      }
-      _isGenerating = false;
-      _setStatus('Done via Netless (offline)');
-      notifyListeners();
-      return;
-    }
+    // ── Netless (offline) fast-path removed — Gemma 4 2B offline model dropped ──
 
     final mode = detectIntent(prompt);
     if (mode == IntentMode.inquisitiveProject) {
@@ -1749,17 +1718,6 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
           debugPrint('[Anthropic] Chat error: $e');
           return null;
         }
-
-      case AIProvider.netless:
-        // On-device Gemma 4 E2B-it — no network required
-        final netless = NetlessService();
-        if (!netless.isAvailable) return null;
-        try {
-          return await netless.generate(prompt, systemPrompt: systemPrompt);
-        } catch (e) {
-          debugPrint('[Netless] Generate error: $e');
-          return null;
-        }
     }
   }
 
@@ -1936,15 +1894,6 @@ Do NOT add extra sections, appendices, or additional diagrams beyond $maxDiag to
       case AIProvider.zeera:
         // Handled via _generateZeeraStream directly
         return null;
-
-      case AIProvider.netless:
-        // On-device Gemma 4 E2B-it — streams tokens natively, no internet needed
-        final netless = NetlessService();
-        if (!netless.isAvailable) {
-          debugPrint('[Netless] Model not loaded — skipping stream');
-          return null;
-        }
-        return netless.generateStream(prompt, systemPrompt: systemPrompt);
     }
   }
 
@@ -2454,9 +2403,6 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
           final key = await _secureStorage.getApiKey('zeeraSynthesis');
           if (key == null || key.isEmpty) return [];
           return await NvidiaApiClient(apiKey: key, model: '').fetchModels();
-        case AIProvider.netless:
-          // On-device model — single fixed model, no list needed
-          return ['Gemma 4 E2B-it (Offline)'];
       }
     } catch (e) {
       debugPrint('[AIRouter] Failed to fetch models for ${provider.name}: $e');
@@ -2527,8 +2473,6 @@ Do NOT just repeat the dialogue — produce a unified, enhanced response.''';
         return 'Zeera';
       case AIProvider.anthropic:
         return 'Anthropic';
-      case AIProvider.netless:
-        return 'Netless (Offline)';
     }
   }
 }

@@ -62,4 +62,39 @@ class Message extends HiveObject {
       tokenCount: tokenCount ?? this.tokenCount,
     );
   }
+
+  // ── Equality ──
+  // Without this, Dart uses identity comparison (`==` on Object). When the
+  // chat list rebuilds after a notify, Flutter's element diff sees the new
+  // MessageBubble as "different" from the old one and DESTROYS the entire
+  // _AIBubble widget tree (including our throttle Timer) on every chunk.
+  // With value-equality, the same content → same Message → same element →
+  // the State (and Timer) survives, and the markdown throttle actually works.
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! Message) return false;
+    return id == other.id &&
+        content == other.content &&
+        isUser == other.isUser &&
+        timestamp == other.timestamp &&
+        provider == other.provider &&
+        model == other.model &&
+        isStreaming == other.isStreaming &&
+        sessionId == other.sessionId &&
+        tokenCount == other.tokenCount;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        content,
+        isUser,
+        timestamp,
+        provider,
+        model,
+        isStreaming,
+        sessionId,
+        tokenCount,
+      );
 }

@@ -22,10 +22,46 @@ class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenStateClass();
 }
 
-class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
+// Value type for the top-level Selector. We rebuild the entire chat screen
+// scaffold only when one of these changes — NOT on every streaming token.
+// Streaming content updates flow through stable-keyed MessageBubbles that
+// own their own state.
+class _ChatScreenState {
+  final int messageCount;
+  final bool isGenerating;
+  final String? pendingNotification;
+  final String? currentSessionId;
+
+  const _ChatScreenState({
+    required this.messageCount,
+    required this.isGenerating,
+    required this.pendingNotification,
+    required this.currentSessionId,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! _ChatScreenState) return false;
+    return messageCount == other.messageCount &&
+        isGenerating == other.isGenerating &&
+        pendingNotification == other.pendingNotification &&
+        currentSessionId == other.currentSessionId;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        messageCount,
+        isGenerating,
+        pendingNotification,
+        currentSessionId,
+      );
+}
+
+class _ChatScreenStateClass extends State<ChatScreen> with WidgetsBindingObserver {
   final _scrollController = ScrollController();
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -209,8 +245,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ChatProvider>(
-      builder: (context, chatProvider, child) {
+    // Selector instead of Consumer: this entire Scaffold rebuilds the
+    // appbar, list view, status bar, and input bar tree on every
+    // notifyListeners. We want to rebuild only when visible state changes
+    // (message count, isGenerating, pendingNotification). The streaming
+    // content updates are handled INSIDE the MessageBubble via a stable
+    // key + Selector, so the scaffold itself does not need to redraw
+    // every token. A new `messages` list with the same length is treated
+    // as "no change" and does NOT trigger a rebuild here.
+    return Selector<ChatProvider, _ChatScreenState>(
+      selector: (_, cp) => _ChatScreenState(
+        messageCount: cp.messages.length,
+        isGenerating: cp.isGenerating,
+        pendingNotification: cp.pendingNotificationReply,
+        currentSessionId: cp.currentSessionId,
+      ),
+      builder: (context, state, child) {
+        final chatProvider = context.read<ChatProvider>();
         // Auto-scroll only when new messages arrive (not on every streaming tick)
         if (chatProvider.messages.length > _lastMessageCount) {
           _lastMessageCount = chatProvider.messages.length;
@@ -248,8 +299,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                 ),
                                 itemCount: chatProvider.messages.length,
                                 itemBuilder: (ctx, i) {
+                                  final msg = chatProvider.messages[i];
                                   return MessageBubble(
-                                    message: chatProvider.messages[i],
+                                    // Stable key per message id so Flutter
+                                    // reuses the existing _AIBubbleState
+                                    // across notifyListeners() rebuilds.
+                                    // Without this, the element diff sees a
+                                    // new widget on every stream chunk and
+                                    // recreates the entire subtree (including
+                                    // the throttle Timer) each time.
+                                    key: ValueKey(msg.id),
+                                    message: msg,
                                   );
                                 },
                               ),
