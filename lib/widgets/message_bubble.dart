@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -1122,63 +1122,73 @@ class _AIBubble extends StatefulWidget {
 
 class _AIBubbleState extends State<_AIBubble> {
   // ── Streaming render throttling ──
-  // MarkdownBody re-parses the ENTIRE content as an AST on every build.
-  // For 20k-token responses that means 20,000 full markdown parses — which
-  // causes 1-3s GPU stalls ("grey freeze") once content grows past ~1k chars.
-  // We render a cheap Text widget every token and throttle the heavy
-  // MarkdownBody rebuild to once every [_markdownRebuildInterval] while
-  // streaming. When streaming ends, we always do one final full render.
+  // During streaming, we show a cheap plain-Text widget (zero AST parse cost).
+  // A periodic Timer drives setState() so Text refreshes with each token batch.
+  // When streaming ends, one final MarkdownBody render runs.
+  // Message.content is mutable and updated in-place by ChatProvider, so
+  // widget.message.content always holds the latest text when build() runs.
   Timer? _markdownThrottle;
-  String _lastRenderedContent = '';
-  bool _markdownReady = false;
+
+  // Cache for _cleanResponse — avoids re-running 10+ regex replacements on
+  // every re-render of a completed bubble (e.g. ListView scroll bounces).
+  String _cleanSrc = '';
+  String _cleanOut = '';
 
   static const Duration _markdownRebuildInterval =
-      Duration(milliseconds: 180);
+      Duration(milliseconds: 150);
+
+  @override
+  void initState() {
+    super.initState();
+    // If the widget is created while already streaming (the normal case when
+    // a new AI message bubble appears mid-stream), start the periodic timer
+    // immediately so cheap text begins updating right away.
+    if (widget.message.isStreaming) {
+      _armRebuildTimer();
+    }
+  }
 
   @override
   void didUpdateWidget(covariant _AIBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.message.content != oldWidget.message.content) {
-      // Always render the latest content immediately when not streaming
-      // (e.g. when user pastes a long message before sending).
-      if (!widget.message.isStreaming) {
-        _markdownThrottle?.cancel();
-        _lastRenderedContent = widget.message.content;
-        _markdownReady = true;
-        return;
-      }
-      _scheduleMarkdownRebuild();
-    }
+    // Streaming just ended → cancel timer; build() switches to _buildMarkdown
+    // automatically because isStreaming is now false.
     if (!widget.message.isStreaming && oldWidget.message.isStreaming) {
-      // Streaming just ended — force a final full markdown render immediately.
       _markdownThrottle?.cancel();
-      if (_lastRenderedContent != widget.message.content) {
-        _lastRenderedContent = widget.message.content;
-        _markdownReady = true;
-        // Schedule rebuild after current frame so it doesn't fight streaming.
-        SchedulerBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() {});
-        });
-      }
+      _markdownThrottle = null;
+      return;
+    }
+    // Streaming just started (edge case: existing bubble becomes streaming)
+    // → arm the timer.
+    if (widget.message.isStreaming && !oldWidget.message.isStreaming) {
+      _armRebuildTimer();
     }
   }
 
-  void _scheduleMarkdownRebuild() {
-    if (!widget.message.isStreaming) return; // non-streaming: render every time
-    if (_markdownThrottle?.isActive ?? false) return; // already scheduled
+  /// Periodic one-shot timer that drives cheap-text rebuilds during streaming.
+  /// Re-arms itself while streaming is active. When streaming ends,
+  /// didUpdateWidget cancels it and build() switches to _buildMarkdown.
+  void _armRebuildTimer() {
+    if (!widget.message.isStreaming) return;
+    if (_markdownThrottle?.isActive ?? false) return;
     _markdownThrottle = Timer(_markdownRebuildInterval, () {
+      _markdownThrottle = null;
       if (!mounted) return;
-      // Only rebuild if content actually changed since last render
-      if (_lastRenderedContent != widget.message.content) {
-        _lastRenderedContent = widget.message.content;
-        _markdownReady = true; // switch from cheap Text to MarkdownBody
-        setState(() {});
+      if (widget.message.isStreaming) {
+        setState(() {}); // build() → _buildCheapText(widget.message.content)
+        _armRebuildTimer(); // re-arm while still streaming
       }
-      // Re-arm: the timer is one-shot. We re-arm so the next content change
-      // (from another didUpdateWidget) will see an active timer and skip;
-      // this re-arm keeps us in "always ready" mode.
-      _scheduleMarkdownRebuild();
+      // If not streaming, parent's rebuild via Selector handles final render.
     });
+  }
+
+  /// Returns _cleanResponse(src) but caches the result so re-renders of a
+  /// completed bubble (e.g. ListView scroll) skip the 10+ regex replacements.
+  String _cleanedCached(String src) {
+    if (src == _cleanSrc) return _cleanOut;
+    _cleanSrc = src;
+    _cleanOut = _cleanResponse(src);
+    return _cleanOut;
   }
 
   @override
@@ -1276,117 +1286,58 @@ class _AIBubbleState extends State<_AIBubble> {
                   ),
                   child: message.content.isEmpty
                       ? _TypingIndicator()
-                      : SelectionArea(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (message.content.contains(
-                                '<!--JARVIS_DIAGRAM-->',
-                              )) ...[
-                                Builder(
-                                  builder: (context) {
-                                    final parts = message.content.split(
-                                      '<!--JARVIS_DIAGRAM-->',
-                                    );
-                                    final textPart = parts[0].trim();
-                                    final htmlPart = parts
-                                        .sublist(1)
-                                        .join('<!--JARVIS_DIAGRAM-->')
-                                        .trim();
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (textPart.isNotEmpty)
-                                          _buildMarkdown(context, textPart),
-                                        if (htmlPart.isNotEmpty)
-                                          message.isStreaming
-                                              ? Container(
-                                                  height: 160,
-                                                  width: double.infinity,
-                                                  margin: const EdgeInsets.only(
-                                                    top: 8,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(
-                                                      0xFF080810,
-                                                    ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          16,
-                                                        ),
-                                                    border: Border.all(
-                                                      color:
-                                                          JarvisColors.border,
-                                                    ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: JarvisColors
-                                                            .accentPrimary
-                                                            .withValues(
-                                                              alpha: 0.1,
-                                                            ),
-                                                        blurRadius: 10,
-                                                        spreadRadius: 2,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  child: Column(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      const SizedBox(
-                                                        width: 28,
-                                                        height: 28,
-                                                        child:
-                                                            CircularProgressIndicator(
-                                                              strokeWidth: 2.5,
-                                                              color: JarvisColors
-                                                                  .accentPrimary,
-                                                            ),
-                                                      ),
-                                                      const SizedBox(
-                                                        height: 16,
-                                                      ),
-                                                      Text(
-                                                        'Crafting Diagram...',
-                                                        style:
-                                                            GoogleFonts.outfit(
-                                                              color: JarvisColors
-                                                                  .accentPrimary
-                                                                  .withValues(
-                                                                    alpha: 0.8,
-                                                                  ),
-                                                              fontSize: 13,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                              letterSpacing:
-                                                                  0.5,
-                                                            ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                )
-                                              : _InlineDiagram(html: htmlPart),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              ] else ...[
-                                _buildStreamingMarkdown(context, message),
-                              ],
-                              if (message.isStreaming) ...[
+                      : message.isStreaming
+                          // ── Streaming: ultra-cheap path — plain Text only.
+                          // No SelectionArea (expensive during streaming),
+                          // no markdown parse, no diagram check, no saveLayer.
+                          // Periodic Timer (_armRebuildTimer) drives rebuilds.
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildCheapText(context, message.content),
                                 const SizedBox(height: 12),
                                 _StreamingCursor(),
-                              ] else ...[
-                                const SizedBox(height: 12),
-                                _buildActionRow(context),
                               ],
-                            ],
-                          ),
-                        ),
+                            )
+                          // ── Done streaming: full-featured path.
+                          // SelectionArea, diagrams, full markdown, action row.
+                          : SelectionArea(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (message.content.contains(
+                                    '<!--JARVIS_DIAGRAM-->',
+                                  )) ...[
+                                    Builder(
+                                      builder: (context) {
+                                        final parts = message.content.split(
+                                          '<!--JARVIS_DIAGRAM-->',
+                                        );
+                                        final textPart = parts[0].trim();
+                                        final htmlPart = parts
+                                            .sublist(1)
+                                            .join('<!--JARVIS_DIAGRAM-->')
+                                            .trim();
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            if (textPart.isNotEmpty)
+                                              _buildMarkdown(context, textPart),
+                                            if (htmlPart.isNotEmpty)
+                                              _InlineDiagram(html: htmlPart),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ] else ...[
+                                    _buildMarkdown(context, message.content),
+                                  ],
+                                  const SizedBox(height: 12),
+                                  _buildActionRow(context),
+                                ],
+                              ),
+                            ),
                 ),
               ],
             ),
@@ -1403,42 +1354,9 @@ class _AIBubbleState extends State<_AIBubble> {
         .fadeIn(duration: 150.ms);
   }
 
-  /// Renders the AI message body. During streaming we throttle the heavy
-  /// MarkdownBody rebuild to once every [_markdownRebuildInterval] so the
-  /// GPU doesn't stall every token. We render a cheap Text widget between
-  /// throttle ticks so the user always sees the latest content immediately;
-  /// the heavy MarkdownBody only re-parses every ~180ms.
-  Widget _buildStreamingMarkdown(BuildContext context, Message message) {
-    // Pre-streaming or post-streaming: always do the full markdown render.
-    if (!message.isStreaming) {
-      return _buildMarkdown(context, message.content);
-    }
-
-    // During streaming:
-    //   • Fast path  = plain Text widget of the live content (no AST parse).
-    //                  Updates on EVERY token; super cheap.
-    //   • Slow path  = full MarkdownBody from the throttled snapshot.
-    //                  Re-parses AST at most once per 180ms; lives in a
-    //                  stable RepaintBoundary so the GPU layer is reused.
-    // We use Stack to overlay the markdown on top of the plain text and
-    // hide the text once markdown is ready, so the user never sees a grey
-    // gap between "text just streamed in" and "markdown parsed it".
-    final showCheapText = !_markdownReady;
-    return RepaintBoundary(
-      child: Stack(
-        children: [
-          if (showCheapText)
-            _buildCheapText(context, message.content),
-          if (!showCheapText)
-            _buildMarkdown(context, _lastRenderedContent),
-        ],
-      ),
-    );
-  }
-
-  /// Ultra-cheap text rendering used during streaming. NO markdown parsing,
-  /// NO syntax trees, just plain styled Text. This is what keeps the GPU
-  /// happy even at 50+ tokens/sec on 20k-token responses.
+  /// Ultra-cheap text rendering used during streaming. No markdown parsing,
+  /// no syntax trees, no extra GPU layers — just plain styled Text. This is
+  /// what keeps the GPU happy even at 50+ tokens/sec on 20k-token responses.
   Widget _buildCheapText(BuildContext context, String content) {
     return Text(
       content,
@@ -1453,7 +1371,7 @@ class _AIBubbleState extends State<_AIBubble> {
   Widget _buildMarkdown(BuildContext context, String content) {
     return RepaintBoundary(
       child: MarkdownBody(
-      data: _cleanResponse(content),
+      data: _cleanedCached(content),
       imageBuilder: (uri, title, alt) {
         final src = uri.toString();
         if (src.startsWith('data:image/')) {
@@ -2330,11 +2248,6 @@ class _JarvisIntelligencePanelState extends State<_JarvisIntelligencePanel>
                             ),
                           ],
                         ),
-                      )
-                      .animate(onPlay: (c) => c.repeat(reverse: true))
-                      .shimmer(
-                        duration: 2000.ms,
-                        color: dna.color.withValues(alpha: 0.15),
                       );
                 }).toList(),
               ),

@@ -625,63 +625,125 @@ class _ChatScreenStateClass extends State<ChatScreen> with WidgetsBindingObserve
   }
 }
 
+// Compact snapshot used by Selector to prevent _ProviderStatusBar from
+// rebuilding on every streaming notifyListeners() call. The bar only needs
+// to update when the generating state or status text actually changes.
+typedef _StatusBarData = ({
+  bool isGenerating,
+  bool hasProvider,
+  String statusMsg,
+});
+
 class _ProviderStatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Consumer<ChatProvider>(
-      builder: (context, chat, _) {
-        final router = chat.router;
-        if (!router.isGenerating && router.activeProvider == null) {
+    return Selector<ChatProvider, _StatusBarData>(
+      selector: (_, cp) => (
+        isGenerating: cp.router.isGenerating,
+        hasProvider: cp.router.activeProvider != null,
+        statusMsg: cp.router.statusMessage,
+      ),
+      builder: (context, s, _) {
+        if (!s.isGenerating && !s.hasProvider) {
           return const SizedBox.shrink();
         }
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Colors.transparent,
-          child: Row(
-            children: [
-              Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: router.isGenerating
-                          ? JarvisColors.accentPrimary
-                          : JarvisColors.success,
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              (router.isGenerating
-                                      ? JarvisColors.accentPrimary
-                                      : JarvisColors.success)
-                                  .withValues(alpha: 0.6),
-                          blurRadius: 8,
-                        ),
-                      ],
+        return RepaintBoundary(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.transparent,
+            child: Row(
+              children: [
+                // Blinking dot is isolated in its own StatefulWidget so its
+                // AnimationController never causes the status text to repaint.
+                _BlinkingStatusDot(isGenerating: s.isGenerating),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    s.statusMsg,
+                    style: const TextStyle(
+                      color: JarvisColors.textMuted,
+                      fontSize: 11,
+                      letterSpacing: 0.3,
                     ),
-                  )
-                  .animate(
-                    onPlay: (c) => router.isGenerating ? c.repeat() : null,
-                  )
-                  .fadeOut(duration: 500.ms)
-                  .then()
-                  .fadeIn(duration: 500.ms),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  router.statusMessage,
-                  style: const TextStyle(
-                    color: JarvisColors.textMuted,
-                    fontSize: 11,
-                    letterSpacing: 0.3,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
 }
+
+/// Isolated blinking indicator dot. Owns its own AnimationController so the
+/// animation never causes the parent status bar or any sibling to repaint.
+class _BlinkingStatusDot extends StatefulWidget {
+  final bool isGenerating;
+  const _BlinkingStatusDot({required this.isGenerating});
+
+  @override
+  State<_BlinkingStatusDot> createState() => _BlinkingStatusDotState();
+}
+
+class _BlinkingStatusDotState extends State<_BlinkingStatusDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    if (widget.isGenerating) _ctrl.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _BlinkingStatusDot old) {
+    super.didUpdateWidget(old);
+    if (widget.isGenerating && !old.isGenerating) {
+      _ctrl.repeat(reverse: true);
+    } else if (!widget.isGenerating && old.isGenerating) {
+      _ctrl
+        ..stop()
+        ..value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.isGenerating
+        ? JarvisColors.accentPrimary
+        : JarvisColors.success;
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (_, _) => Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withValues(alpha: 0.4 + _ctrl.value * 0.6),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: _ctrl.value * 0.6),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
