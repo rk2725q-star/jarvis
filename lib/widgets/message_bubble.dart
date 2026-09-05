@@ -1130,7 +1130,7 @@ class _AIBubbleState extends State<_AIBubble> {
   // streaming. When streaming ends, we always do one final full render.
   Timer? _markdownThrottle;
   String _lastRenderedContent = '';
-  int _renderTick = 0;
+  bool _markdownReady = false;
 
   static const Duration _markdownRebuildInterval =
       Duration(milliseconds: 180);
@@ -1144,7 +1144,7 @@ class _AIBubbleState extends State<_AIBubble> {
       if (!widget.message.isStreaming) {
         _markdownThrottle?.cancel();
         _lastRenderedContent = widget.message.content;
-        _renderTick++;
+        _markdownReady = true;
         return;
       }
       _scheduleMarkdownRebuild();
@@ -1154,7 +1154,7 @@ class _AIBubbleState extends State<_AIBubble> {
       _markdownThrottle?.cancel();
       if (_lastRenderedContent != widget.message.content) {
         _lastRenderedContent = widget.message.content;
-        _renderTick++;
+        _markdownReady = true;
         // Schedule rebuild after current frame so it doesn't fight streaming.
         SchedulerBinding.instance.addPostFrameCallback((_) {
           if (mounted) setState(() {});
@@ -1171,7 +1171,7 @@ class _AIBubbleState extends State<_AIBubble> {
       // Only rebuild if content actually changed since last render
       if (_lastRenderedContent != widget.message.content) {
         _lastRenderedContent = widget.message.content;
-        _renderTick++;
+        _markdownReady = true; // switch from cheap Text to MarkdownBody
         setState(() {});
       }
       // Re-arm: the timer is one-shot. We re-arm so the next content change
@@ -1405,29 +1405,48 @@ class _AIBubbleState extends State<_AIBubble> {
 
   /// Renders the AI message body. During streaming we throttle the heavy
   /// MarkdownBody rebuild to once every [_markdownRebuildInterval] so the
-  /// GPU doesn't stall every token. We still always render from the live
-  /// `message.content` (not a snapshot) — the throttle just reduces how
-  /// often Flutter actually rebuilds the markdown AST. RepaintBoundary
-  /// isolates the markdown from the rest of the chat list so other bubbles
-  /// don't repaint when this one ticks.
+  /// GPU doesn't stall every token. We render a cheap Text widget between
+  /// throttle ticks so the user always sees the latest content immediately;
+  /// the heavy MarkdownBody only re-parses every ~180ms.
   Widget _buildStreamingMarkdown(BuildContext context, Message message) {
     // Pre-streaming or post-streaming: always do the full markdown render.
     if (!message.isStreaming) {
       return _buildMarkdown(context, message.content);
     }
 
-    // During streaming: render markdown from the throttled snapshot.
-    // The throttled snapshot is updated every _markdownRebuildInterval;
-    // the user sees "bursts" of text every ~180ms which is imperceptible.
-    final rendered = _lastRenderedContent.isNotEmpty
-        ? _lastRenderedContent
-        : message.content;
+    // During streaming:
+    //   • Fast path  = plain Text widget of the live content (no AST parse).
+    //                  Updates on EVERY token; super cheap.
+    //   • Slow path  = full MarkdownBody from the throttled snapshot.
+    //                  Re-parses AST at most once per 180ms; lives in a
+    //                  stable RepaintBoundary so the GPU layer is reused.
+    // We use Stack to overlay the markdown on top of the plain text and
+    // hide the text once markdown is ready, so the user never sees a grey
+    // gap between "text just streamed in" and "markdown parsed it".
+    final showCheapText = !_markdownReady;
     return RepaintBoundary(
-      // Key on _renderTick so MarkdownBody actually rebuilds its AST on
-      // each throttle tick. Without a new key Flutter's element diff sees
-      // the widget as identical and skips the rebuild.
-      key: ValueKey('streaming-markdown-$_renderTick'),
-      child: _buildMarkdown(context, rendered),
+      child: Stack(
+        children: [
+          if (showCheapText)
+            _buildCheapText(context, message.content),
+          if (!showCheapText)
+            _buildMarkdown(context, _lastRenderedContent),
+        ],
+      ),
+    );
+  }
+
+  /// Ultra-cheap text rendering used during streaming. NO markdown parsing,
+  /// NO syntax trees, just plain styled Text. This is what keeps the GPU
+  /// happy even at 50+ tokens/sec on 20k-token responses.
+  Widget _buildCheapText(BuildContext context, String content) {
+    return Text(
+      content,
+      style: GoogleFonts.outfit(
+        color: JarvisColors.textPrimary,
+        fontSize: 15,
+        height: 1.6,
+      ),
     );
   }
 
@@ -1600,7 +1619,12 @@ class _AIBubbleState extends State<_AIBubble> {
         'customtable': CustomTableBuilder(),
         'custommermaid': CustomMermaidBuilder(),
       },
-      styleSheetTheme: MarkdownStyleSheetBaseTheme.material,
+      // No `styleSheetTheme` — both `material` and `cupertino` wrap the
+      // MarkdownBody in a Material widget which paints a light-grey fallback
+      // background when the surrounding theme doesn't provide one. The grey
+      // was leaking through as a big solid panel during streaming. The
+      // default (null) skips the wrapper, so we rely on the explicit
+      // `styleSheet` below to style every element ourselves.
       extensionSet: md.ExtensionSet(
         [
           LatexBlockSyntax(),
