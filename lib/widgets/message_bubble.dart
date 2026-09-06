@@ -1122,11 +1122,23 @@ class _AIBubble extends StatefulWidget {
 
 class _AIBubbleState extends State<_AIBubble> {
   // ── Streaming render throttling ──
-  // During streaming, we show a cheap plain-Text widget (zero AST parse cost).
-  // A periodic Timer drives setState() so Text refreshes with each token batch.
-  // When streaming ends, one final MarkdownBody render runs.
-  // Message.content is mutable and updated in-place by ChatProvider, so
-  // widget.message.content always holds the latest text when build() runs.
+  // ChatProvider mutates the Message object IN-PLACE on every token so
+  // widget.message.content is always current even though the Selector
+  // prevents the ListView from rebuilding between tokens. A periodic
+  // Timer calls setState so the cheap Text widget refreshes.
+  //
+  // We track _isStreaming LOCALLY (not from widget.message.isStreaming)
+  // because both widget.message and oldWidget.message point to the SAME
+  // object after an in-place mutation — so the old/new isStreaming values
+  // would be identical and didUpdateWidget could never detect the transition.
+  bool _isStreaming = false;
+
+  // One-frame buffer after streaming ends: show cheap text for exactly one
+  // more frame so Flutter can commit the transition before the MarkdownBody
+  // AST parse begins. This eliminates the grey flash caused by the full
+  // markdown parse running in the same frame as the streaming→done switch.
+  bool _streamingEndPending = false;
+
   Timer? _markdownThrottle;
 
   // Cache for _cleanResponse — avoids re-running 10+ regex replacements on
@@ -1134,51 +1146,66 @@ class _AIBubbleState extends State<_AIBubble> {
   String _cleanSrc = '';
   String _cleanOut = '';
 
-  static const Duration _markdownRebuildInterval =
-      Duration(milliseconds: 150);
+  static const Duration _markdownRebuildInterval = Duration(milliseconds: 150);
 
   @override
   void initState() {
     super.initState();
-    // If the widget is created while already streaming (the normal case when
-    // a new AI message bubble appears mid-stream), start the periodic timer
-    // immediately so cheap text begins updating right away.
-    if (widget.message.isStreaming) {
-      _armRebuildTimer();
-    }
+    _isStreaming = widget.message.isStreaming;
+    if (_isStreaming) _armRebuildTimer();
   }
 
   @override
   void didUpdateWidget(covariant _AIBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Streaming just ended → cancel timer; build() switches to _buildMarkdown
-    // automatically because isStreaming is now false.
-    if (!widget.message.isStreaming && oldWidget.message.isStreaming) {
+    final nowStreaming = widget.message.isStreaming;
+    final wasStreaming = _isStreaming; // ← local tracker, not from old widget
+
+    if (!nowStreaming && wasStreaming) {
+      // Streaming just ended:
+      // 1. Cancel the periodic timer.
+      // 2. Keep showing cheap text for exactly one more frame
+      //    (_streamingEndPending = true) so Flutter can flush the transition
+      //    cleanly before the MarkdownBody AST parse starts.
+      _isStreaming = false;
       _markdownThrottle?.cancel();
       _markdownThrottle = null;
+      setState(() => _streamingEndPending = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _streamingEndPending = false);
+      });
       return;
     }
-    // Streaming just started (edge case: existing bubble becomes streaming)
-    // → arm the timer.
-    if (widget.message.isStreaming && !oldWidget.message.isStreaming) {
+
+    if (nowStreaming && !wasStreaming) {
+      // Streaming just started (edge case: existing bubble re-streams).
+      _isStreaming = true;
+      _streamingEndPending = false;
       _armRebuildTimer();
     }
   }
 
   /// Periodic one-shot timer that drives cheap-text rebuilds during streaming.
-  /// Re-arms itself while streaming is active. When streaming ends,
-  /// didUpdateWidget cancels it and build() switches to _buildMarkdown.
+  /// Re-arms itself while streaming is active. Self-stops (and triggers the
+  /// end-of-stream transition) when it detects streaming has ended.
   void _armRebuildTimer() {
-    if (!widget.message.isStreaming) return;
+    if (!_isStreaming) return;
     if (_markdownThrottle?.isActive ?? false) return;
     _markdownThrottle = Timer(_markdownRebuildInterval, () {
       _markdownThrottle = null;
       if (!mounted) return;
       if (widget.message.isStreaming) {
         setState(() {}); // build() → _buildCheapText(widget.message.content)
-        _armRebuildTimer(); // re-arm while still streaming
+        _armRebuildTimer();
+      } else if (_isStreaming) {
+        // In-place mutation set isStreaming=false but didUpdateWidget
+        // hasn't fired yet (Selector rebuild pending). Handle transition here.
+        _isStreaming = false;
+        setState(() => _streamingEndPending = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _streamingEndPending = false);
+        });
       }
-      // If not streaming, parent's rebuild via Selector handles final render.
     });
   }
 
@@ -1255,7 +1282,7 @@ class _AIBubbleState extends State<_AIBubble> {
                 // notifyListeners tick during streaming). The lists only
                 // mutate once at the start of a response, so this turns
                 // 60 rebuilds/sec into 1.
-                if (message.isStreaming)
+                if (_isStreaming)
                   Selector<ChatProvider, _IntelligenceSnapshot>(
                     selector: (_, cp) => _IntelligenceSnapshot(
                       cp.activeDnaModels,
@@ -1286,21 +1313,28 @@ class _AIBubbleState extends State<_AIBubble> {
                   ),
                   child: message.content.isEmpty
                       ? _TypingIndicator()
-                      : message.isStreaming
-                          // ── Streaming: ultra-cheap path — plain Text only.
-                          // No SelectionArea (expensive during streaming),
-                          // no markdown parse, no diagram check, no saveLayer.
-                          // Periodic Timer (_armRebuildTimer) drives rebuilds.
+                      : (_isStreaming || _streamingEndPending)
+                          // ── Streaming (or one-frame transition buffer):
+                          // Ultra-cheap path — plain Text only.
+                          // No SelectionArea (expensive), no markdown parse,
+                          // no diagram check, no saveLayer.
+                          // Timer (_armRebuildTimer) drives cheap-text rebuilds.
+                          // ChatProvider mutates message.content in-place so
+                          // widget.message.content is always the latest token.
                           ? Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildCheapText(context, message.content),
-                                const SizedBox(height: 12),
-                                _StreamingCursor(),
+                                if (_isStreaming) ...[
+                                  const SizedBox(height: 12),
+                                  _StreamingCursor(),
+                                ],
                               ],
                             )
                           // ── Done streaming: full-featured path.
                           // SelectionArea, diagrams, full markdown, action row.
+                          // MarkdownBody parse runs here — after _streamingEndPending
+                          // gave Flutter one clean frame to commit the transition.
                           : SelectionArea(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,

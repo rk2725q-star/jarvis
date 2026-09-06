@@ -1109,34 +1109,28 @@ After the tool result is returned, continue your response naturally. You can mak
       String currentPrompt = combinedText;
 
       while (isToolCalling && toolLoopCount < 5) {
-        isToolCalling = false; // Assume no tools unless we find a tag
+              isToolCalling = false; // Assume no tools unless we find a tag
         buffer.clear();
+
+        // Set metadata once per stream pass — NOT on every token.
+        // In-place mutation keeps widget.message (same object reference in
+        // _AIBubbleState) up-to-date so the 150ms timer-driven cheap-text
+        // rebuild always reads the latest content without a full ListView
+        // rebuild going through the Selector.
+        currentAiMsg.provider = 'INFINITY';
+        currentAiMsg.model = '3M Context (${router.activeModel ?? "Brain"})';
 
         await for (final chunk in router.generateStream(
           currentPrompt,
           integrationCapabilities: atIntegrationCapability ?? '',
         )) {
           buffer.write(chunk);
-          final currentText = buffer.toString();
-
-          final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
-          if (idx != -1) {
-            // Show raw streamed content directly — no regex stripping here.
-            // Tool-call JSON (if any) is detected and handled AFTER the
-            // stream fully completes, keeping the stream loop lightweight.
-            _messages[idx] = currentAiMsg.copyWith(
-              content: currentText,
-              provider: 'INFINITY',
-              model: '3M Context (${router.activeModel ?? "Brain"})',
-              isStreaming: true,
-            );
-            // THROTTLED: instead of notifying on every token (10-50/s for
-            // a 25k token response = 100k+ full screen rebuilds → 1-3s
-            // GPU stalls / grey freezes), we coalesce all updates into
-            // one notify per 16ms (~60fps). The next post-frame callback
-            // triggers the actual UI rebuild with the latest content.
-            _notifyStreamThrottled();
-          }
+          // Mutate content in-place. _messages[idx] IS currentAiMsg (same
+          // reference), so the list element is also updated automatically.
+          // widget.message in _AIBubbleState IS also currentAiMsg, so the
+          // timer-driven setState() will see the latest content immediately.
+          currentAiMsg.content = buffer.toString();
+          _notifyStreamThrottled();
         }
 
         // ── Post-stream: check for tool calls in the complete response ──
@@ -1231,12 +1225,11 @@ After the tool result is returned, continue your response naturally. You can mak
             isToolCalling = false; // Malformed tag edge case, just exit loop
           }
         } else {
-          // If loop is ending normally, mark final message as not streaming
-          final idx = _messages.indexWhere((m) => m.id == currentAiMsg.id);
-          if (idx != -1) {
-            _messages[idx] = currentAiMsg.copyWith(isStreaming: false);
-            notifyListeners();
-          }
+          // Mark final message as not streaming in-place.
+          // The Selector rebuild (triggered by _isAnalyzing→false in finally)
+          // will pick up isStreaming=false without needing a new object.
+          currentAiMsg.isStreaming = false;
+          notifyListeners();
         }
       }
     } catch (e) {
